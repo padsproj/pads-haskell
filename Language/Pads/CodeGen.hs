@@ -40,14 +40,16 @@ genPadsDecl :: PadsDecl -> Q [Dec]
 
 genPadsDecl (PadsDeclType name args pat padsTy) = do
   { let typeDecs = mkTyRepMDDecl name args padsTy
-  ; parseM  <- genPadsParseM name args pat padsTy
-  ; return (typeDecs ++ parseM) -- ++ parseS  ++ printFL)
+  ; parseM <- genPadsParseM name args pat padsTy
+--  ; parseS <- genPadsParseS name args pat
+  ; return (typeDecs ++ parseM ) -- ++ parseS) --  ++ printFL)
   }
 
 genPadsDecl (PadsDeclData name args pat padsData derives) = do
   { let dataDecs = mkDataRepMDDecl name args padsData derives
   ; parseM  <- genPadsDataParseM name args pat padsData 
-  ; return (dataDecs ++ parseM) --  ++ instances ++ parseS) --  ++ printFL)
+--  ; parseS <- genPadsParseS name args pat
+  ; return (dataDecs ++ parseM) -- ++ parseS) --  ++ instances ) --  ++ printFL)
   }
 
 genPadsDecl (PadsDeclNew name args pat branch derives) = do
@@ -124,7 +126,7 @@ mkNewRepMDDecl name args branch ds
 
 
 -----------------------------------------------------------
--- GENERATE TYPE REPRESENTATION OF PadsTy
+-- GENERATE TYPE REPRESENTATION OF TYPE EXPRESSION
 -----------------------------------------------------------
 
 mkRepTy ::  PadsTy -> Type
@@ -160,7 +162,7 @@ hasRep _               = True
 
 
 -----------------------------------------------------------
--- GENERATE META-DATA REPRESENTATION OF PadsTy
+-- GENERATE META-DATA REPRESENTATION OF TYPE EXPRESSION
 -----------------------------------------------------------
 
 mkMDTy ::  PadsTy -> Type
@@ -201,26 +203,28 @@ genPadsParseM name args patM padsTy = do
   ; return [FunD parser_name [Clause parserArgs (NormalB body) []] ]
   }
   where
-    parser_name = mkTyParserName name    
+    (parser_name,parserArgs) = mkParserNameArgs name args patM
+
+mkParserNameArgs :: UString -> [LString] -> Maybe Pat -> (Name, [Pat])
+mkParserNameArgs name args patM = (parserName, parserArgs)
+  where
+    parserName = mkTyParserName name    
     parserArgs = map (VarP . mkVarParserName) args ++ pat
     pat = Maybe.maybeToList patM
 
-
 {-
-
--- parseS :: String -> ((rep, md), String)   
--- parseS = parseStringInput parsePP
-
-genPadsParseS :: UString -> Maybe (Pat, Type) -> PadsTy -> Q [Dec]
-genPadsParseS name Nothing padsTy = do 
-  { tyS   <- [t| String -> (($(mkRepNameTQ name), $(mkMDNameTQ name)),String) |]
-  ; bodyS <- [| parseStringInput $(return (VarE (mkTyParserName name))) |]
-  ; return [ SigD (mkTyParserSName name) tyS
-           , FunD (mkTyParserSName name) [Clause [] (NormalB bodyS) []] ]
+genPadsParseS :: UString -> [LString] -> Maybe Pat -> Q [Dec]
+genPadsParseS name args patM = do 
+  { bodyS <- [| parseStringInput $(return foo) |]
+  ; return [ FunD (mkTyParserSName name) [Clause parserArgs (NormalB bodyS) []] ]
   }
-
+  where
+    parserName = mkTyParserName name    
+    parserArgs = map (mkVarParserName) args ++ pat
+    parserArgsP = map VarP parserArgs
+    foo = applyE (VarE (mkTyParserName name)) (map VarE parserArgs)
+    pat = Maybe.maybeToList patM
 -}
-
 
 --------------------------------------------------------------
 -- GENERATING PARSER DECLARATION FROM DATA DECLARATION
@@ -232,13 +236,11 @@ genPadsDataParseM name args patM padsData = do
   ; return [ FunD parser_name [Clause parserArgs (NormalB body) []] ]
   }
   where
-    parser_name = mkTyParserName name    
-    parserArgs = map (VarP . mkVarParserName) args ++ pat
-    pat = Maybe.maybeToList patM
+    (parser_name,parserArgs) = mkParserNameArgs name args patM
 
 
 --------------------------------------------------------------
--- GENERATING PARSER DECLARATION FROM DATA DECLARATION
+-- GENERATING PARSER DECLARATION FROM NEWTYPE DECLARATION
 --------------------------------------------------------------
 
 genPadsNewParseM :: UString -> [LString] -> (Maybe Pat) -> BranchInfo -> Q [Dec] 
@@ -248,9 +250,7 @@ genPadsNewParseM name args patM branch = do
   ; return [ FunD parser_name [Clause parserArgs (NormalB body) []] ]
   }
   where
-    parser_name = mkTyParserName name    
-    parserArgs = map (VarP . mkVarParserName) args ++ pat
-    pat = Maybe.maybeToList patM
+    (parser_name,parserArgs) = mkParserNameArgs name args patM
 
 
 ------------------------------------------------------
@@ -268,19 +268,13 @@ genParseTy (PTycon c)                = return $ mkParseTycon c
 genParseTy (PTyvar v)                = return $ mkParseTyvar v
 
 genParseConstrain :: Pat -> PadsTy -> Exp -> Q Exp
-genParseConstrain pat ty exp = [| parseConstraint $(genParseTy ty) $pred  |]
+genParseConstrain pat ty exp = [| parseConstraint $(genParseTy ty) $pred |]
   where
     pred = return (LamE [pat, VarP (mkName "md")] exp)
 
 genParseTyTrans :: PadsTy -> PadsTy -> Exp -> Q Exp
 genParseTyTrans tySrc tyDest exp
-  = [| do { begin_loc <- getLoc
-          ; src_result <- $(genParseTy tySrc)
-          ; end_loc <- getLoc
-          ; let src_pos = S.locsToPos begin_loc end_loc
-          ; let (toDst,toSrc) = $(return exp)
-          ; return (toDst src_pos src_result)
-          } |]
+  = [| parseTrans $(genParseTy tySrc) (fst $(return exp)) |]
 
 genParseList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> Q Exp
 genParseList ty sep term =

@@ -169,6 +169,19 @@ constraintReport isGood md = Base_md {numErrors = totErrors, errInfo = errors}
                                      else FPredicateFailure,
                      position = join $ fmap position errInfo})
 
+
+-------------------------------------------------
+
+parseTrans :: PadsMD dmd => 
+    PadsParser (sr,smd) -> (S.Pos -> (sr,smd) -> (dr,dmd)) -> PadsParser (dr,dmd)
+parseTrans sParser transform = do
+  { begin_loc <- getLoc
+  ; src_result <- sParser
+  ; end_loc <- getLoc
+  ; let src_pos = S.locsToPos begin_loc end_loc
+  ; return (transform src_pos src_result)
+  }
+
 -------------------------------------------------
 
 
