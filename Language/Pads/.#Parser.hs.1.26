@@ -1,0 +1,526 @@
+module Language.Pads.Parser (parsePadsDecls) where 
+
+{-
+** *********************************************************************
+*                                                                      *
+*              This software is part of the pads package               *
+*           Copyright (c) 2005-2011 AT&T Knowledge Ventures            *
+*                      and is licensed under the                       *
+*                        Common Public License                         *
+*                      by AT&T Knowledge Ventures                      *
+*                                                                      *
+*                A copy of the License is available at                 *
+*                    www.padsproj.org/License.html                     *
+*                                                                      *
+*  This program contains certain software code or other information    *
+*  ("AT&T Software") proprietary to AT&T Corp. ("AT&T").  The AT&T     *
+*  Software is provided to you "AS IS". YOU ASSUME TOTAL RESPONSIBILITY*
+*  AND RISK FOR USE OF THE AT&T SOFTWARE. AT&T DOES NOT MAKE, AND      *
+*  EXPRESSLY DISCLAIMS, ANY EXPRESS OR IMPLIED WARRANTIES OF ANY KIND  *
+*  WHATSOEVER, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF*
+*  MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, WARRANTIES OF  *
+*  TITLE OR NON-INFRINGEMENT.  (c) AT&T Corp.  All rights              *
+*  reserved.  AT&T is a registered trademark of AT&T Corp.             *
+*                                                                      *
+*                   Network Services Research Center                   *
+*                          AT&T Labs Research                          *
+*                           Florham Park NJ                            *
+*                                                                      *
+*              Kathleen Fisher <kfisher@research.att.com>              *
+*                                                                      *
+************************************************************************
+-}
+
+
+-- This is the parser for the PADS syntax in Haskell
+
+import Language.Pads.Syntax as S
+
+
+import Control.Monad (msum)
+import Text.Parsec
+import qualified Text.Parsec.String as PS
+import Text.Parsec.Error
+import Text.Parsec.Prim as PP
+import qualified Text.Parsec.Token as PT
+import Text.Parsec.Language
+import Text.ParserCombinators.Parsec.Language 
+import Text.ParserCombinators.Parsec.Pos
+import Text.Parsec.Expr
+import qualified Language.Haskell.Meta as LHM   -- Exts.Parser as LHM
+import Language.Haskell.Exts.Extension
+import Language.Haskell.TH as TH hiding (CharL)
+import Data.Char
+import Language.Pads.RegExp as PRE 
+import System.FilePath.Glob
+
+type Parser = PS.Parser
+
+
+-- The main entry point for the QuasiQuoter is parsePadsDecls.
+
+parsePadsDecls :: SourceName -> Line -> Column -> String -> Either ParseError [PadsDecl]
+parsePadsDecls fileName line column input
+  = pparse padsDecls fileName line column input 
+
+pparse :: PS.Parser a -> SourceName -> Line -> Column -> String -> Either ParseError a
+pparse p fileName line column input 
+  = PP.parse (do {  setPosition (newPos fileName line column)
+                  ; whiteSpace
+                  ; x <- p
+                  ; eof
+                  ; return x
+                  }) fileName input
+
+
+
+padsDecls :: Parser [PadsDecl]
+padsDecls = many padsDecl
+
+padsDecl :: Parser PadsDecl
+padsDecl =  tyDecl
+        <|> dataDecl
+
+
+
+
+lexer :: PT.TokenParser ()
+lexer = PT.makeTokenParser (haskellStyle { reservedOpNames = ["=", "<=>", "{", "}", "::", "<|", "|>", "|", "->" ],
+                                           reservedNames   = ["Line", "Trans", "using", "where", "data", "type", "Eor", "Void",
+                                                              "Eof", "Maybe", "with", "sep", "term", "and", "length", "of",
+                                                              "Try", "case", "constrain" ]})
+
+whiteSpace    = PT.whiteSpace  lexer
+identifier    = PT.identifier  lexer
+reserved      = PT.reserved    lexer
+reservedOp    = PT.reservedOp  lexer
+charLiteral   = PT.charLiteral lexer
+stringLiteral = PT.stringLiteral  lexer
+integer       = PT.integer     lexer
+commaSep1     = PT.commaSep1   lexer
+parens        = PT.parens      lexer
+braces        = PT.braces      lexer
+brackets      = PT.brackets    lexer
+
+lowerId :: Parser String
+lowerId = try (do { id <- identifier
+                  ; if (isLower . head) id then return id else parserZero })
+
+upperId :: Parser String
+upperId = try (do { id <- identifier
+                  ; if (isUpper . head) id then return id else parserZero })
+
+
+replaceName :: String -> PadsTy -> PadsTy
+replaceName str ty = case ty of
+  Precord _ body -> Precord str body
+  Punion  _ body -> Punion  str body
+  Pswitch _ cse body -> Pswitch str cse body
+  otherwise -> ty
+
+
+
+dataDecl :: Parser PadsDecl
+dataDecl = do { reserved "data"
+              ; id <- upperId
+              ; pat <- param
+              ; padsTy <- dataTy id
+              ; return (PadsDecl(id, pat, padsTy))
+              } <?> "Data Declaration"
+
+tyDecl :: Parser PadsDecl
+tyDecl = do { reserved "type"
+            ; id <- upperId
+            ; pat <- param
+            ; ty <- padsTy
+            ; return (PadsDecl(id, pat, replaceName id ty))
+            } <?> "Type Declaration"
+
+
+param :: Parser (Maybe TH.Pat)
+param = do str <- manyTill anyChar (reservedOp "=")
+           if null str 
+             then return Nothing
+             else fmap Just (haskellParsePat str)
+    <?> "haskell expression"
+
+haskellExp :: Parser (TH.Exp)
+haskellExp = do reservedOp "<|"
+                str <- manyTill anyChar (reservedOp "|>") 
+                haskellParseExp str
+         <?> "haskell expression"
+
+
+haskellParseExp :: String -> Parser Exp
+haskellParseExp str = case LHM.parseExp parseMode str of
+                        LHM.ParseFailed loc err -> unexpected ("Failed to parse Haskell expression: " ++ err)
+                        LHM.ParseOk expHE       -> return expHE
+
+haskellParsePat :: String -> Parser Pat
+haskellParsePat str = case LHM.parsePat parseMode str of 
+                        LHM.ParseFailed loc err -> unexpected ("Failed to parse Haskell pattern: " ++ err)
+                        LHM.ParseOk patHE       -> return patHE
+
+dataTy :: String -> Parser PadsTy
+dataTy str =  unionTy str 
+          <|> switchTy str
+          <|> recordTy2 str
+
+
+idTy   :: Parser PadsTy
+idTy   = fmap Pname upperId <?> "named type"
+
+
+hidlitTy :: Parser S.Lit
+hidlitTy = fmap Hid lowerId <?> "haskell identifier literal"
+
+hexplitTy :: Parser S.Lit
+hexplitTy = fmap Hexp haskellExp <?> "haskell expression literal"
+
+charlitTy :: Parser S.Lit
+charlitTy = fmap S.CharL charLiteral <?> "character literal type"
+
+intlitTy :: Parser S.Lit
+intlitTy = fmap S.IntL integer <?> "integer literal type"
+
+strlitTy :: Parser S.Lit
+strlitTy = fmap S.StringL stringLiteral <?> "string literal type"
+
+eorlitTy :: Parser S.Lit
+eorlitTy = reserved "Eor" >> return S.EorL
+
+eoflitTy :: Parser S.Lit
+eoflitTy = reserved "Eof" >> return S.EofL
+
+voidlitTy :: Parser S.Lit
+voidlitTy = reserved "Void" >> return S.VoidL
+
+globlitTy :: Parser S.Lit
+globlitTy = reserved "GL" >> fmap S.GlobL stringLiteral
+
+reglitTy :: Parser S.Lit
+reglitTy = (reserved "RE" >> fmap (S.RegL . RE) stringLiteral)
+       <|> do { reserved "REd"
+              ; reg <- stringLiteral
+              ; def <- stringLiteral
+              ; return (S.RegL (REd reg def))
+              }
+           
+
+
+
+{-
+reglitTy2 :: Parser S.Lit
+reglitTy2 = do 
+   { reserved "re"
+   ; str <- manyTill (noneOf " ") (oneOf " \t\n")
+   ; whiteSpace
+   ; case Text.Parsec.parse reP "" str of
+         Left err -> unexpected ("Failed to parse regular expression: " ++ str)
+         Right s  -> return (S.RegL s)
+   }
+-}
+lit :: Parser S.Lit 
+lit =   charlitTy
+    <|> strlitTy
+    <|> eorlitTy
+    <|> eoflitTy
+    <|> voidlitTy
+    <|> reglitTy
+--    <|> reglitTy2           Doesn't really work; can't find end of regular expression
+    <|> globlitTy
+    <|> intlitTy
+    <|> hidlitTy
+    <|> hexplitTy
+    <?> "literal"
+
+litTy :: Parser PadsTy
+litTy = fmap Plit lit <?> "literal type"
+
+fnTy   :: Parser PadsTy
+fnTy   =  idTy
+
+fnAppTy :: Parser PadsTy
+fnAppTy = do { ty <- fnTy
+             ; lit <- lit <|> parens lit
+             ; return (Papp ty (litToExp lit))
+             } <?> "type function application"
+
+lineTy :: Parser PadsTy
+lineTy = (reserved "Line" >> fmap Pline padsTy) <?> "line type"
+
+tupleTy :: Parser PadsTy
+tupleTy = fmap Ptuple (parens padsTyList) <?> "tuple type"
+
+padsTyList :: Parser [PadsTy]
+padsTyList = commaSep1 padsTy
+
+switchTy :: String -> Parser PadsTy
+switchTy str = do { reservedOp "case"
+                  ; reserved "<|"
+                  ; str <- manyTill anyChar (reservedOp "|>")
+                  ; caseE <- haskellParseExp str
+                  ; reservedOp "of"
+                  ; branches <- switchBranchList
+                  ; return (Pswitch str caseE branches)
+                  } <?> "switch type"
+
+switchBranchList :: Parser [(TH.Pat, FieldInfo)]
+switchBranchList = sepBy1 switchBranch (reservedOp "|")
+
+--switchBranch :: Parser (TH.Pat, FieldInfo)
+switchBranch = do { str <- manyTill anyChar (reservedOp "->")
+                  ; pat <- haskellParsePat str
+                  ; br <- branch
+                  ; return (pat, br)
+                  } <?> "switchBrach"
+
+
+unionTy :: String -> Parser PadsTy
+unionTy str = fmap (Punion str) branchList <?> "data type"
+
+branchList :: Parser [(Maybe String, PadsTy, Maybe TH.Exp)]
+branchList = sepBy1 branch (reservedOp "|")
+
+
+
+branch :: Parser (Maybe String, PadsTy, Maybe TH.Exp)
+branch = do { id    <- upperId
+            ; tyM   <- optionMaybe padsTy
+            ; predM <- optionMaybe fieldPredicate
+            ; let ty = case tyM of {Nothing -> Plit (S.StringL id); Just ty' -> ty'}
+            ; return (Just id, ty, predM)
+            }
+
+recordTy :: Parser PadsTy
+recordTy = do { reservedOp "{"
+              ; fields <- fieldList
+              ; reservedOp "}"
+              ; return (Precord "" fields)   -- empty string is placeholder for record name, which will be filled in at decl level.
+              } <?> "record type"
+
+recordTy2 :: String -> Parser PadsTy
+recordTy2 str = do { 
+                   --id <- identifier ; 
+                   reservedOp "{"
+--                   ; if str == id then return () else error ("Record name ("++ id ++") must match declared type name: (" ++str ++").")
+                   ; fields <- fieldList
+                   ; reservedOp "}"
+                   ; return (Precord str fields)   -- empty string is placeholder for record name, which will be filled in at decl level.
+                   } <?> "record2 type"
+
+
+fieldList :: Parser [(Maybe String, PadsTy, Maybe TH.Exp)]
+fieldList = commaSep1 field
+
+{- Records 
+[pads| Request = { i1 :: Pint, 
+                         ',',
+                   i2 :: Pint Pwhere <| i1 == i2 } |> |]
+-}
+
+field :: Parser (Maybe String, PadsTy, Maybe TH.Exp)
+field = do { idM <- optionMaybe $ try fieldLabel
+           ; ty  <- padsTy
+           ; predM <- optionMaybe fieldPredicate
+           ; return (idM, ty, predM)
+           }
+        
+
+fieldLabel :: Parser String
+fieldLabel = do { id <- lowerId
+                ; reservedOp "::"
+                ; return id
+                }
+
+fieldPredicate :: Parser TH.Exp
+fieldPredicate = do { reserved   "where"
+                    ; reservedOp "<|"
+                    ; str <- manyTill anyChar (reservedOp "|>")
+                    ; haskellParseExp str
+                    }
+
+
+transformTy :: Parser PadsTy
+transformTy = do { reserved "Trans"
+                 ; reservedOp "{" 
+                 ; srcTy <- padsTy
+                 ; reservedOp "<=>" 
+                 ; dstTy <- padsTy
+                 ; reserved "using"
+                 ; str <- manyTill anyChar (reservedOp "}")
+                 ; expTH <- haskellParseExp str 
+                 ; return (Ptrans srcTy dstTy expTH)
+                 } <?> "transform type"
+
+typedefTy:: Parser PadsTy
+typedefTy= do     { reserved "constrain"
+                  ; str1 <- manyTill anyChar (reservedOp "::")
+                  ; pat <- haskellParsePat str1
+                  ; ty <- padsTy
+                  ; reserved "where"
+                  ; reservedOp "<|"
+                  ; str2 <- manyTill anyChar (reservedOp "|>")
+                  ; expTH <- haskellParseExp str2
+                  ; return (Ptypedef pat ty expTH)
+                  } <?> "where type"
+
+maybeTy :: Parser PadsTy 
+maybeTy = (reserved "Maybe" >> fmap Pmaybe padsTy) <?> "maybe type"
+
+
+--       | Plist  PadsTy (Maybe PadsTy) (Maybe TermCond)
+-- [pads| type Entries = [Pint] with sep ',' and term eof         |]
+-- [pads| type Entries = [Pint] with sep ',' and length exp  |]
+-- [pads| type Entries = [Pint] with sep ',' |]    -- keep parsing until get an error in element type
+
+data ListMod a b c = Sep a | Term b | Len c
+
+sortModifier (Sep sep)   = (Just sep, Nothing, Nothing)
+sortModifier (Term term) = (Nothing, Just term, Nothing)
+sortModifier (Len len)   = (Nothing, Nothing, Just len)
+sortModifiers mods = 
+    let (seps, terms, lens) = stripNs $ unzip3 $ map sortModifier mods
+    in if length seps <= 1 && length (terms ++ lens) <= 1 then
+      Just (msum seps, msum (terms ++ lens))
+    else
+      Nothing
+  where
+    stripNs (xs,ys,zs) = (filter (/=Nothing) xs, filter (/=Nothing) ys, filter (/=Nothing) zs)
+
+sep :: Parser PadsTy
+sep = (reserved "sep" >> padsTy) <?> "separator"
+     
+term :: Parser TermCond
+term = (reserved "term" >> fmap TyTC padsTy) <?> "terminator"
+
+len :: Parser TermCond
+len = (reserved "length" >> fmap (LengthTC . litToExp) lit) <?> "length"
+  
+listMod :: Parser (ListMod PadsTy TermCond TermCond)
+listMod = (fmap Sep sep <|> fmap Term term <|> fmap Len len) <?> "list modifier"
+
+listMods :: Parser (Maybe PadsTy, Maybe TermCond)
+listMods = do { reservedOp "with"
+               ; modifiers <- sepBy1 listMod (reservedOp "and")
+               ; case sortModifiers modifiers of
+                   Just sts -> return sts
+                   Nothing  -> parserZero
+               }
+         <|> return (Nothing, Nothing)
+         <?> "list modifiers"
+
+listTy :: Parser PadsTy
+listTy = do { elementTy <- brackets padsTy
+             ; (sepM, termlenM) <- listMods
+             ; return (Plist elementTy sepM termlenM)
+             } <?> "list type"    
+
+tryTy :: Parser PadsTy
+tryTy = (reservedOp "Try" >> fmap Ptry padsTy) <?> "try type"
+
+
+
+padsTy :: Parser PadsTy
+padsTy = lineTy
+     <|> transformTy 
+     <|> tupleTy
+     <|> recordTy
+     <|> maybeTy
+     <|> listTy
+     <|> tryTy
+     <|> try fnAppTy
+     <|> typedefTy
+     <|> litTy
+     <|> idTy
+     <?> "pads type"
+
+
+reP :: Parser RE
+reP = buildExpressionParser table primRE
+
+table = [  [ postfix "+" (.+.), postfix "*" (.*.), postfix "?" (.?.) ]
+        ,  [ binary'    (.&.) AssocLeft ]
+        ,  [ binary "|" (.|.) AssocLeft]
+        ]
+      where
+         postfix  name fun       = Postfix (do{reservedOp name; return fun})
+         binary   name fun assoc = Infix   (do{reservedOp name; return fun}) assoc
+         binary'       fun assoc = Infix   (do{return fun}) assoc
+          
+
+parenRE :: Parser RE
+parenRE = do 
+    { re <- parens reP
+    ; return (PRE.re_parens re)
+    }
+
+primRE :: Parser RE
+primRE = setRE
+--     <|> namedRE
+     <|> parenRE
+     <|> dotRE
+     <|> charRE
+
+dotRE :: Parser RE
+dotRE = do
+  { char '.'
+  ; return (RE ".")
+  }
+
+charRE  :: Parser RE
+charRE = do
+  { c <- noneOf "()+?*[<."
+  ; return (RE [c])
+  }
+    
+
+
+namedRE :: Parser RE
+namedRE = do
+   { char '<'
+   ; id <- identifier
+   ; char '>'
+   ; return (ReName id)
+   }     
+
+setRE :: Parser RE
+setRE = do
+   { char '['
+   ; (isPos, set) <- set
+   ; char ']'
+   ; if isPos then return (charClass set)
+              else return (opCharClass set)
+   }
+
+set :: Parser (Bool, [Char])
+set = do 
+     { char '^'
+     ; rs <- rawset
+     ; return (False, rs)
+     }
+ <|> do 
+     { rs <- rawset
+     ; return (True, rs)
+     }
+
+rawset :: Parser [Char]
+rawset = do { sets <- many1 setitem
+            ; return (concat sets)
+            }
+
+
+-- XXX this needs to be fixed to handle escaping characters correctly
+setitem :: Parser [Char]
+setitem = try (do
+     { c1 <- alphaNum
+     ; char '-'
+     ; c2 <- alphaNum
+     ; return [c1..c2]
+     } )
+  <|> do 
+     { c <- noneOf "-]\\"
+     ; return [c]
+     } <?> "setitem"
+
+
