@@ -79,7 +79,8 @@ printF q = Prelude.print (B.unpack (q B.empty))
 
 
 printList (reps, (_,mds)) printItem printSep printTerm = 
-   (concatFL (List.intersperse printSep (map printItem (zip reps mds))) ) +++ printTerm
+   (concatFL (List.intersperse printSep (map printItem (zip reps mds))) )
+   +++ printTerm
 
 
 

@@ -10,8 +10,8 @@ test = parseStringInput trip_parseM "354;;23|53|43(652%%35)4;hefd"
 
 type Trip = (Int, ";;", Lst CharPair, Foo Int , EOR) 
 
-
-type Lst a = [a | '|'] length 3
+newtype Lst a = Lst ([a | '|'] length 3)
+  deriving Read
 
 data CharPair = Char2 {first::Char,second::Char}
 
@@ -20,10 +20,11 @@ data Foo b = Bazz Int | Zipp "(" b "%%" !Int ')'
 
 data Switcher (x) = case x of
        0 -> Zero "$"
-     | 1 -> One 'd' (Lst Int) "()"
+     | 1 -> One (Lst Int)
   deriving (Read, Eq)
 
 |]
+
 
 
 {-

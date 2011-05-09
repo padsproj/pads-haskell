@@ -50,6 +50,12 @@ genPadsDecl (PadsDeclData name args pat padsData derives) = do
   ; return (dataDecs ++ parseM) --  ++ instances ++ parseS) --  ++ printFL)
   }
 
+genPadsDecl (PadsDeclNew name args pat branch derives) = do
+  { let dataDecs = mkNewRepMDDecl name args branch derives
+  ; parseM  <- genPadsNewParseM name args pat branch 
+  ; return (dataDecs ++ parseM) --  ++ instances ++ parseS) --  ++ printFL)
+  }
+
 
 -----------------------------------------------------------
 -- GENERATE REP/MD TYPE DECLARATIONS
@@ -89,7 +95,6 @@ mkRepUnion (BRecord c fields expM) = RecC (mkConstrName c) lreps
   where   
     lreps = [(mkName l,strict,mkRepTy ty) | (Just l,(strict,ty),expM) <- fields]
 
-
 mkMDUnion :: BranchInfo -> Con
 mkMDUnion (BConstr c args expM) = NormalC (mkConstrMDName c) mds
   where   
@@ -101,6 +106,21 @@ mkMDUnion (BRecord c fields expM) = RecC (mkConstrMDName c) lmds
 derive :: [UString] -> [Name]
 derive ds =  map mkName ds
   ++ [mkName d | d<-["Show","Eq","Typeable","Data","Ord"], not (d `elem` ds)]
+
+
+-----------------------------------------------------------
+-- GENERATE REP/MD NEWTYPE DECLARATIONS
+-----------------------------------------------------------
+
+mkNewRepMDDecl :: UString -> [LString] -> BranchInfo -> [UString] -> [Dec]
+mkNewRepMDDecl name args branch ds
+  = [dataDecl, mdDecl, imdDecl]
+  where
+    dataDecl = NewtypeD [] (mkRepName name) tyArgs (mkRepUnion branch) (derive ds)
+    imdDecl  = NewtypeD [] (mkIMDName name) tyArgs (mkMDUnion branch) (derive [])
+    mdDecl   = TySynD   (mkMDName name)  tyArgs (mkTupleT [ConT ''Base_md, imdApp])
+    tyArgs   = map (PlainTV . mkName) args
+    imdApp   = foldl AppT (ConT (mkIMDName name)) (map (VarT . mkName) args)
 
 
 -----------------------------------------------------------
@@ -209,6 +229,22 @@ genPadsParseS name Nothing padsTy = do
 genPadsDataParseM :: UString -> [LString] -> (Maybe Pat) -> PadsData -> Q [Dec] 
 genPadsDataParseM name args patM padsData = do 
   { body  <- genParseData padsData
+  ; return [ FunD parser_name [Clause parserArgs (NormalB body) []] ]
+  }
+  where
+    parser_name = mkTyParserName name    
+    parserArgs = map (VarP . mkVarParserName) args ++ pat
+    pat = Maybe.maybeToList patM
+
+
+--------------------------------------------------------------
+-- GENERATING PARSER DECLARATION FROM DATA DECLARATION
+--------------------------------------------------------------
+
+genPadsNewParseM :: UString -> [LString] -> (Maybe Pat) -> BranchInfo -> Q [Dec] 
+genPadsNewParseM name args patM branch = do 
+  { (dec,exp) <- genParseBranchInfo branch
+  ; let body = LetE [dec] exp
   ; return [ FunD parser_name [Clause parserArgs (NormalB body) []] ]
   }
   where
