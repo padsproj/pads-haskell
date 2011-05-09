@@ -67,6 +67,7 @@ baseTypesList = [
   ("Pbinary",   (''S.RawStream,  [])),
   ("Pre",       (''String,  [''String])),
   ("Pstring",   (''String,  [''Char])),
+  ("StringC",   (''String,  [''Char])),
   ("PstringFW", (''String,  [''Int])),
   ("PstringME", (''String,  [''RE])),
   ("PstringSE", (''String,  [''RE])),
@@ -145,6 +146,8 @@ newtype Pre = Pre String
   deriving (Eq, Data, Typeable, Ord)
 newtype Pstring    = Pstring    String
   deriving (Eq, Show, Data, Typeable, Ord)
+newtype StringC    = StringC    String
+  deriving (Eq, Show, Data, Typeable, Ord)
 newtype PstringFW = PstringFW String
   deriving (Eq, Show, Data, Typeable, Ord)
 newtype PstringME = PstringME String
@@ -154,6 +157,7 @@ newtype PstringSE = PstringSE String
 
 type Pre_md     = Base_md
 type Pstring_md = Base_md
+type StringC_md = Base_md
 type PstringFW_md = Base_md
 type PstringME_md = Base_md
 type PstringSE_md = Base_md
@@ -165,6 +169,10 @@ instance Pads1 String Pre Base_md where
 instance Pads1 Char Pstring Base_md where 
   parsePP1 = pstring_parseM 
   printFL1 = pstring_printFL
+
+instance Pads1 Char StringC Base_md where 
+  parsePP1 = stringC_parseM 
+  printFL1 = stringC_printFL
 
 instance Pads1 Int PstringFW Base_md where 
   parsePP1 = pstringFW_parseM 
@@ -186,6 +194,9 @@ instance ToString Pre where
 
 instance ToString Pstring where
   toString (Pstring s) = s
+
+instance ToString StringC where
+  toString (StringC s) = s
 
 instance ToString PstringFW where
   toString (PstringFW s) = s
@@ -256,6 +267,13 @@ pstring_parseM c =
   handleEOR (def1 c) "Pstring" $ do
     str <- satisfy (\c'-> c /= c')
     returnClean (Pstring str)
+
+stringC_parseM :: Char -> PadsParser (StringC, Base_md)
+stringC_parseM c =
+  handleEOF (def1 c) "StringC" $
+  handleEOR (def1 c) "StringC" $ do
+    str <- satisfy (\c'-> c /= c')
+    returnClean (StringC str)
 
 ptext_parseM :: PadsParser (Ptext, Base_md)
 ptext_parseM = do
@@ -382,6 +400,9 @@ pstringSE_printFL s (PstringSE str, bmd) = addString str
 
 pstring_printFL :: Char -> (Pstring, Base_md) -> FList
 pstring_printFL c (Pstring str, bmd) = addString str
+
+stringC_printFL :: Char -> (StringC, Base_md) -> FList
+stringC_printFL c (StringC str, bmd) = addString str
 
 ptext_printFL :: (Ptext, Base_md) -> FList
 ptext_printFL (Ptext str, bmd) = addString str

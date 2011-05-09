@@ -1,31 +1,5 @@
 {-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, ScopedTypeVariables #-}
 
-{- Still to do:
-    package Text.Regexp.ByteString as a library; figure out library ownership issues.
-
-    add parsing support for integer literals & globs
-    make it possible for record annotation to come immediately before struct or union.
-    add function to repeated call record parser
-    change type -> newtype, add type with same semantics as Haskell?
-    improve speed
-    implement 
-
-    regular expression literals (wait until new release of ghc)
-
-    BUGS:
-    if a [pads| foo |] declaration doesn't start on the first column, get a weird error message
-    if union declaration starts with "type", get weird error message.
-    bad error message if pass a string argument to a Pstring
-    change unit test to not depend on kfisher path
-    If RE literal appears, tab characters are not treated property; stringLiteral does not have the same behavior as Haskell's string literal behavior.
-        (See examples in Students2.hs)
-
-    add pretty printers for reps and pds
-    improve error messages
-    polymorphic types
-    recursive types
--}
-
 module Examples.First where
 import Language.Pads.Padsc
 import Test.HUnit

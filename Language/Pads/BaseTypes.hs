@@ -45,6 +45,9 @@ import qualified Data.Char as C
 import qualified Data.List as L
 
 
+[pads|
+  type Line a = (a, EOR)
+|]
 
 
 
