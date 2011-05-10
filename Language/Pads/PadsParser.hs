@@ -172,9 +172,9 @@ constraintReport isGood md = Base_md {numErrors = totErrors, errInfo = errors}
 
 -------------------------------------------------
 
-parseTrans :: PadsMD dmd => 
-    PadsParser (sr,smd) -> (S.Pos -> (sr,smd) -> (dr,dmd)) -> PadsParser (dr,dmd)
-parseTrans sParser transform = do
+parseTransform :: PadsMD dmd => 
+    PadsParser (sr,smd) -> (S.Pos->(sr,smd)->(dr,dmd)) -> PadsParser (dr,dmd)
+parseTransform sParser transform = do
   { begin_loc <- getLoc
   ; src_result <- sParser
   ; end_loc <- getLoc

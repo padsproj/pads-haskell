@@ -268,7 +268,7 @@ genParseConstrain pat ty exp = [| parseConstraint $(genParseTy ty) $pred |]
 
 genParseTyTrans :: PadsTy -> PadsTy -> Exp -> Q Exp
 genParseTyTrans tySrc tyDest exp
-  = [| parseTrans $(genParseTy tySrc) (fst $(return exp)) |]
+  = [| parseTransform $(genParseTy tySrc) (fst $(return exp)) |]
 
 genParseList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> Q Exp
 genParseList ty sep term =
@@ -321,7 +321,8 @@ genMergeBaseMDs es  = [| mergeBaseMDs $(listTH es) |]
 genParseExp :: Exp -> Q Exp
 genParseExp (LitE (CharL c)) = [| charLit_parseM c |]
 genParseExp (LitE (StringL s)) = [| strLit_parseM s |]
-genParseExp _ = error "genParseExp: Not yet defined"
+genParseExp exp = [| error $(return exp) |]
+-- = error "genParseExp: Not yet defined on non-char literals"
 
 genParseTyApp :: [PadsTy] -> Maybe Exp -> Q Exp
 genParseTyApp tys expM = do

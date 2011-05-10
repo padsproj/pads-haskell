@@ -260,10 +260,9 @@ test_intRangePBad    = mkTestCase "IntRangePBad" expect_intRangePBad result_intR
 
 
 
-[pads| type  Record (bound::Pint) = 
-     {      i1 :: Pint, 
-       ',', i2 :: Pint where <| i1 + i2 <= bound |>  
-     } |]
+[pads| data  Rec (bound::Pint) = Rec {  i1 :: Pint, 
+                  ',', i2 :: Pint where <| i1 + i2 <= bound |>  
+                    } |]
 
 input_Record = "24,45"
 result_Record = record_parseS 100 input_Record
@@ -284,7 +283,7 @@ expect_IdStr = (Alpha (Pstring "hello"),0,"")
 test_IdStr = mkTestCase "IdAlpha" expect_IdStr result_IdStr
 
 [pads| data Id2 (bound::Pint) = 
-            Numeric2 Pint where <| numeric2 <= bound |> 
+            Numeric2 (constrain n::Pint where <| n <= bound |>)
           | Alpha2   (Pstring ',') |] 
 input_IdInt2 = "23"
 result_IdInt2 = id2_parseS 10 input_IdInt2
@@ -298,9 +297,9 @@ test_IdStr2 = mkTestCase "IdAlpha2" expect_IdStr2 result_IdStr2
 
 
 
-[pads| data Id3  = Numeric3  IntRangeP <|(1,10)|>
+[pads| data Id3  = Numeric3  (IntRangeP <|(1,10)|>)
                  | Numeric3a Pint
-                 | Lit3     ','                 |] 
+                 | Lit3     (',')                 |] 
 input_IdInt3 = "24"
 result_IdInt3 = id3_parseS input_IdInt3
 expect_IdInt3 = (Numeric3a (Pint 24),0,"")
@@ -319,7 +318,7 @@ result_Ab_or_a = ab_or_a_parseS input_AB
 expect_Ab_or_a = (AB,0,"")
 test_Ab_or_a = mkTestCase "Ab_or_a" expect_Ab_or_a result_Ab_or_a
 
-[pads| type  AB_test = { field_AB  :: Ab_or_a , 'b'} |]
+[pads| data  AB_test = AB_test { field_AB  :: Ab_or_a , 'b'} |]
 input_AB_test1 = "abb"
 result_AB_test1 = aB_test_parseS input_AB_test1
 expect_AB_test1 =  (AB_test {field_AB = AB},0,"")
@@ -332,7 +331,7 @@ expect_AB_test2 = (AB_test {field_AB = AB},1,"")
 test_AB_test2 = mkTestCase "AB_test2" expect_AB_test2 result_AB_test2
 
 [pads| data Method  = GET | PUT | LINK | UNLINK | POST  
-       type Version = {"HTTP/", 
+       data Version = V {"HTTP/", 
                         major :: Pint, '.',  -- major mode
                         minor :: Pint} 
 |]
@@ -344,7 +343,7 @@ checkVersion method version =
     UNLINK -> major version == 1 && minor version == 0
     _ -> True
 
-[pads| type Request = { '"',  method  :: Method,       
+[pads| data Request = Req { '"',  method  :: Method,       
                         ' ',  url     :: Pstring ' ', 
                         ' ',  version :: Version where <| checkVersion method version |>, 
                         '"'
@@ -449,7 +448,7 @@ expect_evenInts = (EvenInts [EvenInt (Pdigit 2),EvenInt (Pdigit 4),EvenInt (Pdig
 test_evenInts = mkTestCase "EvenInts" expect_evenInts result_evenInts
 
 
-[pads| type DigitList = [Pdigit] with sep ',' |]
+[pads| type DigitList = [Pdigit | ','] |]
 input_digitListG = "1,2,3"
 input_digitList2G = "1,2,3|fed"
 input_digitListB = "1,b,3"
@@ -465,7 +464,7 @@ result_digitListB = digitList_parseS input_digitListB
 expect_digitListB = (DigitList [Pdigit 1],0,",b,3")
 test_digitListB = mkTestCase "DigitListB" expect_digitListB result_digitListB
 
-[pads| type DigitListLen (x::Int) = [Pdigit] with length <|x + 1 |>  |]
+[pads| type DigitListLen (x::Int) = [Pdigit] length <|x + 1 |>  |]
 input_digitListLenG = "123456"
 input_digitListLenB = "12a456"
 

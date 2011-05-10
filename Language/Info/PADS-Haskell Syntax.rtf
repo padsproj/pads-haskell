@@ -96,10 +96,13 @@ pred 	->
 \f0\b0 expression\
 \
 \
-btype	-> atype \{atype\} [expression]	 	 
+btype	-> etype \{atype\} [expression]	 	 
 \f2\i (type application)\
 
 \f0\i0 \
+etype	-> atype\
+		 | expression\
+\
 atype	-> 
 \f1\b ( 
 \f0\b0 ptype \{
@@ -116,7 +119,6 @@ atype	->
 \f0\i0 \
 		 | gtycon\
 		 | tyvar\
-		 | expression\
 \
 gtycon	-> qtycon						 
 \f2\i (qualified type consctructor)
@@ -173,13 +175,13 @@ branch	-> pattern
 \
 constr	-> con \{[
 \f1\b !
-\f0\b0 ] atype\} [pred]
+\f0\b0 ] etype\} [pred]
 \f2\i \
 
 \f0\i0 		 | con record [pred]\
 		 | conoparg conop conoparg [pred]\
 \
-conoparg -> btype\
+conoparg -> etype\
 	     | 
 \f1\b !
 \f0\b0  atype\

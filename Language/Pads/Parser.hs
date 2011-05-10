@@ -188,10 +188,16 @@ arrow env
 
 btype :: Env -> Parser PadsTy
 btype env
-  = do { tys <- many1 (atype env); expM <- optionMaybe (try expression);
-       ; if length tys==1 && expM == Nothing then return (head tys)
-         else return (PApp tys expM)
+  = do { ty <- etype env; tys <- many (atype env)
+       ; expM <- optionMaybe (try expression);
+       ; if length tys==0 && expM == Nothing then return ty
+         else return (PApp (ty:tys) expM)
        }
+
+etype :: Env -> Parser PadsTy
+etype env
+  =  atype env
+ <|> fmap PExpression expression
 
 atype :: Env -> Parser PadsTy
 atype env
@@ -200,7 +206,6 @@ atype env
         ; return (PList elm sepM Nothing)}
  <|> fmap PTycon qtycon
  <|> fmap PTyvar (tyvar env)
- <|> fmap PExpression expression
 
 tuple :: Env -> Parser PadsTy
 tuple env
@@ -256,7 +261,7 @@ constrArgs :: Env -> Parser [ConstrArg]
 constrArgs env
   = many1 $ do
     { bang <- option NotStrict (reservedOp "!" >> return IsStrict)
-    ; ty <- atype env
+    ; ty <- etype env
     ; return (bang,ty)
     }
 
@@ -381,5 +386,4 @@ upperId = try (do { id <- identifier
 ---------------
 
 p << q = do {x<-p;q;return x}
-
-
+mymany p = option [] (many1 p)

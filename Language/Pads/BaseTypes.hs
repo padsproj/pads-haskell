@@ -56,6 +56,8 @@ import qualified Data.List as L
 
 [pads| type  Pstringln = Line (constrain x :: PstringSE <| RE "$" |> where <| True |>) |]
 
+[pads| type Phex32FW (size :: Int)  = Trans { PstringFW <| size |>  <=> Pint using (hexStr2Int,int2HexStr size) } |]  
+
 hexStr2Int :: Pos -> (PstringFW, Base_md) -> (Pint, Base_md)
 hexStr2Int src_pos (PstringFW s,md) = if good then (Pint (intList2Int ints 0), md)
                                       else (0, mkErrBasePD  (TransformToDstFail "StrHex" s " (non-hex digit)") (Just src_pos))
@@ -83,6 +85,5 @@ int2HexStr size (Pint x,md) = if (length result == size) && wasPos  then (Pstrin
    stutter c n = if n <= 0 then [] else c : (stutter c (n-1))
    result = (stutter '0' padding) ++ temp
 
-[pads| type Phex32FW (size :: Int)  = Trans { PstringFW <| size |>  <=> Pint using (hexStr2Int,int2HexStr size) } |]  
 
 -}
