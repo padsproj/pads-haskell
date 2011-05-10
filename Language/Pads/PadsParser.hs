@@ -155,10 +155,10 @@ parseTry p = PadsParser $ \bs -> replaceSource bs (p # bs)
 -------------
 
 parseConstraint :: PadsMD md => 
-    PadsParser(rep,md) -> (rep -> md -> Bool) -> PadsParser(rep, (Base_md, md))
+    PadsParser(rep,md) -> (rep -> md -> Bool) -> PadsParser(rep, md)
 parseConstraint p pred = do 
   (rep,md) <- p
-  return (rep, (constraintReport (pred rep md) md, md))
+  return (rep, replace_md_header md (constraintReport (pred rep md) md))
  
 constraintReport isGood md = Base_md {numErrors = totErrors, errInfo = errors}
   where
