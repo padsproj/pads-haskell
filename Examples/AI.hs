@@ -10,7 +10,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.ByteString.Lazy.Char8 as B
 
 [pads|
-  data AI    = AI ([Line Entry] terminator EOF)
+  newtype AI    = AI ([Line Entry] terminator EOF)
 
   data Entry = Entry
       {     host       :: Src, 
@@ -64,22 +64,25 @@ checkVersion method version =
   |]
 
 
--- mkPrettyInstance ''AI
--- mkPrettyInstance ''AI_md
+--mkPrettyInstance ''AI
+--mkPrettyInstance ''AI_md
 
 ai_file = ai_big
 ai_3000 = "Examples/data/ai.3000"
 ai_big  = "Examples/data/ai.big"
 
-(ai_rep, ai_md) = let (AI rep, md) = unsafePerformIO $ parseFile ai_file in (rep,md)
+-- (ai_rep, ai_md) = let (AI rep, md) = unsafePerformIO $ parseFile ai_file in (rep,md)
+(AI ai_rep, ai_md) =  unsafePerformIO $ parseFileWith aI_parseM ai_file
+
 
 ai_file_length  = Prelude.length ai_rep
 ai_file_take n  = Prelude.take n ai_rep
 
+{-
 result n  = do 
      { (AI rep, md) <- parseFile ai_file
      ; return (Prelude.take n ai_rep)
      } 
-
+-}
 
 
