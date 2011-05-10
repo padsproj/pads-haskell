@@ -8,6 +8,7 @@ test = parseStringInput trip_parseM "354;;23|53|43(652%%35)4;hefd"
 
 [pads| 
 
+
 type Trip = (Int, ";;", Lst CharPair, Foo Int , EOR) 
 
 newtype Lst a = Lst ([a | '|'] length 3)
@@ -23,7 +24,16 @@ data Switcher (x) = case x of
      | 1 -> One (Lst Int)
   deriving (Read, Eq)
 
+type Triple = (Int, (transform Int => Char using <|(bi,ib)|>, Int)) 
+
+
 |]
+
+
+
+bi::a->(Int,Int_md)->(Char,Char_md)
+bi x = undefined
+ib y = undefined
 
 
 
