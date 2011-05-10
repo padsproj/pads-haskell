@@ -41,21 +41,22 @@ genPadsDecl :: PadsDecl -> Q [Dec]
 genPadsDecl (PadsDeclType name args pat padsTy) = do
   { let typeDecs = mkTyRepMDDecl name args padsTy
   ; parseM <- genPadsParseM name args pat padsTy
---  ; parseS <- genPadsParseS name args pat
-  ; return (typeDecs ++ parseM ) -- ++ parseS) --  ++ printFL)
+  ; parseS <- genPadsParseS name args pat
+  ; return (typeDecs ++ parseM ++ parseS) --  ++ printFL)
   }
 
 genPadsDecl (PadsDeclData name args pat padsData derives) = do
   { let dataDecs = mkDataRepMDDecl name args padsData derives
-  ; parseM  <- genPadsDataParseM name args pat padsData 
---  ; parseS <- genPadsParseS name args pat
-  ; return (dataDecs ++ parseM) -- ++ parseS) --  ++ instances ) --  ++ printFL)
+  ; parseM <- genPadsDataParseM name args pat padsData 
+  ; parseS <- genPadsParseS name args pat
+  ; return (dataDecs ++ parseM ++ parseS) --  ++ instances ) --  ++ printFL)
   }
 
 genPadsDecl (PadsDeclNew name args pat branch derives) = do
   { let dataDecs = mkNewRepMDDecl name args branch derives
-  ; parseM  <- genPadsNewParseM name args pat branch 
-  ; return (dataDecs ++ parseM) --  ++ instances ++ parseS) --  ++ printFL)
+  ; parseM <- genPadsNewParseM name args pat branch 
+  ; parseS <- genPadsParseS name args pat
+  ; return (dataDecs ++ parseM ++ parseS) --  ++ instances ) --  ++ printFL)
   }
 
 
@@ -193,14 +194,31 @@ mkMDTuple tys = case mds of
     mds = [mkMDTy ty | ty <- tys, hasRep ty]
 
 
---------------------------------------------------------------
--- GENERATING PARSER DECLARATION FROM TYPE DECLARATION
---------------------------------------------------------------
+-----------------------------------------------------------------
+-- GENERATING PARSER DECLARATION FROM TYPE/DATA/NEW DECLARATION
+------------------------------------------------------------------
 
 genPadsParseM :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
 genPadsParseM name args patM padsTy = do 
   { body  <- genParseTy padsTy
   ; return [FunD parser_name [Clause parserArgs (NormalB body) []] ]
+  }
+  where
+    (parser_name,parserArgs) = mkParserNameArgs name args patM
+
+genPadsDataParseM :: UString -> [LString] -> (Maybe Pat) -> PadsData -> Q [Dec] 
+genPadsDataParseM name args patM padsData = do 
+  { body  <- genParseData padsData
+  ; return [ FunD parser_name [Clause parserArgs (NormalB body) []] ]
+  }
+  where
+    (parser_name,parserArgs) = mkParserNameArgs name args patM
+
+genPadsNewParseM :: UString -> [LString] -> (Maybe Pat) -> BranchInfo -> Q [Dec] 
+genPadsNewParseM name args patM branch = do 
+  { (dec,exp) <- genParseBranchInfo branch
+  ; let body = LetE [dec] exp
+  ; return [ FunD parser_name [Clause parserArgs (NormalB body) []] ]
   }
   where
     (parser_name,parserArgs) = mkParserNameArgs name args patM
@@ -212,7 +230,11 @@ mkParserNameArgs name args patM = (parserName, parserArgs)
     parserArgs = map (VarP . mkVarParserName) args ++ pat
     pat = Maybe.maybeToList patM
 
-{-
+
+--------------------------------------------------------------
+-- GENERATING STRING-PARSER DECLARATION
+--------------------------------------------------------------
+
 genPadsParseS :: UString -> [LString] -> Maybe Pat -> Q [Dec]
 genPadsParseS name args patM = do 
   { bodyS <- [| parseStringInput $(return foo) |]
@@ -220,37 +242,9 @@ genPadsParseS name args patM = do
   }
   where
     parserName = mkTyParserName name    
-    parserArgs = map (mkVarParserName) args ++ pat
-    parserArgsP = map VarP parserArgs
-    foo = applyE (VarE (mkTyParserName name)) (map VarE parserArgs)
+    parserArgs = map (VarP . mkVarParserName) args ++ pat
+    foo = applyE (VarE (mkTyParserName name)) (map patToExp parserArgs)
     pat = Maybe.maybeToList patM
--}
-
---------------------------------------------------------------
--- GENERATING PARSER DECLARATION FROM DATA DECLARATION
---------------------------------------------------------------
-
-genPadsDataParseM :: UString -> [LString] -> (Maybe Pat) -> PadsData -> Q [Dec] 
-genPadsDataParseM name args patM padsData = do 
-  { body  <- genParseData padsData
-  ; return [ FunD parser_name [Clause parserArgs (NormalB body) []] ]
-  }
-  where
-    (parser_name,parserArgs) = mkParserNameArgs name args patM
-
-
---------------------------------------------------------------
--- GENERATING PARSER DECLARATION FROM NEWTYPE DECLARATION
---------------------------------------------------------------
-
-genPadsNewParseM :: UString -> [LString] -> (Maybe Pat) -> BranchInfo -> Q [Dec] 
-genPadsNewParseM name args patM branch = do 
-  { (dec,exp) <- genParseBranchInfo branch
-  ; let body = LetE [dec] exp
-  ; return [ FunD parser_name [Clause parserArgs (NormalB body) []] ]
-  }
-  where
-    (parser_name,parserArgs) = mkParserNameArgs name args patM
 
 
 ------------------------------------------------------
@@ -411,12 +405,6 @@ genConstr_md fnMD conMD vars_fmd md_vars vars_conmd = do
       = ValD (VarP m) (NormalB (AppE (VarE 'get_md_header) (VarE f))) []
 
 
-
-
-
-    
-
-
 ------------------------------------------
 -- PRINTING FUNCTIONS
 ------------------------------------------
@@ -464,7 +452,7 @@ mkfnMDName str     = mkName (strToLower str ++ "_md")
 mkTyParserName  str = mkName ((strToLower str) ++ "_parseM")
 mkTyParserSName str = mkName ((strToLower str) ++ "_parseS")
 
-mkVarParserName str = mkName (str ++ "__parseM")
+mkVarParserName str = mkName (str ++ "__p")
 
 
 -- Naming Printers

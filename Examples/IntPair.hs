@@ -27,6 +27,7 @@ data Switcher (x) = case x of
 
 
 
+
 {-
 [type Trip = (Int, Lst CharPair, Foo Int),
  type Trip_md =
