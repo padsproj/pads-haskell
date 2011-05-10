@@ -52,10 +52,12 @@ import qualified Data.List as L
 
 
 
-{-
+
 
 [pads| type  Pstringln = Line (constrain x :: PstringSE <| RE "$" |> where <| True |>) |]
+[pads| type  Stringln = Line (constrain x :: PstringSE <| RE "$" |> where <| True |>) |]
 
+{-
 [pads| type Phex32FW (size :: Int)  = Trans { PstringFW <| size |>  <=> Pint using (hexStr2Int,int2HexStr size) } |]  
 
 hexStr2Int :: Pos -> (PstringFW, Base_md) -> (Pint, Base_md)
@@ -86,4 +88,10 @@ int2HexStr size (Pint x,md) = if (length result == size) && wasPos  then (Pstrin
    result = (stutter '0' padding) ++ temp
 
 
+
 -}
+
+-- [pads| type StringlnP p = constrain s :: Stringln where <| p s |> |]
+
+
+
