@@ -533,24 +533,6 @@ getBranchNameL   str = mkName  (strToLower str)
 
 {-
 
-genRepMDDeclStruct :: Name -> Name -> [(Maybe String, PadsTy, Maybe Exp)] -> (Dec, [Dec], Type)
-genRepMDDeclStruct ty_name md_ty_name fields = 
-  let (vsts', md_vsts') = unzip $ flattenMaybeList $ map genRepMDField fields
-      derives      = [''Show, ''Eq, ''Typeable, ''Data, ''Ord]
-      ty_con       = RecC ty_name vsts'
-      ty_decl      = DataD [] ty_name [] [ty_con] derives
-      inner_md_name = mkInnerMDName ty_name   -- ty name is the same as the declared pads type name
-      imd_con       = RecC inner_md_name md_vsts'
-      imd_decl      = DataD [] inner_md_name [] [imd_con] derives   -- declaration of line for nested components
-      imd_ty        = ConT inner_md_name
-      md_ty         = tyListToTupleTy [ConT ''Base_md, imd_ty]
-      md_decl       = TySynD md_ty_name [] md_ty
-  in if length vsts' == 0 then 
-        error ("Error: Record " ++ (show ty_name) ++ " must contain at least one named field.")
-     else 
-        (ty_decl, [imd_decl,md_decl], md_ty)
- 
-
 mkPadsInstance parse_name print_name ty_name md_ty mpat_info = 
   let (inst, parsePP, printFL) = case mpat_info of
                           Nothing -> (AppT (AppT (ConT ''Pads) (ConT ty_name)) md_ty,   -- Pads RepTy MDTy
@@ -566,20 +548,6 @@ mkPadsInstance parse_name print_name ty_name md_ty mpat_info =
       printFL_method = ValD (VarP printFL) (NormalB (VarE print_name)) []
   in [InstanceD [] inst [parsePP_method, printFL_method]]
 
-genPadsParseS :: String -> Name -> Name -> Name -> PadsTy -> Maybe(Pat, Type) -> Q [Dec]
-genPadsParseS p_name parse_name rep_name pd_name padsTy mpat_info = return [sigD, funD]
-  where
-       parseSName  = getParseSName p_name
-       stringTy    = ConT ''String
-       padsPairTy  = AppT (AppT (TupleT 2) (ConT rep_name)) (ConT pd_name)
-       resultTy    = AppT (AppT (TupleT 2) padsPairTy) stringTy
-       core_ty     = arrowTy stringTy resultTy
-       (bodyE, ty) = case mpat_info of
-                      Nothing -> (VarE 'parseS, core_ty)
-                      Just (pat,pat_ty) -> (LamE [pat] (AppE (VarE 'parseS1) (patToExp pat)),
-                                            arrowTy pat_ty core_ty)
-       sigD = SigD parseSName ty
-       funD = ValD (VarP parseSName) (NormalB bodyE ) []
    
 -}
 
@@ -671,23 +639,6 @@ genPrintList ty sepOpt termCondOpt repE mdE = do
                 Just (TyTC termTy) -> printE' (termTy, TupE [], TupE [])
   return (AppE (AppE (AppE (AppE (VarE 'printList) (TupE [repE, mdE])) parseElemFnE) sepElemE) termElemE)
 
-printMaybe :: PadsTy -> Exp -> Exp -> Q Exp
-printMaybe ty repE mdE = do 
-  (jrepE, jrepP) <- doGenPE "rep"
-  (jmdE,  jmdP)  <- doGenPE "md"
-  justE <- printE' (ty, jrepE, jmdE)
-  let justB = NormalB justE
-  let jrepPat = ConP 'Just [jrepP]
-  let jmdPat =  TupP[WildP, ConP 'Just [jmdP]]
-  let justPat = TupP [jrepPat, jmdPat]
-  let justmatch = Match justPat justB []
-  let nrepPat = ConP 'Nothing []
-  let nmdPat =  TupP[WildP, ConP 'Nothing []]
-  let nPat = TupP [nrepPat, nmdPat]
-  let nmatch = Match nPat (NormalB (VarE 'printNothing)) []
-  let caseE = CaseE(TupE[repE,mdE]) [justmatch,nmatch]
-  return caseE
-
 
 printUnion :: Name -> [FieldInfo] -> Exp -> Exp -> Q Exp
 printUnion ty_name branches repE mdE = do
@@ -730,10 +681,6 @@ printApp :: (PadsTy, Exp, Exp, Exp) -> Q Exp
 printApp (ty, argE, repE, mdE) = case ty of
   Pname p_name   -> return (AppE (AppE  (VarE (getPrintFLName p_name))  argE) (TupE [repE, mdE]))
 
-printLine :: (PadsTy, Exp, Exp) -> Q Exp
-printLine trm = do
-  elemE <- printE' trm
-  return (AppE (VarE 'endRecord) elemE)
 
 printRecord :: Name -> [FieldInfo] -> Exp -> Exp -> Q Exp
 printRecord recName fields repE mdE = do 
@@ -795,160 +742,6 @@ genPEforTuple tys = do
 
 -}
 
-{-
-
-
-mkParseSwitch :: String -> Exp -> [(Pat, (Maybe String, PadsTy, Maybe Exp))] -> Q Exp
-mkParseSwitch str testE pat_branches = let
-  (pats, branches) = unzip pat_branches
-  in do parseEs <- mkParseBranches str branches
-        let pat_parses = zip pats parseEs
-        let matches = map (\(pat,exp) -> Match pat (NormalB exp) []) pat_parses
-        return (CaseE testE matches)
-
-mkParseUnion :: String -> [(Maybe String, PadsTy, Maybe Exp)] -> Q Exp
-mkParseUnion str branches = do
-  parseEs     <- mkParseBranches str branches   
-  return (AppE (VarE 'choiceP) (ListE parseEs))       -- choiceP [parse1, ..., parsen]
-
-
-
-mkParseBranches :: String -> [(Maybe String, PadsTy, Maybe Exp)] -> Q [Exp]
-mkParseBranches str branches = mapM (mkParseBranch str) branches
-
-mkParseBranch :: String -> (Maybe String, PadsTy, Maybe Exp) -> Q Exp
-mkParseBranch str (Nothing, padsTy, predM) = error ("Union ("++ str ++ ") branch is missing a name.")
-mkParseBranch str (Just name, padsTy, predM) = do
-   let repName  = getBranchNameL   name
-   let mdName   = getBranchMDNameL name
-   bmdName1     <- genBMdName 
-   bmdName2     <- genBMdName 
-   let (repE,  repP)  = genPE repName
-   let ( mdE,  mdP)   = genPE mdName
-   let (bmd1E, bmd1P) = genPE bmdName1
-   let (bmd2E, bmd2P) = genPE bmdName2
-   rhsE        <- genParseTy padsTy
-   case (predM,padsTy) of
-    (Just pred, Plit l) -> error ("Union "++ str ++ ": literal branch can't have a predicate.")
-    (Nothing,   Plit l) -> let
-       stmtPrs = BindS (TupP [repP,mdP]) rhsE                                     -- (rep, md) <- parse
-       frepE   = ConE (getBranchNameU   name)                                  -- . inject value into data type: Foo 
-       imdE    = AppE (ConE (getBranchMDNameU name))  mdE                   -- . inject md into data type: Foo_md md
-       fmdE    = TupE [mdE,  imdE]                                                -- . build final md: (md, Foo_md md)
-       resultE = TupE [frepE,fmdE]                                                -- . build final result: (Foo, (md, Foo_md md))
-       stmtRet = NoBindS (AppE (VarE 'mdReturn) resultE)                            -- return (Foo, (md, Foo_md md))
-       in return (DoE [stmtPrs,stmtRet])
-    (Nothing, _) -> let
-       stmtPrs = BindS (TupP [repP,mdP]) rhsE                                     -- (rep, md) <- parse
-       stmtGmd = LetS [ValD bmd1P (NormalB (AppE (VarE 'get_md_header) mdE)) []]  -- let mbd1 = get_md_header md
-       frepE   = AppE (ConE (getBranchNameU   name)) repE                   -- . inject value into data type: Foo rep
-       imdE    = AppE (ConE (getBranchMDNameU name))  mdE                   -- . inject md into data type: Foo_md md
-       fmdE    = TupE [bmd1E,imdE]                                                -- . build final md: (bmd1, Foo_md md)
-       resultE = TupE [frepE,fmdE]                                                -- . build final result: 
-       stmtRet = NoBindS (AppE (VarE 'mdReturn) resultE)                            -- return (Foo rep, (bmd1, Foo_md md))
-       in return (DoE [stmtPrs,stmtGmd,stmtRet])
-    (Just pred,_) -> let
-       stmtPrs = BindS (TupP [repP,mdP]) rhsE                                     -- (rep,md) <- parse
-       stmtGmd = LetS [ValD bmd1P (NormalB (AppE (VarE 'get_md_header) mdE)) []]  -- let mbd1 = get_md_header md
-       predTestE = CondE pred bmd1E (AppE (VarE 'addPredFailureMD) bmd1E)      -- . build predicate test 
-       stmtPred  = LetS [ValD bmd2P (NormalB predTestE)  []]                      -- let mbd2 = if pred then bmd1 else addPredFailureMD bmd1
-       frepE   = AppE (ConE (getBranchNameU   name)) repE                   -- . inject value into data type: Foo rep
-       imdE    = AppE (ConE (getBranchMDNameU name))  mdE                   -- . inject md into data type:    Foo_md md
-       fmdE    = TupE [bmd2E,imdE]                                                -- . build final md:              (mbd2, Foo_md md)
-       resultE = TupE [frepE,fmdE]                                                -- . build final result           (Foo rep, (md2, Foo_md md))
-       stmtRet = NoBindS (AppE (VarE 'mdReturn) resultE)                            -- return (Foo rep, (md2, Foo_md md))
-       in return (DoE [stmtPrs,stmtGmd,stmtPred,stmtRet])                      
-
-mkParseRecord :: String -> [(Maybe String, PadsTy, Maybe Exp)] -> Q Exp
-mkParseRecord str fields = do
-  (repEs,mdEs,bmdEs, stmts) <- mkParseFields fields
-  let tyName             = mkName str
-  let top_md             = mkName "top_md"
-  let (top_mdE, top_mdP) = genPE top_md
-  let headerE            = AppE (VarE 'mergeBaseMDs) (ListE bmdEs)
-  let mdS                = LetS [ValD top_mdP (NormalB headerE) []]
-  let repE               = RecConE tyName repEs
-  let inner_md_name      = mkInnerMDName tyName   -- ty name is the same as the declared pads type name
-  let mdE                = TupE [top_mdE, RecConE inner_md_name mdEs]
-  let resultE            = TupE [repE,mdE]
-  let finalS             = NoBindS (AppE (VarE 'return) resultE)
-  return (DoE (stmts ++ [mdS,finalS]))
-
-
-
-mkParseField :: (Maybe String, PadsTy, Maybe Exp) -> Q ([FieldExp], [FieldExp], Exp, [Stmt])
-mkParseField (labelM, ty, predM) = do
-   repName     <- case labelM of { Nothing -> genRepName; Just str -> return $ mkFieldName   str}
-   mdName      <- case labelM of { Nothing -> genMdName;  Just str -> return $ mkFieldMDName str}
-   bmdName     <- genBMdName 
-   let (repE, repP) = genPE repName
-   let ( mdE,  mdP) = genPE mdName
-   let (bmdE, bmdP) = genPE bmdName
-   rhsE        <- genParseTy ty
-   case (labelM,predM) of 
-    (Nothing, Just p)      ->  error "Predicates cannot modify unnamed fields in records."
-    (Nothing, Nothing)      ->  let                                         -- Parse unnamed, non-literal struct field
-       stmt1 = BindS (TupP [repP,mdP]) rhsE                                    -- rep and md exist for non-literal types
-       stmt2 = LetS [ValD bmdP (NormalB (AppE (VarE 'get_md_header) mdE)) []]  -- Read out header of resulting parse descriptor
-       in return([], [], bmdE, [stmt1,stmt2])                                  -- No rep or md to include in result
-    (Just str, Nothing)    -> let                                          -- Parse named, non-literal struct field, no predicate
-       stmt1 = BindS (TupP [repP,mdP]) rhsE                                    -- rep and md exist for non-literal types
-       stmt2 = LetS [ValD bmdP (NormalB (AppE (VarE 'get_md_header) mdE)) []]  -- Read out header of resulting parse descriptor
-       in return([(repName,repE)], [(mdName,mdE)], bmdE, [stmt1,stmt2])       -- Include named rep and md in result
-    (Just str, Just pred)    -> do                                         -- Parse named, non-literal struct field, predicate
-      final_mdName    <- genMdName
-      raw_bmdName     <- genBMdName 
-      let (finalMDE, finalMDP)   = genPE final_mdName
-      let (rawBMDE, rawBMDP) = genPE raw_bmdName
-      let predTestE      = CondE pred rawBMDE (AppE (VarE 'addPredFailureMD) rawBMDE)    -- if pred then rawBMD else addPredFailureMD rawBMD
-      let replaceHeaderE = AppE (AppE (VarE 'replace_md_header) mdE) bmdE                -- replace_md_header rawMD bmd
-      let stmt1 = BindS (TupP [repP,mdP]) rhsE
-      let stmt2 = LetS [ValD rawBMDP (NormalB (AppE (VarE 'get_md_header) mdE)) []]
-      let stmt3 = LetS [ValD bmdP (NormalB predTestE)  []] 
-      let stmt4 = LetS [ValD finalMDP  (NormalB replaceHeaderE) []]
-      return ([(repName,repE)], [(mdName,finalMDE)], bmdE, [stmt1,stmt2,stmt3,stmt4])       -- Include named rep and md in result
-
-mkParseFields :: [(Maybe String, PadsTy, Maybe Exp)] -> Q ([FieldExp], [FieldExp], [Exp], [Stmt])
-mkParseFields [] = return ([],[],[],[])
-mkParseFields (field:fields) = do
-  (rep_field,   md_field,  bmd_field,  stmts_field)  <- mkParseField  field
-  (reps_fields, md_fields, bmd_fields, stmts_fields) <- mkParseFields fields
-  return (rep_field++reps_fields, md_field++md_fields, bmd_field:bmd_fields, stmts_field++stmts_fields)
-
-addPredFailureMD :: Base_md -> Base_md
-addPredFailureMD (Base_md{numErrors, errInfo}) = 
-  let errInfo' = case errInfo of
-                  Nothing -> E.ErrInfo {msg = E.FPredicateFailure, position = Nothing}
-                  Just e ->  e
-  in Base_md{numErrors = numErrors + 1, errInfo = Just errInfo'}
-       
--}       
-
-
-
-{- 
-Invariants: literal can't have a field name or a predicate; no field name, no predicate
-   stmts to parse each field of a record
-   do
-    (field_name, field_name_raw_md) <- parse_1             -- if field_name exists, not a literal, predicate
-    let raw_bmd_1 = get_md_header field_name_raw_md
-    let bmd_1 = if pred_1 then raw_bmd_1
-                else addPredFailureMD raw_bmd_1
-    let field_name_md = replace_md_header field_name_raw_md bmd_1
-    ...
-    (field_name, field_name_md) <- parse_field_name        -- if field_name exists, not a literal, no predicate
-    let bmd_field_name = get_md_header field_name_md
-    ... 
-    md_i <- parse_i                                        -- no field name, literal field, no predicate
-    let bmd_i = get_md_header md_i
-    ...
-    (rep_j,md_j) <- parse_j                                -- no field name, not literal, no predicate
-    let bmd_j = get_md_header md_j
-
-    let top_md = mergeBaseMDs [bmd_1,...bmd_n]
-    let name_md = Name_md{name_1 = field_name_md, ... }
-    return (rep,(top_md,name_md))
--}
 
 
 

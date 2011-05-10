@@ -26,7 +26,7 @@ results
      result29, result30, result31, result32, result33, result34, result35,
      result36, result37, result38, result39, result40, result41, result42,
      result43, result44, result45, result46, result47, result48, result49,
-     result50, result51, result52
+     result50, result51, result52, result53
     ]
 result = and results
 failures = [n | (r,n) <- zip results [1..], not r]
@@ -300,5 +300,10 @@ t52' = "type Fun a b = transform b => (->) a b using <|(const, \\f -> f def)|>"
 pt52 = testParsePadsDecls t52
 ppt52 = case pt52 of Left e -> show e ; Right r -> pretty 152 (ppDeclList r)
 result52 = t52' == ppt52
+
+t53   = "type StrTy = PstringFW <|testStrLen + computeLen 4|>"
+pt53  = testParsePadsDecls t53
+ppt53 = case pt53 of Left e -> show e ; Right r -> pretty 150 (ppDeclList r)
+result53 = t53 == ppt53
 
 
