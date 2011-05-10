@@ -300,7 +300,7 @@ test_IdStr2 = mkTestCase "IdAlpha2" expect_IdStr2 result_IdStr2
 
 [pads| data Id3  = Numeric3  (IntRangeP <|(1,10)|>)
                  | Numeric3a Pint
-                 | Lit3     (',')                 |] 
+                 | Lit3     ','               |] 
 input_IdInt3 = "24"
 result_IdInt3 = id3_parseS input_IdInt3
 expect_IdInt3 = (Numeric3a (Pint 24),0,"")
@@ -515,7 +515,7 @@ result_digitListTermSepB = digitListTermSep_parseS input_digitListTermSepB
 expect_digitListTermSepB = ([Pdigit 1,Pdigit 2,Pdigit 3,Pdigit 4,Pdigit 5],1,"hello")
 test_digitListTermSepB =   mkTestCase "digitListTermSepB" expect_digitListTermSepB result_digitListTermSepB
 
-{- Restate when Try is implemented
+{- Reinstate when Try is implemented
 [pads| type TryTest = (Try Pchar, PstringFW 3) |]
 input_tryTest = "abc123"
 result_tryTest = tryTest_parseS input_tryTest
@@ -548,7 +548,7 @@ test_ListWithTry = mkTestCase "ListWithTry" expect_ListWithTry result_ListWithTr
 
 -}
 
-{- Restate when Void is implemented 
+{- Reinstate when Void is implemented 
 [pads| type WithVoid = (Pchar, ',', Void, '|') |]
 input_WithVoid = "a,|rest"
 result_WithVoid = withVoid_parseS input_WithVoid
