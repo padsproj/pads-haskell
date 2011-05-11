@@ -72,7 +72,8 @@ baseTypesList = [
   ("PstringME", (''String,  [''RE])),
   ("PstringSE", (''String,  [''RE])),
   ("Int",       (''Int, [])),
-  ("Char",      (''Char, []))
+  ("Char",      (''Char, [])),
+  ("Double",    (''Double, []))
  ]
 
 
@@ -98,6 +99,7 @@ type Pdigit_md = Base_md
 type Ptext_md = Base_md
 type Pbinary_md = Base_md
 type Int_md = Base_md
+type Double_md = Base_md
 type Char_md = Base_md
 type EOF_md = Base_md
 type EOR_md = Base_md
@@ -113,14 +115,6 @@ instance Pretty Pre where
               
 instance Pretty Pbinary where
   ppr (Pbinary str) = text "Binary"
-
-instance Pads Int Base_md where
-  parsePP = int_parseM
-  printFL = int_printFL
-
-instance Pads Char Base_md where
-  parsePP = char_parseM
-  printFL = char_printFL
 
 instance Pads Pint Base_md where
   parsePP = pint_parseM
@@ -141,6 +135,20 @@ instance Pads Ptext Base_md where
 instance Pads Pbinary Base_md where
   parsePP = pbinary_parseM
   printFL = pbinary_printFL
+
+instance Pads Int Base_md where
+  parsePP = int_parseM
+  printFL = int_printFL
+
+instance Pads Double Base_md where
+  parsePP = double_parseM
+  printFL = double_printFL
+
+instance Pads Char Base_md where
+  parsePP = char_parseM
+  printFL = char_printFL
+
+
 
 newtype Pre = Pre String
   deriving (Eq, Data, Typeable, Ord)
@@ -324,15 +332,50 @@ pint_parseM =
 
 int_parseM :: PadsParser (Int,Base_md)
 int_parseM =
-  handleEOF def "Pint" $
-  handleEOR def "Pint" $ do
+  handleEOF def "Int" $
+  handleEOR def "Int" $ do
     c <- peekHeadP 
     let isNeg = (c == '-')
     when isNeg (takeHeadP >> return ())
     digits <- satisfy Char.isDigit
     if not (null digits)
       then returnClean (digitListToInt isNeg digits)
-      else returnError def (E.FoundWhenExpecting (mkStr c) "Pint")
+      else returnError def (E.FoundWhenExpecting (mkStr c) "Int")
+
+double_parseM :: PadsParser (Double,Base_md)
+double_parseM =
+  handleEOF def "Double" $
+  handleEOR def "Double" $ do
+    -- Get leading sign
+    c <- peekHeadP 
+    let isNeg = (c == '-')
+    when isNeg (takeHeadP >> return ())
+    let sign = if isNeg then "-" else ""
+    -- Get digits before any dot
+    digits1 <- satisfy Char.isDigit
+    -- Get optional dot
+    d <- peekHeadP 
+    let hasDot = (d == '.')
+    when hasDot (takeHeadP >> return ())
+    let dec = if hasDot then "." else ""
+    -- Get digits after dot
+    digits2 <- satisfy Char.isDigit
+    -- Get optional exponent marker
+    e <- peekHeadP 
+    let hasExp = (e == 'e')
+    when hasExp (takeHeadP >> return ())
+    let exp = if hasExp then "e" else ""
+    -- Get optional exponent sign
+    es <- peekHeadP 
+    let hasESign = (es == '-')
+    when hasESign (takeHeadP >> return ())
+    let expSign = if hasESign then "-" else ""
+    -- Get digits in the exponent
+    digits3 <- satisfy Char.isDigit
+    -- As long as the double had digits
+    if not (null digits1)
+      then returnClean (read (sign ++digits1++dec++digits2++exp++expSign++digits3))
+      else returnError def (E.FoundWhenExpecting (mkStr c) "Double")
 
 
 
@@ -424,6 +467,9 @@ pint_printFL (Pint i, bmd) = fshow i
 
 int_printFL :: (Int, Base_md) -> FList
 int_printFL (i, bmd) = fshow i
+
+double_printFL :: (Double, Base_md) -> FList
+double_printFL (d, bmd) = fshow d
 
 preLit_printFL :: RE -> FList
 preLit_printFL (RE re)  = addString "--REGEXP LITERAL-- "
