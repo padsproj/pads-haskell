@@ -659,7 +659,6 @@ litRec_result = litRec_parseS litRec_input
 litRec_expects = (LitRec {fstField = Pint 12, sndField = Pint 34},0,"")
 litRec_test = mkTestCase "Haskell identifier literal" litRec_expects litRec_result
 
-
 [pads| type WhiteSpace = (Pint, <|RE "[ \t]+"|>, Pint) |]
 whiteSpace_input = "12      34"
 whiteSpace_result = whiteSpace_parseS whiteSpace_input

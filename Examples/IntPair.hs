@@ -20,15 +20,14 @@ data Foo b = Bazz Int | Zipp "(" b "%%" !Int ')'
   deriving (Read, Eq)
 
 data Switcher (x) = case x of
-       0 -> Zero "$"
-     | 1 -> One (Lst Int)
-  deriving (Read, Eq)
+                      0 -> Zero "$"
+                    | 1 -> One (Lst Int)
+                         deriving (Read, Eq)
 
 type Triple = (Int, (transform Int => Char using <|(bi,ib)|>, Int)) 
 
 
 |]
-
 
 
 bi::a->(Int,Int_md)->(Char,Char_md)

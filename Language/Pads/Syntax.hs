@@ -50,7 +50,13 @@ data BranchInfo = BRecord UString [FieldInfo] (Maybe Exp)
 type FieldInfo = (Maybe LString, ConstrArg, Maybe Exp)
 type ConstrArg = (Strict, PadsTy)
 
-
-
 type UString = String
 type LString = String
+
+
+hasRep :: PadsTy -> Bool
+hasRep (PExpression l) = False
+hasRep (PTycon "EOF")  = False
+hasRep (PTycon "EOR")  = False
+hasRep _               = True
+

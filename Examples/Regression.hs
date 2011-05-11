@@ -306,4 +306,8 @@ pt53  = testParsePadsDecls t53
 ppt53 = case pt53 of Left e -> show e ; Right r -> pretty 150 (ppDeclList r)
 result53 = t53 == ppt53
 
-
+t54   = "data HP = HP {student_num :: Pint, ',', student_name :: PstringFW <|pintToInt student_num|>}\ntype HP_data = [Line HP]"
+pt54  = testParsePadsDecls t54
+ppt54 = case pt54 of Left e -> show e ; Right r -> pretty 250 (ppDeclList r)
+result54 = t54 == ppt54
+       
