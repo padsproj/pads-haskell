@@ -405,7 +405,7 @@ genParseRecord c fields pred = do
 
     vars_conmd = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
     md_vars    = [ mkName ("m"++show n) | n <- [1 .. length tys]] 
-    vars_con   = [v | (v,t) <- zip vars_conmd tys, hasRep t]
+    vars_con   = [v | (v,(Just l, (_,t),_)) <- zip vars_conmd fields, hasRep t]
     conLabsQ = return (applyE (ConE (mkConstrName c)) (map (VarE . mkName) labs))
     conMD = ConE (mkConstrIMDName c)
     fnMD  = mkfnMDName c

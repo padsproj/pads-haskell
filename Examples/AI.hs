@@ -43,7 +43,7 @@ import qualified Data.ByteString.Lazy.Char8 as B
       { '"',  method  :: Method,       
         ' ',  url     :: StringC ' ', 
         ' ',  version :: Version  where <| checkVersion method version |>,
-        final :: '"'
+        '"'
       }  
 
   data Method  = GET | PUT | POST | HEAD | DELETE
