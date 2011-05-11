@@ -96,15 +96,15 @@ mkRepUnion (BConstr c args expM) = NormalC (mkConstrName c) reps
     reps = [(strict,mkRepTy ty) | (strict,ty) <- args, hasRep ty]
 mkRepUnion (BRecord c fields expM) = RecC (mkConstrName c) lreps
   where   
-    lreps = [(mkName l,strict,mkRepTy ty) | (Just l,(strict,ty),expM) <- fields]
+    lreps = [(mkName l,strict,mkRepTy ty) | (Just l,(strict,ty),expM) <- fields, hasRep ty]
 
 mkMDUnion :: BranchInfo -> Con
-mkMDUnion (BConstr c args expM) = NormalC (mkConstrMDName c) mds
+mkMDUnion (BConstr c args expM) = NormalC (mkConstrIMDName c) mds
   where   
     mds = [(NotStrict,mkMDTy ty) | (_,ty) <- args, hasRep ty]
-mkMDUnion (BRecord c fields expM) = RecC (mkConstrMDName c) lmds
+mkMDUnion (BRecord c fields expM) = RecC (mkConstrIMDName c) lmds
   where   
-    lmds = [(mkFieldMDName l,NotStrict,mkMDTy ty) | (Just l,(_,ty),expM) <- fields]
+    lmds = [(mkFieldMDName l,NotStrict,mkMDTy ty) | (Just l,(_,ty),expM) <- fields, hasRep ty]
 
 derive :: [UString] -> [Name]
 derive ds =  map mkName ds
@@ -346,7 +346,7 @@ genParseUnion bs = do
   { (decs,bodies) <- fmap unzip $ mapM genParseBranchInfo bs
   ; let body = case bodies of
                  [b] -> b
-                 bs  -> VarE 'choiceP `AppE` ListE bs
+                 bs  -> (VarE 'choiceP) `AppE` (ListE bs)
   ; return (LetE decs body)
   }
 
@@ -357,7 +357,6 @@ genParseSwitch exp pbs = do
   ; let body = CaseE exp [Match p (NormalB b) [] | (p,b) <- zip ps bodies]
   ; return (LetE decs body)
   }
-
 
 genParseBranchInfo :: BranchInfo -> Q (Dec,Exp)
 genParseBranchInfo (BRecord c fields pred) = genParseRecord c fields pred
@@ -372,7 +371,7 @@ genParseBranchInfo (BConstr c args pred) = do
     md_vars    = [ mkName ("m"++show n) | n <- [1 .. length tys]] 
     vars_con   = [v | (v,t) <- zip vars_conmd tys, hasRep t]
     conQ  = return (ConE (mkConstrName c))
-    conMD = ConE (mkConstrMDName c)
+    conMD = ConE (mkConstrIMDName c)
     fnMD  = mkfnMDName c
 
 genConstr_md :: Name -> Exp -> [Name] -> [Name] -> [Name] -> Q Dec
@@ -402,13 +401,13 @@ genParseRecord c fields pred = do
   }
   where
     tys  = [ty | (labelM, (strict,ty), expM) <- fields]
-    labs = [lab | (Just lab, (strict,ty), expM) <- fields]
+    labs = [lab | (Just lab, (strict,ty), expM) <- fields, hasRep ty]
 
     vars_conmd = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
     md_vars    = [ mkName ("m"++show n) | n <- [1 .. length tys]] 
     vars_con   = [v | (v,t) <- zip vars_conmd tys, hasRep t]
     conLabsQ = return (applyE (ConE (mkConstrName c)) (map (VarE . mkName) labs))
-    conMD = ConE (mkConstrMDName c)
+    conMD = ConE (mkConstrIMDName c)
     fnMD  = mkfnMDName c
 
 genParseField :: FieldInfo -> Name -> Q Stmt
@@ -554,9 +553,9 @@ mkMDVarName name = mkName (name ++ "_md")
 mkFieldName str   = mkName str
 mkFieldMDName str = mkName (str++"_md")
 
-mkConstrName   str = mkName str
-mkConstrMDName str = mkName (str++"_md")
-mkfnMDName str     = mkName (strToLower str ++ "_md")
+mkConstrName   str  = mkName str
+mkConstrIMDName str = mkName (str++"_imd")
+mkfnMDName str      = mkName (strToLower str ++ "_md")
 
 
 -- Naming Parsers

@@ -42,7 +42,8 @@ import qualified Data.ByteString.Lazy.Char8 as B
   data Request = Request 
       { '"',  method  :: Method,       
         ' ',  url     :: StringC ' ', 
-        ' ',  version :: Version  where <| checkVersion method version |>,  '"'
+        ' ',  version :: Version  where <| checkVersion method version |>,
+        final :: '"'
       }  
 
   data Method  = GET | PUT | POST | HEAD | DELETE
