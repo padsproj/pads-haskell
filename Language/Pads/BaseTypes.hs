@@ -40,6 +40,8 @@ import Language.Pads.CoreBaseTypes
 import Language.Pads.Quote
 import Language.Pads.RegExp
 import Language.Pads.LazyList
+import Data.Time
+import System.Locale
 
 import qualified Data.Char as C
 import qualified Data.List as L
@@ -54,11 +56,37 @@ import qualified Data.List as L
 
 
 
-[pads| type  Pstringln = Line (constrain x :: PstringSE <| RE "$" |> where <| True |>) |]
-[pads| type  Stringln = Line (constrain x :: PstringSE <| RE "$" |> where <| True |>) |]
+[pads| type  Pstringln = Line (constrain x :: PstringSE <| RE "$" |> where <| True |>)           |]
+[pads| type  Stringln =  Line (constrain x :: PstringSE <| RE "$" |> where <| True |>)           |]
+[pads| type StringlnP (p :: String -> bool) = constrain s :: Stringln where <| p (toString s) |> |]
+
 
 {-
-[pads| type Phex32FW (size :: Int)  = Trans { PstringFW <| size |>  <=> Pint using (hexStr2Int,int2HexStr size) } |]  
+[pads| type DateFSE (fmt :: String, se :: RE) = transform PstringSE se =>  UTCTime using <| (strToUTC fmt, utcToStr fmt) |> |]  
+
+strToUTC :: Pos -> String -> (PstringSE, Base_md) -> (UTCTime, Base_md)
+strToUTC pos fmt (PstringSE input, input_bmd) = 
+  case parseTime defaultTimeLocale fmt input of 
+       Nothing -> (gdef, mkErrBasePD  mergeBaseMDs [(TransformToDstFail "DateFSE" input " (conversion failed)") (Just pos), input_bmd])
+       Just t  -> (t, input_bmd)
+
+utcToStr :: String -> (UTCTime, Base_md) -> (PstringSE, Base_md) 
+utcToStr fmt (utcTime, bmd) = (PstringSE (formatTime defaultTimeLocale fmt utcTime), bmd)
+
+[pads| type TimeZoneSE (se :: RE) = transform PstringSE se =>  TimeZone using <| (strToTz, tzToStr) |> |]  
+
+strToTz :: Pos -> (PstringSE, Base_md) -> (TimeZone, Base_md)
+strToTz pos fmt (PstringSE input, input_bmd) = 
+  case parseTime defaultTimeLocale "%z" input of 
+       Nothing -> (gdef, mkErrBasePD  mergeBaseMDs [(TransformToDstFail "TimeZoneSE" input " (conversion failed)") (Just pos), input_bmd])
+       Just t  -> (t, input_bmd)
+
+tzToStr :: String -> (TimeZone, Base_md) -> (PstringSE, Base_md) 
+tzToStr fmt (tz, bmd) = (PstringSE (h ++ ":" ++ m), bmd)
+           where (h,m) = splitAt 3 (show tz)
+
+
+[pads| type Phex32FW (size :: Int) = transform PstringFW size => Pint using <| (hexStr2Int,int2HexStr size) |> |]  
 
 hexStr2Int :: Pos -> (PstringFW, Base_md) -> (Pint, Base_md)
 hexStr2Int src_pos (PstringFW s,md) = if good then (Pint (intList2Int ints 0), md)
@@ -91,7 +119,7 @@ int2HexStr size (Pint x,md) = if (length result == size) && wasPos  then (Pstrin
 
 -}
 
--- [pads| type StringlnP p = constrain s :: Stringln where <| p s |> |]
+
 
 
 
