@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables, MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables, MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances, FlexibleInstances #-}
 {-
 ** *********************************************************************
 *                                                                      *
@@ -156,6 +156,8 @@ newtype Pstring    = Pstring    String
   deriving (Eq, Show, Data, Typeable, Ord)
 newtype StringC    = StringC    String
   deriving (Eq, Show, Data, Typeable, Ord)
+newtype StringESC   = StringESC    String
+  deriving (Eq, Show, Data, Typeable, Ord)
 newtype PstringFW = PstringFW String
   deriving (Eq, Show, Data, Typeable, Ord)
 newtype PstringME = PstringME String
@@ -169,10 +171,15 @@ type StringC_md = Base_md
 type PstringFW_md = Base_md
 type PstringME_md = Base_md
 type PstringSE_md = Base_md
+type StringESC_md = Base_md
 
 instance Pads1 String Pre Base_md where 
   parsePP1 = pre_parseM 
   printFL1 = pre_printFL
+
+instance Pads1 (Char, [Char]) StringESC Base_md where 
+  parsePP1 = stringESC_parseM 
+  printFL1 = stringESC_printFL
 
 instance Pads1 Char Pstring Base_md where 
   parsePP1 = pstring_parseM 
@@ -378,10 +385,50 @@ double_parseM =
       else returnError def (E.FoundWhenExpecting (mkStr c) "Double")
 
 
+stringESC_parseM :: (Char, [Char]) -> PadsParser(StringESC, Base_md)
+stringESC_parseM (escape, stops) = 
+  handleEOF (StringESC "") "StringESC" $
+  handleEOR (StringESC "") "StringESC" $ do 
+    { c1 <- peekHeadP
+    ; if c1 `elem` stops then 
+         returnClean (StringESC "")
+      else if c1 == escape then do
+         { takeHeadP
+         ; c2 <- takeHeadP
+         ; if (c2 == escape) || (c2 `elem` stops) then do
+            { (StringESC rest, rest_md) <- stringESC_parseM (escape, stops) 
+            ;  return (StringESC (c2:rest), rest_md)
+            }
+           else do 
+             { (StringESC rest, rest_md) <- stringESC_parseM (escape, stops) 
+             ; return (StringESC(c1:c2:rest), rest_md)
+             }
+         } else do 
+            { c1 <- takeHeadP
+            ; (StringESC rest, rest_md) <- stringESC_parseM (escape, stops) 
+            ; return (StringESC(c1:rest), rest_md)
+            }
+    }
+
+class LitParse a where
+  litParse :: a -> PadsParser ((), Base_md)
+  litPrint :: a -> FList
+
+instance LitParse Char where
+  litParse = charLit_parseM
+  litPrint = charLit_printFL
+
+instance LitParse String where
+  litParse = strLit_parseM
+  litPrint = strLit_printFL
+
+instance LitParse RE where
+  litParse = reLit_parseM
+  litPrint = reLit_printFL
 
 
-preLit_parseM :: RE -> PadsParser ((), Base_md)
-preLit_parseM re = do
+reLit_parseM :: RE -> PadsParser ((), Base_md)
+reLit_parseM re = do
   (match, md) <- pstringME_parseM re
   if numErrors md == 0 
     then return ((), md) 
@@ -447,6 +494,12 @@ pstring_printFL c (Pstring str, bmd) = addString str
 stringC_printFL :: Char -> (StringC, Base_md) -> FList
 stringC_printFL c (StringC str, bmd) = addString str
 
+stringESC_printFL :: (Char, [Char]) -> (StringESC, Base_md) -> FList
+stringESC_printFL (escape, stops) (StringESC str, bmd) = 
+  let replace c = if c `elem` stops then escape : [c] else [c]
+      newStr =  concat (map replace str)
+  in addString newStr
+
 ptext_printFL :: (Ptext, Base_md) -> FList
 ptext_printFL (Ptext str, bmd) = addString str
 
@@ -471,9 +524,9 @@ int_printFL (i, bmd) = fshow i
 double_printFL :: (Double, Base_md) -> FList
 double_printFL (d, bmd) = fshow d
 
-preLit_printFL :: RE -> FList
-preLit_printFL (RE re)  = addString "--REGEXP LITERAL-- "
-preLit_printFL (REd re def) = addString def
+reLit_printFL :: RE -> FList
+reLit_printFL (RE re)  = addString "--REGEXP LITERAL-- "
+reLit_printFL (REd re def) = addString def
 
 charLit_printFL :: Char ->  FList
 charLit_printFL c  = addString [c] 

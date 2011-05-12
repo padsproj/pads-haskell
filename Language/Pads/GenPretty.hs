@@ -198,7 +198,12 @@ mkPrettyInstance' worklist done decls =
                      { let nestedTyNames = getTyNames ty
 --                     ; report True ("tysyn for"++(nameBase ty_name)) 
                      ; return (nestedTyNames, [])} 
-                   otherwise -> do {report True ("pattern didn't match for"++(nameBase ty_name)) ; return (S.empty, [])} 
+                   TyConI (TySynD ty_name' tyVarBndrs ty) -> do 
+                     { let nestedTyNames = getTyNames ty
+--                     ; report True ("tysyn for"++(nameBase ty_name)) 
+                     ; return (nestedTyNames, [])} 
+                   TyConI dec -> do {report True ("otherwise; tyconI case "++(nameBase ty_name)) ; return (S.empty, [])} 
+                   otherwise -> do {report True ("pattern didn't match for "++(nameBase ty_name)) ; return (S.empty, [])} 
          let newWorklist = worklist `S.union` nestedTyNames
          let newDecls = decls'++decls
          mkPrettyInstance' newWorklist newDone newDecls

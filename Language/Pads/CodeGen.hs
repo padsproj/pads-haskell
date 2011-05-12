@@ -314,7 +314,7 @@ genMergeBaseMDs es  = [| mergeBaseMDs $(listTH es) |]
 genParseExp :: Exp -> Q Exp
 genParseExp (LitE (CharL c)) = [| charLit_parseM c |]
 genParseExp (LitE (StringL s)) = [| strLit_parseM s |]
-genParseExp exp = [| error $(return exp) |]
+genParseExp exp = [| litParse $(return exp) |]
 -- = error "genParseExp: Not yet defined on non-char literals"
 
 genParseTyApp :: [PadsTy] -> Maybe Exp -> Q Exp

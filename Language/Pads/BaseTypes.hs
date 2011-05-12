@@ -61,28 +61,35 @@ import qualified Data.List as L
 [pads| type StringlnP (p :: String -> bool) = constrain s :: Stringln where <| p (toString s) |> |]
 
 
-{-
-[pads| type DateFSE (fmt :: String, se :: RE) = transform PstringSE se => UTCTime using <| (strToUTC fmt, utcToStr fmt) |> |]  
 
-strToUTC :: Pos -> String -> (PstringSE, Base_md) -> (UTCTime, Base_md)
-strToUTC pos fmt (PstringSE input, input_bmd) = 
+[pads| type DateFSE (fmt :: String, se :: RE) = transform PstringSE se => UTCTime using <| (strToUTC fmt, utcToStr fmt) |> 
+       type DateFC (fmt::String, c::Char) = DateFSE <|(fmt, RE ("[" ++ [c] ++  "]")) |> |]  
+
+type UTCTime_md = Base_md
+
+
+strToUTC :: String -> Pos -> (PstringSE, Base_md) -> (UTCTime, Base_md)
+strToUTC fmt pos (PstringSE input, input_bmd) = 
   case parseTime defaultTimeLocale fmt input of 
-       Nothing -> (gdef, mkErrBasePD  mergeBaseMDs [(TransformToDstFail "DateFSE" input " (conversion failed)") (Just pos), input_bmd])
+       Nothing -> (gdef, mergeBaseMDs [mkErrBasePD (TransformToDstFail "DateFSE" input " (conversion failed)") (Just pos), input_bmd])
        Just t  -> (t, input_bmd)
 
 utcToStr :: String -> (UTCTime, Base_md) -> (PstringSE, Base_md) 
 utcToStr fmt (utcTime, bmd) = (PstringSE (formatTime defaultTimeLocale fmt utcTime), bmd)
 
-[pads| type TimeZoneSE (se :: RE) = transform PstringSE se =>  TimeZone using <| (strToTz, tzToStr) |> |]  
+[pads| type TimeZoneSE (se :: RE) = transform PstringSE se =>  TimeZone using <| (strToTz, tzToStr) |> 
+       type TimeZoneC (c::Char) = TimeZoneSE <|RE ("[" ++ [c] ++  "]") |> |]  
+
+type TimeZone_md = Base_md
 
 strToTz :: Pos -> (PstringSE, Base_md) -> (TimeZone, Base_md)
-strToTz pos fmt (PstringSE input, input_bmd) = 
+strToTz pos (PstringSE input, input_bmd) = 
   case parseTime defaultTimeLocale "%z" input of 
-       Nothing -> (gdef, mkErrBasePD  mergeBaseMDs [(TransformToDstFail "TimeZoneSE" input " (conversion failed)") (Just pos), input_bmd])
+       Nothing -> (gdef,  mergeBaseMDs [mkErrBasePD (TransformToDstFail "TimeZoneSE" input " (conversion failed)") (Just pos), input_bmd])
        Just t  -> (t, input_bmd)
 
-tzToStr :: String -> (TimeZone, Base_md) -> (PstringSE, Base_md) 
-tzToStr fmt (tz, bmd) = (PstringSE (h ++ ":" ++ m), bmd)
+tzToStr ::  (TimeZone, Base_md) -> (PstringSE, Base_md) 
+tzToStr (tz, bmd) = (PstringSE (h ++ ":" ++ m), bmd)
            where (h,m) = splitAt 3 (show tz)
 
 
@@ -117,7 +124,7 @@ int2HexStr size (Pint x,md) = if (length result == size) && wasPos  then (Pstrin
 
 
 
--}
+
 
 
 
