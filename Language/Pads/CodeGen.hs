@@ -391,20 +391,20 @@ genConstr_md fnMD conMD vars_fmd md_vars vars_conmd = do
 
 genParseRecord :: UString -> [FieldInfo] -> (Maybe Exp) -> Q (Dec,Exp)
 genParseRecord c fields pred = do
-  { repVars <- sequence [newName "x" | n <- [1 .. length tys]] 
-  ; con_md <- genConstr_md fnMD conMD vars_conmd md_vars vars_con
-  ; doStmts <- sequence [genParseField f xn | (f,xn) <- zip fields repVars]
-  ; let fnMDxsQ  = return (applyE (VarE (fnMD)) (map VarE repVars))
+  { let vars_conmd = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
+  ; let md_vars    = [ mkName ("m"++show n) | n <- [1 .. length tys]] 
+  ; let vars_con   = [v | (v,(Just l, (_,t),_)) <- zip vars_conmd fields, hasRep t]
+  ; con_md  <- genConstr_md fnMD conMD vars_conmd md_vars vars_con
+  
+  ; labMDs  <- sequence [genLabName labelM | (labelM, (strict,ty), expM) <- fields] 
+  ; doStmts <- sequence [genParseField f xn | (f,xn) <- zip fields labMDs]
+  ; let fnMDxsQ  = return (applyE (VarE (fnMD)) (map VarE labMDs))
   ; returnStmt <- [| return ($conLabsQ,$fnMDxsQ) |]
   ; return (con_md, DoE (doStmts ++ [NoBindS returnStmt]))
   }
   where
     tys  = [ty | (labelM, (strict,ty), expM) <- fields]
     labs = [lab | (Just lab, (strict,ty), expM) <- fields, hasRep ty]
-
-    vars_conmd = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
-    md_vars    = [ mkName ("m"++show n) | n <- [1 .. length tys]] 
-    vars_con   = [v | (v,(Just l, (_,t),_)) <- zip vars_conmd fields, hasRep t]
     conLabsQ = return (applyE (ConE (mkConstrName c)) (map (VarE . mkName) labs))
     conMD = ConE (mkConstrIMDName c)
     fnMD  = mkfnMDName c
@@ -413,16 +413,21 @@ genParseField :: FieldInfo -> Name -> Q Stmt
 genParseField (labM, (strict, ty), expM) xn = do
   { parseTy <- case expM of 
                 Nothing  -> genParseTy ty
-                Just exp -> genParseTy (PConstrain labP ty exp)
+                Just exp -> genParseRecConstrain labP (VarP xn) ty exp
   ; return (BindS (TupP [labP, VarP xn]) parseTy)
   }
   where
     labP = case labM of
-             Just lab -> VarP (mkName lab)
-             Nothing  -> WildP
+              Just lab -> VarP (mkName lab)
+              Nothing  -> WildP
 
+genParseRecConstrain :: Pat -> Pat -> PadsTy -> Exp -> Q Exp
+genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred |]
+  where
+    pred = return (LamE [labP, xnP] exp)
 
-
+genLabName (Just lab) = return (mkFieldMDName lab)
+genLabName Nothing    = newName "x"
 
 
 ------------------------------------------
@@ -551,6 +556,8 @@ mkMDVarName name = mkName (name ++ "_md")
 
 mkFieldName str   = mkName str
 mkFieldMDName str = mkName (str++"_md")
+
+
 
 mkConstrName   str  = mkName str
 mkConstrIMDName str = mkName (str++"_imd")
