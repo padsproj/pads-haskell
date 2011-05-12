@@ -26,7 +26,12 @@ data Switcher (x) = case x of
 
 type Triple = (Int, (transform Int => Char using <|(bi,ib)|>, Int)) 
 
+{-
+newtype Void = Void ()
 
+oldtype Maybe a = Just a
+                | Nothing ()
+-}
 |]
 
 

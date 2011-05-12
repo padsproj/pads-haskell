@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, ScopedTypeVariables #-}
+
 module Text.VCard
     ( -- $doc
       VCard(..)
@@ -15,7 +17,9 @@ module Text.VCard
 import Data.List (intercalate)
 import Data.Time (UTCTime, TimeZone, FormatTime, formatTime)
 import System.Locale (defaultTimeLocale)
-import Language.Pads.Haskell
+
+import Language.Pads.Padsc
+-- import Language.Pads.Haskell
 
 
 -- Lines are delimited with carriage return/line-feed (control-M, newline)  \r\n
@@ -29,7 +33,7 @@ type VCards = [VCcard | EOR] terminator EOF
 --      guaranteed to be in a particular order.
 data VCard = VCard  ("BEGIN:", vcardRE, EOR, [Entry|EOR] terminator "END:", vcardRE)
 
-type Entry = Entry { prefix   :: Maybe ("item", Int, '.'),
+data Entry = Entry { prefix   :: Maybe ("item", Int, '.'),
                      tag      :: Tag, 
                      sep      :: PstringME semicommaRE, 
                      property :: VCardProperty tag }
@@ -40,6 +44,7 @@ data Tag = VERSION | N | FN | NICKNAME | PHOTO | BDAY | ADR | LABEL
          | SOUND | UID | URL | CLASS | KEY
          | EXTENSION ("X-", VCardString)
          | ITEM "item"
+
 
 data VCardProperty (tag :: Tag) = case tag of 
     -- | Version number of VCard file format
@@ -147,11 +152,11 @@ data VCardProperty (tag :: Tag) = case tag of
     -- unit names. E.g.,
     --
     -- > Organization ["Spearhead Development, L.L.C.", "Executive"]
-    | ORG -> Organization ([VCardString | ';'] termintor EOR)
+    | ORG -> Organization ([VCardString | ';'] terminator EOR)
     -- | General categories to describe the vCard entity. E.g.,
     --
     -- > Categories ["Internet", "Web Services", "Programmers"]
-    | CATEGORIES -> Categories [VCardString | ','] terminator EOR
+    | CATEGORIES -> Categories ([VCardString | ','] terminator EOR)
     -- | A general note about the vCard entity. E.g.,
     --
     -- > Note "Email is the absolute best contact method."
@@ -191,7 +196,7 @@ data VCardProperty (tag :: Tag) = case tag of
     --
     -- > UID "19950401-080045-40000F192713-0052"
     | UID -> Uid { uidType :: Maybe (TypeS, ';')
-                   uidData :: VCardString }
+                 , uidData :: VCardString }
     -- | A website associated with the vCard entity. E.g.,
     --
     -- > URL "http://spearheaddev.com/"
@@ -200,7 +205,7 @@ data VCardProperty (tag :: Tag) = case tag of
     -- accessible the included information should be. E.g.,
     --
     -- > Class ClassConfidential
-    | CLASS Class
+    | CLASS -> Class
     -- | Specifies a public key or authentication certificate associated with
     -- the vCard entity. E.g.,
     --
@@ -251,6 +256,7 @@ data TelType    = TelHome "HOME"
                 | TelPCS "PCS"
                 | TelPreferred (PstringME "PREF|pref")
 
+
 -- | Represents the various types or properties of an email address.
 data EmailType = EmailInternet "INTERNET"
                | EmailX400  "X400"
@@ -268,6 +274,7 @@ data Data = URI    ("VALUE=uri:", VCardString)
 
 type WrappedEncoding = [Line (StringlnP startsWithSpace)]
 
+
 -- | Classifies the vCard's intended access level.
 data Class = ClassPublic "PUBLIC"
            | ClassPrivate "PRIVATE"
@@ -278,12 +285,13 @@ data Class = ClassPublic "PUBLIC"
 -- If parser sees first component of tuple, it stops.
 -- Second component is prefix to escape first component, so //, does not stop.
 -- Pretty printer prefixes stopping components with escape sequence.
-type VCardString = StringESC [(',', "\\"), (';', "\\"), (':', "\\")]   
+type VCardString = StringESC <| [(',', "\\"), (';', "\\"), (':', "\\")] |>
+
 type NameSs = [VCardString | ','] terminator ';'
 type NameRs = [VCardString | ','] terminator EOR
 
-type TypeS = (typeRE, '=', [VCardString|','] terminator (Try (RE "[:;]")))
-type TypeL a = [(typeRE, '=', [a|','] terminator (Try ';'))|';'] terminator ':')
+type TypeS = (typeRE, '=', [VCardString|','] terminator (Try <| RE "[:;]" |>))
+type TypeL a = [(typeRE, '=', [a|','] terminator (Try ';')) | ';'] terminator ':'
 
 |]
 

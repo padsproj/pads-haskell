@@ -175,9 +175,7 @@ mkMDList :: PadsTy -> Type
 mkMDList ty = mkTupleT [ConT ''Base_md, AppT ListT (mkMDTy ty)]    
 
 mkMDApp :: [PadsTy] -> Type
-mkMDApp tys = foldl AppT m ms
-  where
-    (m:ms) = [mkMDTy ty | ty <- tys, hasRep ty]
+mkMDApp tys = foldl1 AppT [mkMDTy ty | ty <- tys, hasRep ty]
 
 mkMDTuple :: [PadsTy] -> Type
 mkMDTuple tys = case mds of  
@@ -246,14 +244,15 @@ genPadsParseS name args patM = do
 ------------------------------------------------------
 
 genParseTy :: PadsTy -> Q Exp
-genParseTy (PConstrain pat ty exp)   = genParseConstrain pat ty exp
-genParseTy (PTransform src dest exp) = genParseTyTrans src dest exp
-genParseTy (PList ty sep term)       = genParseList ty sep term
-genParseTy (PApp tys argE)           = genParseTyApp tys argE
-genParseTy (PTuple tys)              = genParseTuple tys
-genParseTy (PExpression exp)         = genParseExp exp
-genParseTy (PTycon c)                = return $ mkParseTycon c
-genParseTy (PTyvar v)                = return $ mkParseTyvar v
+genParseTy pty = case pty of
+    PConstrain pat ty exp   -> genParseConstrain pat ty exp
+    PTransform src dest exp -> genParseTyTrans src dest exp
+    PList ty sep term       -> genParseList ty sep term
+    PApp tys argE           -> genParseTyApp tys argE
+    PTuple tys              -> genParseTuple tys
+    PExpression exp         -> genParseExp exp
+    PTycon c                -> return $ mkParseTycon c
+    PTyvar v                -> return $ mkParseTyvar v
 
 genParseConstrain :: Pat -> PadsTy -> Exp -> Q Exp
 genParseConstrain pat ty exp = [| parseConstraint $(genParseTy ty) $pred |]

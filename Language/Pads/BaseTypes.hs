@@ -62,7 +62,7 @@ import qualified Data.List as L
 
 
 {-
-[pads| type DateFSE (fmt :: String, se :: RE) = transform PstringSE se =>  UTCTime using <| (strToUTC fmt, utcToStr fmt) |> |]  
+[pads| type DateFSE (fmt :: String, se :: RE) = transform PstringSE se => UTCTime using <| (strToUTC fmt, utcToStr fmt) |> |]  
 
 strToUTC :: Pos -> String -> (PstringSE, Base_md) -> (UTCTime, Base_md)
 strToUTC pos fmt (PstringSE input, input_bmd) = 
