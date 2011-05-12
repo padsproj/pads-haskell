@@ -360,27 +360,27 @@ genParseSwitch exp pbs = do
 genParseBranchInfo :: BranchInfo -> Q (Dec,Exp)
 genParseBranchInfo (BRecord c fields pred) = genParseRecord c fields pred
 genParseBranchInfo (BConstr c args pred) = do
-  { con_md <- genConstr_md fnMD conMD vars_conmd md_vars vars_con
+  { con_md <- genConstr_md fnMD conMD tys
   ; body   <- foldl parseNext [| return ($conQ,$(return (VarE fnMD))) |] tys
   ; return (con_md, body)
   }
   where
     tys = [ty | (strict,ty) <- args]
-    vars_conmd = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
-    md_vars    = [ mkName ("m"++show n) | n <- [1 .. length tys]] 
-    vars_con   = [v | (v,t) <- zip vars_conmd tys, hasRep t]
     conQ  = return (ConE (mkConstrName c))
     conMD = ConE (mkConstrIMDName c)
     fnMD  = mkfnMDName c
 
-genConstr_md :: Name -> Exp -> [Name] -> [Name] -> [Name] -> Q Dec
-genConstr_md fnMD conMD vars_fmd md_vars vars_conmd = do
-  { body <- [| ($(genMergeBaseMDs md_vars), $(return (applyE conMD (map VarE vars_conmd)))) |]
+genConstr_md :: Name -> Exp -> [PadsTy] -> Q Dec
+genConstr_md fnMD conMD tys = do
+  { let vars_fmd   = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
+  ; let md_vars    = [ mkName ("m"++show n) | n <- [1 .. length tys]] 
+  ; let vars_conmd = [v | (v,t) <- zip vars_fmd tys, hasRep t]
+  ; let decls      = zipWith buildMDecl md_vars vars_fmd
+  ; body <- [| ($(genMergeBaseMDs md_vars), $(return (applyE conMD (map VarE vars_conmd)))) |]
   ; return (FunD fnMD [Clause (map VarP vars_fmd)
               (NormalB (LetE decls body)) []])
   }
   where
-    decls = zipWith buildMDecl md_vars vars_fmd
     buildMDecl m f
       = ValD (VarP m) (NormalB (AppE (VarE 'get_md_header) (VarE f))) []
 
@@ -391,10 +391,7 @@ genConstr_md fnMD conMD vars_fmd md_vars vars_conmd = do
 
 genParseRecord :: UString -> [FieldInfo] -> (Maybe Exp) -> Q (Dec,Exp)
 genParseRecord c fields pred = do
-  { let vars_conmd = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
-  ; let md_vars    = [ mkName ("m"++show n) | n <- [1 .. length tys]] 
-  ; let vars_con   = [v | (v,(Just l, (_,t),_)) <- zip vars_conmd fields, hasRep t]
-  ; con_md  <- genConstr_md fnMD conMD vars_conmd md_vars vars_con
+  { con_md <- genConstr_md fnMD conMD tys
   
   ; labMDs  <- sequence [genLabName labelM | (labelM, (strict,ty), expM) <- fields] 
   ; doStmts <- sequence [genParseField f xn | (f,xn) <- zip fields labMDs]
