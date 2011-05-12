@@ -1,12 +1,10 @@
 {-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, NamedFieldPuns, ScopedTypeVariables #-}
-
 module Examples.AI where
 import Language.Pads.Padsc hiding (str)
 import Language.Pads.GenPretty       
 import Control.Monad
 
 import System.IO.Unsafe (unsafePerformIO)
-
 import qualified Data.ByteString.Lazy.Char8 as B
 
 [pads|
@@ -28,18 +26,8 @@ import qualified Data.ByteString.Lazy.Char8 as B
 
   data ID = Missing '-' | Id (StringC ' ')
 
-  type TimeStamp = ('[', Date, ':', Time, ' ', TimeZone, ']')   
-
-  data Date = Date {day::Day, '/', month::Month, '/', year::Int}    
-  data Time = Time {hours::Hours, ':', minutes :: Minutes, ':', seconds :: Seconds}  
-  type TimeZone = ('-', Int)
-
-  type Year    = constrain y :: Int where <| 1900 <= y && y < 3000 |>   
-  data Month   = Jan | Feb | Mar | Apr | May | Jun | Jul | Aug | Sep | Oct | Nov | Dec  
-  type Day     = constrain d :: Int where <| 1 <= d && d < 31 |>   
-  type Hours   = constrain h :: Int where <| 0 <= h && h < 24 |>   
-  type Minutes = constrain m :: Int where <| 0 <= m && m < 60 |> 
-  type Seconds = constrain s :: Int where <| 0 <= s && s < 60 |> 
+  type TimeStamp = ('[', Date, ']')   
+  type Date = DateFC <|("%d/%h/%Y:%H:%M:%S %z", ']')|>
 
   data Request = Request 
       { '"',  method  :: Method,       

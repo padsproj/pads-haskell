@@ -10,7 +10,7 @@ module Text.VCard
     , TelType(..)
     , EmailType(..)
     , AgentData(..)
-    , Data(..)
+    , VCardData(..)
     , Class(..)
     ) where
 
@@ -27,7 +27,7 @@ import Language.Pads.Padsc
 
 [pads|
 -- KSF: Added to describe sequence of VCards
-type VCards = [VCcard | EOR] terminator EOF
+type VCards = [VCard | EOR] terminator EOF
 
 -- KSF: moved IndividualNames and Common Name into VCardPropety because these attributes are not 
 --      guaranteed to be in a particular order.
@@ -66,7 +66,7 @@ data VCardProperty (tag :: Tag) = case tag of
     -- | A photo of the VCard entity. E.g.,
     --
     -- > Photo Nothing (URI "http://accentuate.us/smedia/images/michael.jpg")
-    | PHOTO -> Photo Data
+    | PHOTO -> Photo VCardData
 
     -- | Specifies the birth date of the VCard entity. E.g.,
     --
@@ -136,7 +136,7 @@ data VCardProperty (tag :: Tag) = case tag of
     -- their organization. E.g.,
     --
     -- > Logo Nothing (URI "http://spearheaddev.com/smedia/images/logo-trans.png")
-    | LOGO -> Logo  Data
+    | LOGO -> Logo  VCardData
     -- | Indicates the vCard of an assistant or area administrator who is
     -- typically separately addressable. E.g.,
     --
@@ -188,7 +188,7 @@ data VCardProperty (tag :: Tag) = case tag of
     -- > Sound  "BASIC"
     -- >        (URI "CID:JOHNQPUBLIC.part8.19960229T080000.xyzMail@host1.com")
     | SOUND -> Sound { sndType   :: Maybe (TypeS, ';') -- ^ Registered IANA format
-                     , sndData   :: Data
+                     , sndData   :: VCardData
                      }
     -- | A value to uniquely identify the vCard. Please note well that this
     -- should be one of the registered IANA formats, but as of this time, this
@@ -211,7 +211,7 @@ data VCardProperty (tag :: Tag) = case tag of
     --
     -- > Key "x509" (Binary "dGhpcyBjb3VsZCBiZSAKbXkgY2VydGlmaWNhdGUK")
     | KEY -> Key { keyType   :: Maybe (TypeS, ';') -- ^ Registered IANA format
-                 , keyData   :: Data
+                 , keyData   :: VCardData
                  }
     | EXTENSION s -> VCardString    
 
@@ -268,9 +268,9 @@ data AgentData = AgentURI ("VALUE=uri:", VCardString)
                | AgentVCard VCard
 
 -- | Represents the various types of data that can be included in a vCard.
-data Data = URI    ("VALUE=uri:", VCardString) 
-          | Binary ("ENCODING=b", Maybe(';', TypeS), ':', WrappedEncoding )
-          | Base64 ("BASE64:", WrappedEncoding)
+data VCardData = URI    ("VALUE=uri:", VCardString) 
+               | Binary ("ENCODING=b", Maybe(';', TypeS), ':', WrappedEncoding )
+               | Base64 ("BASE64:", WrappedEncoding)
 
 type WrappedEncoding = [Line (StringlnP startsWithSpace)]
 
@@ -285,7 +285,7 @@ data Class = ClassPublic "PUBLIC"
 -- If parser sees first component of tuple, it stops.
 -- Second component is prefix to escape first component, so //, does not stop.
 -- Pretty printer prefixes stopping components with escape sequence.
-type VCardString = StringESC <| [(',', "\\"), (';', "\\"), (':', "\\")] |>
+type VCardString = StringESC <| ('\\', ",:;") |>
 
 type NameSs = [VCardString | ','] terminator ';'
 type NameRs = [VCardString | ','] terminator EOR
