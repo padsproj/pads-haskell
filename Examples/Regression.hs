@@ -311,3 +311,7 @@ pt54  = testParsePadsDecls t54
 ppt54 = case pt54 of Left e -> show e ; Right r -> pretty 250 (ppDeclList r)
 result54 = t54 == ppt54
        
+t55   = "newtype Void = Void ()"
+pt55  = testParsePadsDecls t55
+ppt55 = case pt55 of Left e -> show e ; Right r -> pretty 150 (ppDeclList r)
+result55 = t55 == ppt55

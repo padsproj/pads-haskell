@@ -49,15 +49,25 @@ genPadsDecl (PadsDeclData name args pat padsData derives) = do
   { let dataDecs = mkDataRepMDDecl name args padsData derives
   ; parseM <- genPadsDataParseM name args pat padsData 
   ; parseS <- genPadsParseS name args pat
-  ; return (dataDecs ++ parseM ++ parseS) --  ++ instances ) --  ++ printFL)
+  ; let instances = mkPadsInstance name (fmap patType pat)
+  ; return (dataDecs ++ parseM ++ parseS ++ [instances] ) --  ++ printFL)
   }
 
 genPadsDecl (PadsDeclNew name args pat branch derives) = do
   { let dataDecs = mkNewRepMDDecl name args branch derives
   ; parseM <- genPadsNewParseM name args pat branch 
   ; parseS <- genPadsParseS name args pat
-  ; return (dataDecs ++ parseM ++ parseS) --  ++ instances ) --  ++ printFL)
+  ; let instances = mkPadsInstance name (fmap patType pat)
+  ; return (dataDecs ++ parseM ++ parseS ++ [instances] ) --  ++ printFL)
   }
+
+patType :: Pat -> Type
+patType p = case p of
+  LitP lit -> case lit of
+                CharL c   -> VarT ''Char
+                StringL s -> VarT ''String
+  TupP ps  -> mkTupleT (map patType ps)
+  SigP p t -> t
 
 
 -----------------------------------------------------------
@@ -96,7 +106,7 @@ mkRepUnion (BConstr c args expM) = NormalC (mkConstrName c) reps
     reps = [(strict,mkRepTy ty) | (strict,ty) <- args, hasRep ty]
 mkRepUnion (BRecord c fields expM) = RecC (mkConstrName c) lreps
   where   
-    lreps = [(mkName l,strict,mkRepTy ty) | (Just l,(strict,ty),expM) <- fields, hasRep ty]
+    lreps = [(mkName l,strict,mkRepTy ty) | (Just l,(strict,ty),_) <- fields, hasRep ty]
 
 mkMDUnion :: BranchInfo -> Con
 mkMDUnion (BConstr c args expM) = NormalC (mkConstrIMDName c) mds
@@ -104,7 +114,7 @@ mkMDUnion (BConstr c args expM) = NormalC (mkConstrIMDName c) mds
     mds = [(NotStrict,mkMDTy ty) | (_,ty) <- args, hasRep ty]
 mkMDUnion (BRecord c fields expM) = RecC (mkConstrIMDName c) lmds
   where   
-    lmds = [(mkFieldMDName l,NotStrict,mkMDTy ty) | (Just l,(_,ty),expM) <- fields, hasRep ty]
+    lmds = [(mkFieldMDName l,NotStrict,mkMDTy ty) | (Just l,(_,ty),_) <- fields, hasRep ty]
 
 derive :: [UString] -> [Name]
 derive ds =  map mkName ds
@@ -186,6 +196,31 @@ mkMDTuple tys = case mds of
     mds = [mkMDTy ty | ty <- tys, hasRep ty]
 
 
+
+-----------------------------------------------------------------
+-- GENERATING INSTANCE DECLARATIONS FROM DATA/NEW DECLARATION
+------------------------------------------------------------------
+
+-- Doesn't yet work for higher kinded Pads types
+
+mkPadsInstance :: UString -> Maybe Type -> Dec
+mkPadsInstance str Nothing 
+  = buildInst str (ConT ''Pads) (VarP 'parsePP) (VarP 'printFL)
+mkPadsInstance str (Just ety) 
+  = buildInst str  (ConT ''Pads1 `AppT` ety) (VarP 'parsePP1) (VarP 'printFL1)
+
+buildInst str pads parse print
+  = InstanceD [] inst [parsePP_method, printFL_method]
+  where
+    ty_name = ConT $ mkName str
+    md_ty   = ConT $ mkMDName str
+    inst    = applyT [pads, ty_name, md_ty]
+    parsePP_method = ValD parse (NormalB (VarE (mkTyParserName str))) []
+    printFL_method = ValD print (NormalB (VarE 'dummyPrintFL)) [] -- (mkPrintFLName str))) []
+
+dummyPrintFL = error "printFL is not yet defined"
+
+
 -----------------------------------------------------------------
 -- GENERATING PARSER DECLARATION FROM TYPE/DATA/NEW DECLARATION
 ------------------------------------------------------------------
@@ -235,7 +270,7 @@ genPadsParseS name args patM = do
   where
     parserName = mkTyParserName name    
     parserArgs = map (VarP . mkVarParserName) args ++ pat
-    foo = applyE (VarE (mkTyParserName name)) (map patToExp parserArgs)
+    foo = applyE (VarE (mkTyParserName name) : map patToExp parserArgs)
     pat = Maybe.maybeToList patM
 
 
@@ -245,8 +280,8 @@ genPadsParseS name args patM = do
 
 genParseTy :: PadsTy -> Q Exp
 genParseTy pty = case pty of
-    PConstrain pat ty exp   -> genParseConstrain pat ty exp
-    PTransform src dest exp -> genParseTyTrans src dest exp
+    PConstrain pat ty exp   -> genParseConstrain (return pat) ty (return exp)
+    PTransform src dest exp -> genParseTyTrans src dest (return exp)
     PList ty sep term       -> genParseList ty sep term
     PApp tys argE           -> genParseTyApp tys argE
     PTuple tys              -> genParseTuple tys
@@ -254,14 +289,14 @@ genParseTy pty = case pty of
     PTycon c                -> return $ mkParseTycon c
     PTyvar v                -> return $ mkParseTyvar v
 
-genParseConstrain :: Pat -> PadsTy -> Exp -> Q Exp
-genParseConstrain pat ty exp = [| parseConstraint $(genParseTy ty) $pred |]
+genParseConstrain :: Q Pat -> PadsTy -> Q Exp -> Q Exp
+genParseConstrain patQ ty expQ = [| parseConstraint $(genParseTy ty) $pred |]
   where
-    pred = return (LamE [pat, VarP (mkName "md")] exp)
+    pred = lamE [patQ, varP (mkName "md")] expQ
 
-genParseTyTrans :: PadsTy -> PadsTy -> Exp -> Q Exp
-genParseTyTrans tySrc tyDest exp
-  = [| parseTransform $(genParseTy tySrc) (fst $(return exp)) |]
+genParseTyTrans :: PadsTy -> PadsTy -> Q Exp -> Q Exp
+genParseTyTrans tySrc tyDest expQ
+  = [| parseTransform $(genParseTy tySrc) (fst $expQ) |]
 
 genParseList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> Q Exp
 genParseList ty sep term =
@@ -275,41 +310,37 @@ genParseList ty sep term =
 
 genParseTuple :: [PadsTy] -> Q Exp
 genParseTuple tys = do
-  { f_rep <- buildF_rep vars_frep
-  ; f_md  <- buildF_md vars_fmd md_vars vars_frep
+  { let f_rep = buildF_rep vars_frep
+  ; let f_md  = buildF_md vars_fmd vars_frep 
   ; body  <- foldl parseNext [| return ($(dyn "f_rep"),$(dyn "f_md")) |] tys
   ; return (LetE [f_rep,f_md] body)
   }
   where
-    vars_fmd  = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
-    md_vars   = [ mkName ("m"++show n) | n <- [1 .. length tys]] 
     vars_frep = [v | (v,t) <- zip vars_fmd tys, hasRep t]
-
-buildF_rep :: [Name] -> Q Dec
-buildF_rep vars_frep = do
-  { body <- tupleTH vars_frep
-  ; return (FunD (mkName "f_rep") [Clause (map VarP vars_frep) (NormalB body) [] ])
-  }
-
-buildF_md :: [Name] -> [Name] -> [Name] -> Q Dec
-buildF_md vars_fmd md_vars vars_frep = do
-  { body <- [| ($(genMergeBaseMDs md_vars), $(tupleTH vars_frep)) |]
-  ; return (FunD (mkName "f_md") [Clause (map VarP vars_fmd)
-              (NormalB (LetE decls body)) []])
-  }
-  where
-    decls = zipWith buildMDecl md_vars vars_fmd
-    buildMDecl m f
-      = ValD (VarP m) (NormalB (AppE (VarE 'get_md_header) (VarE f))) []
+    vars_fmd  = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
 
 parseNext :: Q Exp -> PadsTy -> Q Exp
 parseNext prog t
   | hasRep t  = [| $prog =@= $(genParseTy t) |]
   | otherwise = [| $prog =@  $(genParseTy t) |]
 
-genMergeBaseMDs [e] = return (VarE e)
-genMergeBaseMDs es  = [| mergeBaseMDs $(listTH es) |]
+buildF_rep :: [Name] -> Dec
+buildF_rep vars_frep
+  = FunD (mkName "f_rep") [Clause
+         (map VarP vars_frep) (NormalB (TupE (map VarE vars_frep))) [] ]
 
+buildF_md :: [Name] -> [Name] -> Dec
+buildF_md vars_fmd vars_frep 
+  = FunD (mkName "f_md") [Clause (map VarP vars_fmd) (NormalB body) []]
+  where
+    mdHeaders = [ VarE 'get_md_header `AppE` VarE xi | xi <- vars_fmd ]
+    body = TupE [mkMergeBaseMDs mdHeaders, TupE (map VarE vars_frep)]
+
+mkMergeBaseMDs :: [Exp] -> Exp
+mkMergeBaseMDs [e] = e
+mkMergeBaseMDs es  = VarE 'mergeBaseMDs `AppE` ListE es
+
+genMergeBaseMDs e = return (mkMergeBaseMDs e)
 
 genParseExp :: Exp -> Q Exp
 genParseExp (LitE (CharL c)) = [| charLit_parseM c |]
@@ -360,29 +391,21 @@ genParseSwitch exp pbs = do
 genParseBranchInfo :: BranchInfo -> Q (Dec,Exp)
 genParseBranchInfo (BRecord c fields pred) = genParseRecord c fields pred
 genParseBranchInfo (BConstr c args pred) = do
-  { con_md <- genConstr_md fnMD conMD tys
-  ; body   <- foldl parseNext [| return ($conQ,$(return (VarE fnMD))) |] tys
+  { body <- foldl parseNext [| return ($(conE (mkConstrName c)),$(varE (mkfnMDName c))) |] tys
   ; return (con_md, body)
   }
   where
-    tys = [ty | (strict,ty) <- args]
-    conQ  = return (ConE (mkConstrName c))
-    conMD = ConE (mkConstrIMDName c)
-    fnMD  = mkfnMDName c
+    tys  = [ty | (strict,ty) <- args]
+    con_md = buildConstr_md (mkfnMDName c) (ConE (mkConstrIMDName c)) tys
 
-genConstr_md :: Name -> Exp -> [PadsTy] -> Q Dec
-genConstr_md fnMD conMD tys = do
-  { let vars_fmd   = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
-  ; let md_vars    = [ mkName ("m"++show n) | n <- [1 .. length tys]] 
-  ; let vars_conmd = [v | (v,t) <- zip vars_fmd tys, hasRep t]
-  ; let decls      = zipWith buildMDecl md_vars vars_fmd
-  ; body <- [| ($(genMergeBaseMDs md_vars), $(return (applyE conMD (map VarE vars_conmd)))) |]
-  ; return (FunD fnMD [Clause (map VarP vars_fmd)
-              (NormalB (LetE decls body)) []])
-  }
+buildConstr_md :: Name -> Exp -> [PadsTy] -> Dec
+buildConstr_md fnMD conMD tys 
+  = FunD fnMD [Clause (map VarP vars_fmd) (NormalB body) []]
   where
-    buildMDecl m f
-      = ValD (VarP m) (NormalB (AppE (VarE 'get_md_header) (VarE f))) []
+    vars_fmd   = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
+    mdHeaders  = [ VarE 'get_md_header `AppE` VarE xi | xi <- vars_fmd ]
+    body       = TupE [mkMergeBaseMDs mdHeaders, applyE (conMD : map VarE vars_conmd)]
+    vars_conmd = [v | (v,t) <- zip vars_fmd tys, hasRep t]
 
 
 ----------------------------------------------------------
@@ -391,20 +414,20 @@ genConstr_md fnMD conMD tys = do
 
 genParseRecord :: UString -> [FieldInfo] -> (Maybe Exp) -> Q (Dec,Exp)
 genParseRecord c fields pred = do
-  { con_md <- genConstr_md fnMD conMD tys
-  
-  ; labMDs  <- sequence [genLabName labelM | (labelM, (strict,ty), expM) <- fields] 
+  { labMDs  <- sequence [genLabMDName l | (l,(_,_),_) <- fields] 
+  ; let fnMDLabs  = applyE $ map VarE (mkfnMDName c : labMDs)
   ; doStmts <- sequence [genParseField f xn | (f,xn) <- zip fields labMDs]
-  ; let fnMDxsQ  = return (applyE (VarE (fnMD)) (map VarE labMDs))
-  ; returnStmt <- [| return ($conLabsQ,$fnMDxsQ) |]
+  ; returnStmt <- [| return ($(return conLabs),$(return fnMDLabs)) |]
   ; return (con_md, DoE (doStmts ++ [NoBindS returnStmt]))
   }
   where
-    tys  = [ty | (labelM, (strict,ty), expM) <- fields]
-    labs = [lab | (Just lab, (strict,ty), expM) <- fields, hasRep ty]
-    conLabsQ = return (applyE (ConE (mkConstrName c)) (map (VarE . mkName) labs))
-    conMD = ConE (mkConstrIMDName c)
-    fnMD  = mkfnMDName c
+    labs    = [mkName lab | (Just lab,(_,ty),_) <- fields, hasRep ty]
+    conLabs = applyE (ConE (mkConstrName c) : map VarE labs)
+    con_md  = buildConstr_md (mkfnMDName c) (ConE (mkConstrIMDName c))
+                [ty | (_,(_,ty),_) <- fields]
+
+genLabMDName (Just lab) = return (mkFieldMDName lab)
+genLabMDName Nothing    = newName "x"
 
 genParseField :: FieldInfo -> Name -> Q Stmt
 genParseField (labM, (strict, ty), expM) xn = do
@@ -422,9 +445,6 @@ genParseRecConstrain :: Pat -> Pat -> PadsTy -> Exp -> Q Exp
 genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred |]
   where
     pred = return (LamE [labP, xnP] exp)
-
-genLabName (Just lab) = return (mkFieldMDName lab)
-genLabName Nothing    = newName "x"
 
 
 ------------------------------------------

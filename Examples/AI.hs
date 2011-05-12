@@ -53,6 +53,7 @@ checkVersion method version =
 
 
 
+
 --mkPrettyInstance ''AI
 --mkPrettyInstance ''AI_md
 
@@ -66,7 +67,7 @@ ai_big  = "Examples/data/ai.big"
 
 ai_file_length  = Prelude.length ai_rep
 ai_file_take n  = Prelude.take n ai_rep
-
+test = ai_file_take 20
 
 -- printAI n = putStrLn(pretty 100 (ppr (ai_file_take n)))
 

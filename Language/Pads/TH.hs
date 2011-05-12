@@ -61,11 +61,11 @@ mapFstChar f (c:cs) = (f c) : cs
 strToUpper = mapFstChar toUpper
 strToLower = mapFstChar toLower
 
-applyE :: Exp -> [Exp] -> Exp
-applyE t ts = foldl AppE t ts
+applyE :: [Exp] -> Exp
+applyE ts = foldl1 AppE ts
 
-applyT :: Type -> [Type] -> Type
-applyT t ts = foldl AppT t ts
+applyT :: [Type] -> Type
+applyT ts = foldl1 AppT ts
 
 abstractT :: Type -> [Type] -> Type
 abstractT t ts = foldr arrow t ts
@@ -73,6 +73,7 @@ abstractT t ts = foldr arrow t ts
     t1 `arrow` t2 = (ArrowT `AppT` t1) `AppT` t2
 
 arrowTy ty1 ty2 = (ArrowT `AppT` ty1) `AppT` ty2
+
 
 mkListT, mkTupleT :: [Type] -> Type
 mkListT ts = foldl AppT ListT ts
