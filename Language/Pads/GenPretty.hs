@@ -47,6 +47,8 @@ import Control.Monad
 import System.Posix.Types
 import Data.Word
 import Data.Int
+import Data.Time
+
 
 pprE argE = AppE (VarE 'ppr) argE
 pprListEs argEs = ListE (map pprE argEs) 
@@ -112,7 +114,7 @@ getNamedTys' answers worklist =
 
 baseTypeNames = S.fromList [ ''Pint, ''Pchar, ''Pdigit, ''Ptext, ''Pstring, ''PstringFW, ''PstringME 
                            , ''PstringSE, ''String, ''Char, ''COff, ''EpochTime, ''FileMode, ''Int, ''Word, ''Int64
-                           , ''Language.Pads.Errors.ErrInfo, ''Bool, ''Pbinary, ''Pre, ''Base_md
+                           , ''Language.Pads.Errors.ErrInfo, ''Bool, ''Pbinary, ''Pre, ''Base_md, ''UTCTime, ''TimeZone
                            ]
 
 mkPrettyInstance :: TH.Name -> Q [TH.Dec]

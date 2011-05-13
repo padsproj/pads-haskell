@@ -39,7 +39,8 @@ import Text.PrettyPrint.Mainland as PP
 
 import Data.Int
 import Data.Data
-
+import Data.Word
+import Data.Char
 
 
 type RawStream = B.ByteString
@@ -77,6 +78,11 @@ instance Pretty Source where
     ppr (Source{current, rest, ..}) = text "Current:" <+> text (show current)
                                 
 
+chrToWord8 :: Char -> Word8
+chrToWord8 c = toEnum $ fromEnum c
+
+word8ToChr :: Word8 -> Char 
+word8ToChr w = toEnum $ fromEnum w
 
 {- Called when current is empty.
    Should not be called when atEOF is already set. -}
