@@ -99,6 +99,8 @@ pprHexp exp = case exp of
   TH.VarE name -> text(TH.pprint exp)
   TH.ConE name -> text(TH.pprint exp)
   TH.LitE lit  -> text(TH.pprint exp)
+  TH.AppE (TH.ConE re) (TH.LitE (TH.StringL str)) | re==TH.mkName "RE" 
+               -> text("'"++str++"'")
   otherwise    -> ppr_bird (text(TH.pprint exp))
 
 ppr_bird s = (text "<|") <> s <> (text "|>")

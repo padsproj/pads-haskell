@@ -16,23 +16,29 @@ newtype Lst a = Lst ([a | '|'] length 3)
 
 data CharPair = Char2 {first::Char,second::Char}
 
-data Foo b = Bazz Int | Zipp "(" b "%%" !Int ')'
+data Foo b = Bazz Int | Zipp "(" b '[01]+' !Int ')'
   deriving (Read, Eq)
 
-data Switcher (x) = case x of
+data Switcher (x::Int) = case x of
                       0 -> Zero "$"
                     | 1 -> One (Lst Int)
                          deriving (Read, Eq)
 
 type Triple = (Int, (transform Int => Char using <|(bi,ib)|>, Int)) 
 
-{-
+
 newtype Void = Void ()
 
+-- newtype Jib = Jib (StringSE $[a-z]+$)
+
+
+{-
 oldtype Maybe a = Just a
                 | Nothing ()
 -}
 |]
+
+
 
 
 bi::a->(Int,Int_md)->(Char,Char_md)

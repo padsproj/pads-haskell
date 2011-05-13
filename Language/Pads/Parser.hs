@@ -54,7 +54,7 @@ parsePadsDecls fileName line column input
 
 lexer :: PT.TokenParser ()
 lexer = PT.makeTokenParser (haskellStyle 
-             { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", "," ],
+             { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", reMark ],
                reservedNames   = ["data", "type", "newtype", "oldtype", "deriving",
                                    "using", "where", "terminator", "length", "of",
                                    "case", "constrain", "transform" ]})
@@ -183,8 +183,11 @@ listEnd env
 
 arrow env
   = do { bs <- btype env `sepBy` reservedOp "->"
-       ; if length bs == 1 then return (head bs)
-         else return (PApp (PTycon "(->)" : bs) Nothing)}
+       ; return $ case length bs of
+           0 -> PTuple []
+           1 -> head bs
+           _ -> PApp (PTycon "(->)" : bs) Nothing
+       }
 
 btype :: Env -> Parser PadsTy
 btype env
@@ -357,12 +360,20 @@ haskellParsePatTill op = do { str <- manyTill anyChar (reservedOp op)
 
 
 literal :: Parser Exp 
-literal =  fmap (LitE . CharL) charLiteral
+literal =  fmap (LitE . CharL) (try charLiteral)
+       <|> reLiteral
        <|> fmap (LitE . StringL) stringLiteral
        <|> fmap (LitE . IntegerL) (try integer)
        <|> fmap (VarE . mkName) var
        <|> fmap (ConE . mkName) con
        <?> "Pads literal"
+
+reLiteral :: Parser Exp 
+reLiteral = do { reservedOp reMark
+               ; str <- manyTill anyChar (reservedOp reMark) 
+               ; return (ConE (mkName "RE") `AppE` LitE (StringL str))
+               }
+reMark = "'"
 
 var = lowerId
 con = upperId
