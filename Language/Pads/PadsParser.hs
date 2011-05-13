@@ -165,8 +165,8 @@ constraintReport isGood md = Base_md {numErrors = totErrors, errInfo = errors}
     Base_md {numErrors, errInfo} = get_md_header md
     totErrors = if isGood then numErrors else numErrors + 1
     errors = if totErrors == 0 then Nothing else 
-       Just(ErrInfo {msg = if isGood then FUnderlyingTypedefFail
-                                     else FPredicateFailure,
+       Just(ErrInfo {msg = if isGood then UnderlyingTypedefFail
+                                     else PredicateFailure,
                      position = join $ fmap position errInfo})
 
 
