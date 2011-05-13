@@ -1,4 +1,5 @@
-{-# LANGUAGE TemplateHaskell, NamedFieldPuns, ScopedTypeVariables, RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell, NamedFieldPuns, ScopedTypeVariables,
+             RecordWildCards, UndecidableInstances #-}
 
 
 module Language.Pads.CodeGen where
@@ -49,7 +50,7 @@ genPadsDecl (PadsDeclData name args pat padsData derives) = do
   { let dataDecs = mkDataRepMDDecl name args padsData derives
   ; parseM <- genPadsDataParseM name args pat padsData 
   ; parseS <- genPadsParseS name args pat
-  ; let instances = mkPadsInstance name (fmap patType pat)
+  ; let instances = mkPadsInstance name args (fmap patType pat)
   ; return (dataDecs ++ parseM ++ parseS ++ [instances] ) --  ++ printFL)
   }
 
@@ -57,7 +58,7 @@ genPadsDecl (PadsDeclNew name args pat branch derives) = do
   { let dataDecs = mkNewRepMDDecl name args branch derives
   ; parseM <- genPadsNewParseM name args pat branch 
   ; parseS <- genPadsParseS name args pat
-  ; let instances = mkPadsInstance name (fmap patType pat)
+  ; let instances = mkPadsInstance name args (fmap patType pat)
   ; return (dataDecs ++ parseM ++ parseS ++ [instances] ) --  ++ printFL)
   }
 
@@ -203,20 +204,23 @@ mkMDTuple tys = case mds of
 
 -- Doesn't yet work for higher kinded Pads types
 
-mkPadsInstance :: UString -> Maybe Type -> Dec
-mkPadsInstance str Nothing 
-  = buildInst str (ConT ''Pads) (VarP 'parsePP) (VarP 'printFL)
-mkPadsInstance str (Just ety) 
-  = buildInst str  (ConT ''Pads1 `AppT` ety) (VarP 'parsePP1) (VarP 'printFL1)
+mkPadsInstance :: UString -> [LString] -> Maybe Type -> Dec
+mkPadsInstance str args Nothing 
+  = buildInst str args (ConT ''Pads) (VarP 'parsePP) (VarP 'printFL)
+mkPadsInstance str args (Just ety) 
+  = buildInst str args (ConT ''Pads1 `AppT` ety) (VarP 'parsePP1) (VarP 'printFL1)
 
-buildInst str pads parse print
-  = InstanceD [] inst [parsePP_method, printFL_method]
+buildInst str args pads parse print
+  = InstanceD cxt inst [parsePP_method, printFL_method]
   where
-    ty_name = ConT $ mkName str
-    md_ty   = ConT $ mkMDName str
     inst    = applyT [pads, ty_name, md_ty]
+    ty_name = applyT (ConT (mkName str) : map fst argpairs)
+    md_ty   = applyT (ConT (mkMDName str) : map snd argpairs)
     parsePP_method = ValD parse (NormalB (VarE (mkTyParserName str))) []
     printFL_method = ValD print (NormalB (VarE 'dummyPrintFL)) [] -- (mkPrintFLName str))) []
+    argpairs = [(VarT (mkName a), VarT (mkName (a++"_md"))) | a <- args]
+
+    cxt = [ClassP ''Pads [r,m] | (r,m) <- argpairs]
 
 dummyPrintFL = error "printFL is not yet defined"
 
