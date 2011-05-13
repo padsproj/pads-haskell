@@ -55,7 +55,7 @@ parsePadsDecls fileName line column input
 lexer :: PT.TokenParser ()
 lexer = PT.makeTokenParser (haskellStyle 
              { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", reMark ],
-               reservedNames   = ["data", "type", "newtype", "oldtype", "deriving",
+               reservedNames   = ["data", "type", "newtype", "oldtype", "olddata", "existing", "deriving",
                                    "using", "where", "terminator", "length", "of",
                                    "case", "constrain", "transform" ]})
 
@@ -86,36 +86,33 @@ padsDecls = option [] (many1 topDecl)
 
 topDecl :: Parser PadsDecl
 topDecl 
-  =  typeDecl <|> dataDecl <|> newDecl <|> oldDecl
+  =  typeDecl <|> dataDecl <|> newDecl
  <?> "Pads declaration keyword"
 
 typeDecl :: Parser PadsDecl
 typeDecl 
-  = do { reserved "type"; (id,env,pat) <- declLHS
+  = do { old <- (reserved "type" >> return False)
+            <|> (reserved "oldtype" >> return True)
+       ; (id,env,pat) <- declLHS
        ; rhs <- ptype env
-       ; return (PadsDeclType id env pat rhs)
+       ; return (PadsDeclType old id env pat rhs)
        } <?> "Pads type declaration"
 
 dataDecl :: Parser PadsDecl
 dataDecl 
-  = do { reserved "data"; (id,env,pat) <- declLHS
+  = do { old <- (reserved "data" >> return False)
+            <|> (reserved "olddata" >> return True)
+       ; (id,env,pat) <- declLHS
        ; rhs <- dataRHS env; drvs <- option [] derives
-       ; return (PadsDeclData id env pat rhs drvs)
+       ; return (PadsDeclData old id env pat rhs drvs)
        } <?> "Pads data declaration"
 
 newDecl :: Parser PadsDecl
 newDecl 
   = do { reserved "newtype"; (id,env,pat) <- declLHS
        ; rhs <- newRHS env; drvs <- option [] derives
-       ; return (PadsDeclNew id env pat rhs drvs)
+       ; return (PadsDeclNew False id env pat rhs drvs)
        } <?> "Pads newtype declaration"
-
-oldDecl :: Parser PadsDecl
-oldDecl
-  = do { reserved "oldtype"; (id,env,pat) <- declLHS
-       ; rhs <- ptype env
-       ; return (PadsDeclOld id env pat rhs)
-       } <?> "Pads oldtype declaration"
 
 declLHS
   = do { id <- upperId; env <- option [] (try $ many var)
