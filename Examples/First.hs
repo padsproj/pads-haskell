@@ -126,7 +126,7 @@ bar2_expects = ((Pint 56,(Pint 23,Pint 46),Pint 29), 0 ,"")
 bar2_test    = mkTestCase "bar2" bar2_expects bar2_result
 
 [pads| type BazR = Line (Pint, ',',Pint) |]                  -- type that consumes a line boundary.
-bazr_result = bazR_parseS "33,33:"
+bazr_result = bazR_parseS "33,33\n"
 bazr_expects = ((Pint 33,Pint 33),0,"")
 bazr_test    = mkTestCase "bazr" bazr_expects bazr_result
 
@@ -624,7 +624,7 @@ test_myData = mkTestCase "MyData" expect_myData result_myData
 pintToInt (Pint i) = i
 [pads| data HP = HP { student_num  :: Pint , ',', 
                       student_name :: PstringFW <|pintToInt student_num|> }
-       type HP_data = [Line HP] |]   
+       type HP_data = [Line HP] terminator EOF |]   
 
 input_hp_data = "8,Hermione\n3,Ron\n5,Harry\n"
 result_hp_data = hP_data_parseS input_hp_data
@@ -635,7 +635,7 @@ test_hp_data = mkTestCase "HP Data" expect_hp_data result_hp_data
 
 
 {-
-test_file = "data/test_file"
+test_file = "Examples/data/test_file"
 result_hp_data_file_parse :: (HP_data, HP_data_md) = unsafePerformIO $
                                                      parseFile test_file
 expect_hp_data_file_parse = 
@@ -647,7 +647,7 @@ test_hp_data_file_parse = mkFileTestCase "HP file" expect_hp_data_file_parse res
 
 
 [pads| type MyDoc = Ptext |]
-myDoc_input_file = "data/test_file"
+myDoc_input_file = "Examples/data/test_file"
 myDoc_result :: (Ptext, Base_md) = unsafePerformIO $ parseFile myDoc_input_file
 myDoc_expects = (Ptext "8,Hermione\n3,Ron\n5,Harry\n",0)
 myDoc_test = mkFileTestCase "myDoc" myDoc_expects myDoc_result
