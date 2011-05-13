@@ -27,9 +27,19 @@ data Switcher (x::Int) = case x of
 type Triple = (Int, (transform Int => Char using <|(bi,ib)|>, Int)) 
 
 
-newtype Void = Void ()
+type Void = ()
 
--- newtype Jib = Jib (StringSE $[a-z]+$)
+data May a = Jus a
+           | Noth ()
+|]
+
+[pads|
+
+olddata Maybe a = Just a
+                | Nothing ""
+
+
+
 
 
 {-
@@ -37,8 +47,6 @@ oldtype Maybe a = Just a
                 | Nothing ()
 -}
 |]
-
-
 
 
 bi::a->(Int,Int_md)->(Char,Char_md)

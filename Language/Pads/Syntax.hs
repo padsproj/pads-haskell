@@ -18,10 +18,9 @@ import Language.Haskell.TH
 
 
 
-data PadsDecl = PadsDeclType UString [LString] (Maybe Pat) PadsTy
-              | PadsDeclData UString [LString] (Maybe Pat) PadsData [UString]
-              | PadsDeclNew  UString [LString] (Maybe Pat) BranchInfo [UString]
-              | PadsDeclOld  UString [LString] (Maybe Pat) PadsTy
+data PadsDecl = PadsDeclType  Bool UString [LString] (Maybe Pat) PadsTy
+              | PadsDeclData  Bool UString [LString] (Maybe Pat) PadsData [UString]
+              | PadsDeclNew   Bool UString [LString] (Maybe Pat) BranchInfo [UString]
    deriving (Eq, Data, Typeable, Show)
 
 

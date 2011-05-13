@@ -39,23 +39,23 @@ make_pads_declarations ds = fmap concat (mapM genPadsDecl ds)
 
 genPadsDecl :: PadsDecl -> Q [Dec]
 
-genPadsDecl (PadsDeclType name args pat padsTy) = do
-  { let typeDecs = mkTyRepMDDecl name args padsTy
+genPadsDecl (PadsDeclType old name args pat padsTy) = do
+  { let typeDecs = mkTyRepMDDecl old name args padsTy
   ; parseM <- genPadsParseM name args pat padsTy
   ; parseS <- genPadsParseS name args pat
   ; return (typeDecs ++ parseM ++ parseS) --  ++ printFL)
   }
 
-genPadsDecl (PadsDeclData name args pat padsData derives) = do
-  { let dataDecs = mkDataRepMDDecl name args padsData derives
+genPadsDecl (PadsDeclData old name args pat padsData derives) = do
+  { let dataDecs = mkDataRepMDDecl old name args padsData derives
   ; parseM <- genPadsDataParseM name args pat padsData 
   ; parseS <- genPadsParseS name args pat
   ; let instances = mkPadsInstance name args (fmap patType pat)
   ; return (dataDecs ++ parseM ++ parseS ++ [instances] ) --  ++ printFL)
   }
 
-genPadsDecl (PadsDeclNew name args pat branch derives) = do
-  { let dataDecs = mkNewRepMDDecl name args branch derives
+genPadsDecl (PadsDeclNew old name args pat branch derives) = do
+  { let dataDecs = mkNewRepMDDecl old name args branch derives
   ; parseM <- genPadsNewParseM name args pat branch 
   ; parseS <- genPadsParseS name args pat
   ; let instances = mkPadsInstance name args (fmap patType pat)
@@ -75,9 +75,9 @@ patType p = case p of
 -- GENERATE REP/MD TYPE DECLARATIONS
 -----------------------------------------------------------
 
-mkTyRepMDDecl :: UString -> [UString] -> PadsTy -> [Dec]
-mkTyRepMDDecl name args ty 
-  = [repType, mdType]
+mkTyRepMDDecl :: Bool -> UString -> [UString] -> PadsTy -> [Dec]
+mkTyRepMDDecl old name args ty 
+  = (if old then [] else [repType]) ++ [mdType]
   where
     repType = TySynD (mkRepName name) tyArgs (mkRepTy ty)
     mdType  = TySynD (mkMDName name) tyArgs (mkMDTy ty)
@@ -88,9 +88,9 @@ mkTyRepMDDecl name args ty
 -- GENERATE REP/MD DATA DECLARATIONS
 -----------------------------------------------------------
 
-mkDataRepMDDecl :: UString -> [LString] -> PadsData -> [UString] -> [Dec]
-mkDataRepMDDecl name args branches ds
-  = [dataDecl, mdDecl, imdDecl]
+mkDataRepMDDecl :: Bool -> UString -> [LString] -> PadsData -> [UString] -> [Dec]
+mkDataRepMDDecl old name args branches ds
+  = (if old then [] else [dataDecl]) ++ [mdDecl, imdDecl]
   where
     dataDecl = DataD [] (mkRepName name) tyArgs (map mkRepUnion bs) (derive ds)
     imdDecl  = DataD [] (mkIMDName name) tyArgs (map mkMDUnion bs) (derive [])
@@ -126,9 +126,9 @@ derive ds =  map mkName ds
 -- GENERATE REP/MD NEWTYPE DECLARATIONS
 -----------------------------------------------------------
 
-mkNewRepMDDecl :: UString -> [LString] -> BranchInfo -> [UString] -> [Dec]
-mkNewRepMDDecl name args branch ds
-  = [dataDecl, mdDecl, imdDecl]
+mkNewRepMDDecl :: Bool -> UString -> [LString] -> BranchInfo -> [UString] -> [Dec]
+mkNewRepMDDecl old name args branch ds
+  = (if old then [] else [dataDecl]) ++ [mdDecl, imdDecl]
   where
     dataDecl = NewtypeD [] (mkRepName name) tyArgs (mkRepUnion branch) (derive ds)
     imdDecl  = NewtypeD [] (mkIMDName name) tyArgs (mkMDUnion branch) (derive [])
