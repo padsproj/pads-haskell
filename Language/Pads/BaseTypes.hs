@@ -42,6 +42,7 @@ import Language.Pads.RegExp
 import Language.Pads.LazyList
 import Data.Time
 import System.Locale
+import Text.PrettyPrint.Mainland
 
 import qualified Data.Char as C
 import qualified Data.List as L
@@ -66,6 +67,8 @@ import qualified Data.List as L
        type DateFC (fmt::String, c::Char) = DateFSE <|(fmt, RE ("[" ++ [c] ++  "]")) |> |]  
 
 type UTCTime_md = Base_md
+instance Pretty UTCTime where
+  ppr utc = text (show utc)
 
 
 strToUTC :: String -> Pos -> (PstringSE, Base_md) -> (UTCTime, Base_md)
@@ -81,6 +84,8 @@ utcToStr fmt (utcTime, bmd) = (PstringSE (formatTime defaultTimeLocale fmt utcTi
        type TimeZoneC (c::Char) = TimeZoneSE <|RE ("[" ++ [c] ++  "]") |> |]  
 
 type TimeZone_md = Base_md
+instance Pretty TimeZone where
+  ppr tz = text (show tz)
 
 strToTz :: Pos -> (PstringSE, Base_md) -> (TimeZone, Base_md)
 strToTz pos (PstringSE input, input_bmd) = 

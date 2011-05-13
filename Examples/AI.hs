@@ -52,8 +52,8 @@ checkVersion method version =
     _ -> True
 
 
--- mkPrettyInstance ''AI
--- mkPrettyInstance ''AI_md
+mkPrettyInstance ''AI
+mkPrettyInstance ''AI_md
 
 ai_file = ai_big
 ai_3000 = "Examples/data/ai.3000"
@@ -67,7 +67,7 @@ ai_file_length  = Prelude.length ai_rep
 ai_file_take n  = Prelude.take n ai_rep
 
 
--- printAI n = putStrLn(pretty 100 (ppr (ai_file_take n)))
+printAI n = putStrLn(pretty 100 (ppr (ai_file_take n)))
 
 {-
 result n  = do 
