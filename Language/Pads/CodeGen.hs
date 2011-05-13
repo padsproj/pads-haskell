@@ -190,12 +190,11 @@ mkMDApp tys = foldl1 AppT [mkMDTy ty | ty <- tys, hasRep ty]
 
 mkMDTuple :: [PadsTy] -> Type
 mkMDTuple tys = case mds of  
-    []     -> mkTupleT [ConT ''Base_md, ConT ''Base_md]
+    []     -> ConT ''Base_md
     [m]    -> mkTupleT [ConT ''Base_md, m]
     (m:ms) -> mkTupleT [ConT ''Base_md, mkTupleT mds]
   where
     mds = [mkMDTy ty | ty <- tys, hasRep ty]
-
 
 
 -----------------------------------------------------------------
@@ -216,7 +215,7 @@ buildInst str args pads parse print
     inst    = applyT [pads, ty_name, md_ty]
     ty_name = applyT (ConT (mkName str) : map fst argpairs)
     md_ty   = applyT (ConT (mkMDName str) : map snd argpairs)
-    parsePP_method = ValD parse (NormalB (VarE (mkTyParserName str))) []
+    parsePP_method = ValD parse (NormalB (applyE (VarE (mkTyParserName str) : [VarE 'parsePP | a <- args]))) []
     printFL_method = ValD print (NormalB (VarE 'dummyPrintFL)) [] -- (mkPrintFLName str))) []
     argpairs = [(VarT (mkName a), VarT (mkName (a++"_md"))) | a <- args]
 
@@ -313,6 +312,7 @@ genParseList ty sep term =
     (Just sep, Just (LTerm term))-> [| parseListSepTerm $(genParseTy sep) $(genParseTy term) $(genParseTy ty) |]
 
 genParseTuple :: [PadsTy] -> Q Exp
+genParseTuple [] = [| return ((), cleanBasePD) |]
 genParseTuple tys = do
   { let f_rep = buildF_rep vars_frep
   ; let f_md  = buildF_md vars_fmd vars_frep 
@@ -347,10 +347,9 @@ mkMergeBaseMDs es  = VarE 'mergeBaseMDs `AppE` ListE es
 genMergeBaseMDs e = return (mkMergeBaseMDs e)
 
 genParseExp :: Exp -> Q Exp
-genParseExp (LitE (CharL c)) = [| charLit_parseM c |]
+genParseExp (LitE (CharL c))   = [| charLit_parseM c |]
 genParseExp (LitE (StringL s)) = [| strLit_parseM s |]
-genParseExp exp = [| litParse $(return exp) |]
--- = error "genParseExp: Not yet defined on non-char literals"
+genParseExp exp                = [| litParse $(return exp) |]
 
 genParseTyApp :: [PadsTy] -> Maybe Exp -> Q Exp
 genParseTyApp tys expM = do

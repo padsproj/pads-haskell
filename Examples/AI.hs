@@ -53,7 +53,6 @@ checkVersion method version =
 
 
 
-
 --mkPrettyInstance ''AI
 --mkPrettyInstance ''AI_md
 

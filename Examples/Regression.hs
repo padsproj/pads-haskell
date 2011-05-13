@@ -259,7 +259,7 @@ pt44 = testParsePadsDecls t44
 ppt44 = case pt44 of Left e -> show e ; Right r -> pretty 150 (ppDeclList r)
 result44 = t44 == ppt44
 
-t45 = "type WhiteSpace = (Int, <|RE \"[ \\t]+\"|>, Int)"
+t45 = "type WhiteSpace = (Int, '[ \\t]+', Int)"
 pt45 = testParsePadsDecls t45
 ppt45 = case pt45 of Left e -> show e ; Right r -> pretty 150 (ppDeclList r)
 result45 = t45 == ppt45
@@ -310,8 +310,20 @@ t54   = "data HP = HP {student_num :: Pint, ',', student_name :: PstringFW <|pin
 pt54  = testParsePadsDecls t54
 ppt54 = case pt54 of Left e -> show e ; Right r -> pretty 250 (ppDeclList r)
 result54 = t54 == ppt54
+
+(t55,pt55,ppt55,result55) = (t,pt,ppt,result)
+  where
+    t      = "newtype Void = Void ()"
+    pt     = testParsePadsDecls t
+    ppt    = case pt of Left e -> show e ; Right r -> pretty 150 (ppDeclList r)
+    result = t == ppt
        
-t55   = "newtype Void = Void ()"
-pt55  = testParsePadsDecls t55
-ppt55 = case pt55 of Left e -> show e ; Right r -> pretty 150 (ppDeclList r)
-result55 = t55 == ppt55
+(t56,pt56,ppt56,result56) = (t,pt,ppt,result)
+  where
+    t      = "type Foo = Baz '[a-z+]'"
+    pt     = testParsePadsDecls t
+    ppt    = case pt of Left e -> show e ; Right r -> pretty 150 (ppDeclList r)
+    result = t == ppt
+
+
+
