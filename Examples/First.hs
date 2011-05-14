@@ -23,8 +23,7 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "StrTy"   strTy_test 
                 , TestLabel "StrTy1"  strTy1_test 
                 , TestLabel "Baz"     baz_test 
---                , TestLabel "Phex32FW"  phex32FW_test 
-                ---- Add cases for regular expressions
+                , TestLabel "Phex32FW"  phex32FW_test 
                 , TestLabel "IntRange" test_intRange24
                 , TestLabel "IntRange" test_intRange0
                 , TestLabel "IntRange" test_intRange256
@@ -57,8 +56,8 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "Eor" test_eor_test
                 , TestLabel "Eof" test_eof_test_G
                 , TestLabel "Eof" test_eof_test_B
---                , TestLabel "Opt" test_opt_test_j
---                , TestLabel "Opt" test_opt_test_n
+                , TestLabel "Opt" test_opt_test_j
+                , TestLabel "Opt" test_opt_test_n
                 , TestLabel "List" test_entries_nosep_noterm
                 , TestLabel "List" test_entries_nosep_noterm'
                 , TestLabel "List" test_entries_nosep_noterm2
@@ -175,11 +174,10 @@ strP1_result = strP1_parseS 3 input_strP1
 input_strHex = "12abcds"
 strHex_result = strHex_parseS input_strHex
 
-{- Testing for Phex32FW, which is in Pads.Language.BaseTypes
--- Add back when transforms are implemented.
+{- Testing for Phex32FW, which is in Pads.Language.BaseTypes -}
 input_hex32FW = "12bc34"  
 phex32FW_results = phex32FW_parseS 4 input_hex32FW   
-phex32FW_expects = (Phex32FW (4796), 0, "34")
+phex32FW_expects = (4796, 0, "34")
 phex32FW_test    = mkTestCase "phex32FW" phex32FW_expects phex32FW_results
 
 input2_hex32FW = "00bc34"  
@@ -192,7 +190,7 @@ strhex32FW_result3 = phex32FW_parseS 4 input3_hex32FW    -- Prints error message
 input_hexpair = "aa,bbb"
 hexpair_result = hexPair_parseS input_hexpair
 
- -}
+
 {- Constrained types -}
 [pads| type  IntRange = constrain x :: Int where <| 0 <= x && x <= 256 |> |]
 intRange24_input = "24"
@@ -406,18 +404,18 @@ result_eof_test_B = eof_Test_parseS input_eof_test_B
 expect_eof_test_B = ((23,56), 1,"ab")
 test_eof_test_B = mkTestCase "Eof_TestB" expect_eof_test_B result_eof_test_B
 
-{- Restate after Maybe is implemented 
+{- Restate after Maybe is implemented  -}
 [pads| type Opt_test = (Int, '|', Maybe Int, '|', Int) |]
 input_opt_test_j = "34|35|56"
 result_opt_test_j = opt_test_parseS input_opt_test_j
-expect_opt_test_j = (Opt_test (34,Just (35),56),0,"")
+expect_opt_test_j = ((34,Just 35,56),0,"")
 test_opt_test_j = mkTestCase "Opt_test_j" expect_opt_test_j result_opt_test_j
 
 input_opt_test_n = "34||56"
 result_opt_test_n = opt_test_parseS input_opt_test_n
-expect_opt_test_n = (Opt_test (34,Nothing,56),0,"")
+expect_opt_test_n = ((34,Nothing,56),0,"")
 test_opt_test_n = mkTestCase "Opt_test_n" expect_opt_test_n result_opt_test_n
--}       
+
 
 {- LIST EXAMPLES -}
 

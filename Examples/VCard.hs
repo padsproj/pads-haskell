@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, ScopedTypeVariables, TypeSynonymInstances #-}
 
 module Text.VCard
     ( -- $doc
@@ -19,7 +19,6 @@ import Data.Time (UTCTime, TimeZone, FormatTime, formatTime)
 import System.Locale (defaultTimeLocale)
 
 import Language.Pads.Padsc
--- import Language.Pads.Haskell
 
 
 -- Lines are delimited with carriage return/line-feed (control-M, newline)  \r\n
@@ -56,7 +55,7 @@ data VCardProperty (tag :: Tag) = case tag of
     -- | Formated name of the represented person
     --
     -- > CommonName "Mr. Michael A. F. Schade"
-    | FN -> CommonName VCardString
+    | FN -> FName VCardString
 
     -- | A list of nicknames belonging to the VCard entity. E.g.,
     --
@@ -92,7 +91,7 @@ data VCardProperty (tag :: Tag) = case tag of
     -- > Label  [AddrParcel, AddrPostal]
     -- >        ["Michael Schade", "PO Box 935", "Fenton, MO 63026"]
     | LABEL -> Label { lblType   :: TypeL AddrType
-                     , label     :: VCardString
+                     , lbl       :: VCardString
                      }
     -- | A telephone number for the VCard entity, as well as a list of
     -- properties describing the telephone number. E.g.,
@@ -106,7 +105,7 @@ data VCardProperty (tag :: Tag) = case tag of
     --
     -- > Email [EmailInternet, EmailPreferred] "hackage@mschade.me"
     | EMAIL -> Email { emailType :: TypeL EmailType
-                     , email     :: VCardString
+                     , emailAddr :: VCardString
                      }
     -- | Specifies the mailing agent the vCard entity uses. E.g.,
     --
@@ -232,13 +231,13 @@ data TZone = TzText ("VALUE=text:", Stringln)
 
 
 -- | Represents the various types or properties of an address.
-data AddrType   = AddrDomestic (StringME "DOM|dom")
-                | AddrInternational (StringME "INTL|intl")
-                | AddrPostal (StringME "POSTAL|postal")
-                | AddrParcel (StringME "PARCEL|parcel")
-                | AddrHome (StringME "HOME|home")
-                | AddrWork (StringME "WORK|work")
-                | AddrPreferred (StringME "PREF|pref")
+data AddrType   = AddrDomestic (StringME 'DOM|dom')
+                | AddrInternational (StringME 'INTL|intl')
+                | AddrPostal (StringME 'POSTAL|postal')
+                | AddrParcel (StringME 'PARCEL|parcel')
+                | AddrHome (StringME 'HOME|home')
+                | AddrWork (StringME 'WORK|work')
+                | AddrPreferred (StringME 'PREF|pref')
 
 -- | Represents the various types or properties of a telephone number.
 data TelType    = TelHome "HOME"
@@ -254,13 +253,13 @@ data TelType    = TelHome "HOME"
                 | TelCar "CAR"
                 | TelISDN "ISDN"
                 | TelPCS "PCS"
-                | TelPreferred (StringME "PREF|pref")
+                | TelPreferred (StringME 'PREF|pref')
 
 
 -- | Represents the various types or properties of an email address.
 data EmailType = EmailInternet "INTERNET"
                | EmailX400  "X400"
-               | EmailPreferred (StringME "PREF|pref")
+               | EmailPreferred (StringME 'PREF|pref')
 
 -- | Represents the data associated with a vCard's Agent. This could be a URI
 -- to such a vCard or the embedded contents of the vCard itself.
@@ -290,10 +289,13 @@ type VCardString = StringESC <| ('\\', ",:;") |>
 type NameSs = [VCardString | ','] terminator ';'
 type NameRs = [VCardString | ','] terminator EOR
 
-type TypeS = (typeRE, '=', [VCardString|','] terminator (Try <| RE "[:;]" |>))
-type TypeL a = [(typeRE, '=', [a|','] terminator (Try ';')) | ';'] terminator ':'
+
+type TypeS = (typeRE, '=', [VCardString|','] terminator (Try (Void, '[:;]')))
+type TypeL a = [(typeRE, '=', [a|','] terminator Try (Void, ';')) | ';'] terminator ':'
 
 |]
+type CommonName = String
+
 
 semicommaRE = RE "[;,]"
 vcardRE = REd "VCARD|vCard" "VCARD"
