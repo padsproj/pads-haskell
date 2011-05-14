@@ -117,11 +117,11 @@ srcLineEnd s = if isEOF s
 
 {- External code should not set discipline to NoDiscipline; that is an internal state only to 
    mark state between two legal external disciplines. -}
-setRecordDiscipline :: RecordDiscipline -> Source -> Source
+setRecordDiscipline :: RecordDiscipline -> Source -> ((),Source)
 setRecordDiscipline r s = 
   let s'   = unputCurrentLine s
       s'' = s'{disc = r}
-  in getNextLine s''
+  in ((),getNextLine s'')
 
 {- Merge current record back on to rest according to current record discipline.
    Resulting source will be in NoDiscipline state.

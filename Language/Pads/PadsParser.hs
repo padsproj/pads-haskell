@@ -82,8 +82,9 @@ liftStoP f def = PadsParser $ \bs ->
                    Nothing      -> ((def,bs), False)
                    Just (v,bs') -> ((v,bs'), True)
 
-replaceSource :: S.Source -> (Result (a,S.Source)) -> (Result (a,S.Source))
+replaceSource :: S.Source -> Result (a,S.Source) -> Result (a,S.Source)
 replaceSource bs ((v,_),b) = ((v,bs),b)
+
 
 
 -------------------------
@@ -158,6 +159,19 @@ parseTransform sParser transform = do
 
 -------------------------------------------------
 
+
+parsePartition :: PadsMD md => 
+    PadsParser(rep,md) -> S.RecordDiscipline -> PadsParser(rep, md)
+parsePartition p newDisc = do
+  { oldDisc <- queryP S.getRecordDiscipline
+  ; primPads (S.setRecordDiscipline newDisc)
+  ; x <- p
+  ; primPads (S.setRecordDiscipline oldDisc)
+  ; return x
+  }
+
+
+-------------------------------------------------
 
 parseListNoSepNoTerm :: PadsMD md => 
     PadsParser (rep,md) -> PadsParser ([rep], (Base_md, [md]))

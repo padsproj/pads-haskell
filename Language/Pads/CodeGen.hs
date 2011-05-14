@@ -286,6 +286,7 @@ genParseTy pty = case pty of
     PConstrain pat ty exp   -> genParseConstrain (return pat) ty (return exp)
     PTransform src dest exp -> genParseTyTrans src dest (return exp)
     PList ty sep term       -> genParseList ty sep term
+    PPartition ty exp       -> genParsePartition ty exp
     PApp tys argE           -> genParseTyApp tys argE
     PTuple tys              -> genParseTuple tys
     PExpression exp         -> genParseExp exp
@@ -310,6 +311,9 @@ genParseList ty sep term =
     (Just sep, Just (LLen lenE)) -> [| parseListSepLength $(genParseTy sep) $(return lenE) $(genParseTy ty) |]
     (Nothing,  Just (LTerm term))-> [| parseListNoSepTerm $(genParseTy term) $(genParseTy ty) |]
     (Just sep, Just (LTerm term))-> [| parseListSepTerm $(genParseTy sep) $(genParseTy term) $(genParseTy ty) |]
+
+genParsePartition :: PadsTy -> Exp -> Q Exp
+genParsePartition ty dis = [| parsePartition $(genParseTy ty) $(return dis) |]
 
 genParseTuple :: [PadsTy] -> Q Exp
 genParseTuple [] = [| return ((), cleanBasePD) |]
