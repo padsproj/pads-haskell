@@ -1,8 +1,6 @@
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
-    FlexibleInstances, TypeSynonymInstances #-}
-{-
+    FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
 
--}
 
 module Language.Pads.BaseTypes where
 
