@@ -1,4 +1,6 @@
-{-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, 
+    MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
+    DeriveDataTypeable, ScopedTypeVariables #-}
 module Examples.IntPair where
 import Language.Pads.Padsc
 import Data.Data
@@ -24,15 +26,16 @@ data Switcher (x::Int) = case x of
                     | 1 -> One (Lst Int)
                          deriving (Read, Eq)
 
+type Triple = (Int, (obtain Char from Int using <|(bi,ib)|>, Int)) 
+
+
 |]
 
 [pads| 
 
-type Triple = (Int, (obtain Char from Int using <|(bi,ib)|>, Int)) 
-
-
 data May a = Jus a
            | Noth ()
+
 |]
 
 

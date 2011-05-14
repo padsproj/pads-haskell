@@ -155,10 +155,10 @@ constrain env
 
 transform :: Env -> Parser PadsTy
 transform env
-  = do { reserved "obtain"; src <- ptype env
-       ; reservedOp "from"; dst <- ptype env
+  = do { reserved "obtain"; dst <- ptype env
+       ; reservedOp "from"; src <- ptype env
        ; reserved "using"; exp <- expression 
-       ; return (PTransform dst src exp)
+       ; return (PTransform src dst exp)
        } <?> "Pads transform type"
 
 
@@ -187,6 +187,7 @@ partition env
        ; return (PPartition ty exp)
        } <?> "Pads partition type"
 
+
 btype :: Env -> Parser PadsTy
 btype env
   = do { ty <- etype env; tys <- many (atype env)
@@ -199,6 +200,7 @@ etype :: Env -> Parser PadsTy
 etype env
   =  atype env
  <|> fmap PExpression expression
+ <?> "Pads etype"
 
 atype :: Env -> Parser PadsTy
 atype env
@@ -210,7 +212,7 @@ atype env
 
 tuple :: Env -> Parser PadsTy
 tuple env
-  = do { tys <- parens $ commaSep1 (ptype env)
+  =  do { tys <- parens $ option [] (commaSep1 (ptype env))
        ; if length tys==1 then return (head tys)
          else return (PTuple tys)
        }
@@ -379,9 +381,6 @@ tyvar env = try $ do { v <- var; guard (v `elem` env); return v }
 qtycl = con
 qtycon = tycon
 tycon =  con
-     <|> do { op <- parens operator
-            ; return ("("++op++")")
-            }
 
 lowerId :: Parser String
 lowerId = try (do { id <- identifier
