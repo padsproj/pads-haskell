@@ -30,7 +30,8 @@ type StringLnP (p :: String -> Bool) = constrain s :: StringLn where <| p s |>
 old data Maybe a = Just a
                  | Nothing Void
 
-type Lit (x::String) = (Void, x)
+type Lit   (x::String) = (Void, x)
+type LitRE (x::RE)     = (Void, x)
 
 |]
 

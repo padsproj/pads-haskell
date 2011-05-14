@@ -290,8 +290,8 @@ type NameSs = [VCardString | ','] terminator ';'
 type NameRs = [VCardString | ','] terminator EOR
 
 
-type TypeS = (typeRE, '=', [VCardString|','] terminator Try (Lit '[:;]'))
-type TypeL a = [(typeRE, '=', [a|','] terminator Try (Lit ';')) | ';'] terminator ':'
+type TypeS = (typeRE, '=', [VCardString|','] terminator Try (LitRE '[:;]'))
+type TypeL a = [(typeRE, '=', [a|','] terminator Try (Lit ";")) | ';'] terminator ':'
 
 |]
 type CommonName = String
