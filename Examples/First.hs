@@ -170,7 +170,7 @@ strSE_results_2 = strSE_parseS input_strSE_2
 input_strP1 = "abcd"
 strP1_result = strP1_parseS 3 input_strP1
 
-[pads| type  StrHex = StringME <|RE "[0-9A-Fa-f]+"|> |]
+[pads| type  StrHex = StringME '[0-9A-Fa-f]+' |]
 input_strHex = "12abcds"
 strHex_result = strHex_parseS input_strHex
 

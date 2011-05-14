@@ -17,22 +17,23 @@
 \f1\b Type declarations
 \f0\b0 \
 \
-topdecl	-> 
+topdecl	-> [
+\f1\b old
+\f0\b0 ] 
 \f1\b type
-\f0\b0     declLHS ptype\
-		 | 
+\f0\b0  declLHS ptype\
+		 | [
+\f1\b old
+\f0\b0 ] 
 \f1\b data
-\f0\b0     declLHS dataRHS    [
+\f0\b0  declLHS dataRHS    [
 \f1\b deriving
 \f0\b0  derives]\
 		 | 
 \f1\b newtype
-\f0\b0  declLHS newtypeRHS [
+\f0\b0     declLHS newtypeRHS [
 \f1\b deriving
 \f0\b0  derives]\
-		 | 
-\f1\b oldtype
-\f0\b0  declLHS ptype\
 \
 declLHS	-> tycon \{tyvar\} [pattern] 
 \f1\b =\
@@ -49,6 +50,7 @@ derives	-> qtycls\
 \f0\b0 \
 \
 \
+\
 -- 
 \f1\b type expressions
 \f0\b0 \
@@ -61,20 +63,20 @@ ptype 	->
 \f2\i (subtype)
 \f0\i0 \
 		 | 
-\f1\b transform 
+\f1\b obtain 
 \f0\b0 ptype 
-\f1\b =>
+\f1\b from
 \f0\b0  ptype 
 \f1\b using
 \f0\b0  expression	
 \f2\i (transformed type)
 \f0\i0 \
 		 | list [listEnd]\
-		 | btype \{
-\f1\b -> 
-\f0\b0 btype\}						
-\f2\i (function)
-\f0\i0 \
+		 | 
+\f1\b partition
+\f0\b0  ptype 
+\f1\b using
+\f0\b0  expression\
 \
 list		-> 
 \f1\b [
@@ -132,11 +134,6 @@ gtycon	-> qtycon
 \f1\b []
 \f0\b0 							 
 \f2\i (list constructor)
-\f0\i0 \
-		 | 
-\f1\b (->)
-\f0\b0 	 						 
-\f2\i (function constructor)
 \f0\i0 \
 		 | 
 \f1\b (,

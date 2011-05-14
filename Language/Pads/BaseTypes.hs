@@ -41,7 +41,7 @@ old data Maybe a = Just a
 
 
 
-[pads| type DateFSE (fmt :: String, se :: RE) = transform StringSE se => UTCTime using <| (strToUTC fmt, utcToStr fmt) |> 
+[pads| type DateFSE (fmt :: String, se :: RE) = obtain UTCTime from StringSE se using <| (strToUTC fmt, utcToStr fmt) |> 
        type DateFC (fmt::String, c::Char) = DateFSE <|(fmt, RE ("[" ++ [c] ++  "]")) |> |]  
 
 type UTCTime_md = Base_md
@@ -58,7 +58,7 @@ strToUTC fmt pos (input, input_bmd) =
 utcToStr :: String -> (UTCTime, Base_md) -> (StringSE, Base_md) 
 utcToStr fmt (utcTime, bmd) = (formatTime defaultTimeLocale fmt utcTime, bmd)
 
-[pads| type TimeZoneSE (se :: RE) = transform StringSE se =>  TimeZone using <| (strToTz, tzToStr) |> 
+[pads| type TimeZoneSE (se :: RE) = obtain TimeZone from StringSE se using <| (strToTz, tzToStr) |> 
        type TimeZoneC (c::Char) = TimeZoneSE <|RE ("[" ++ [c] ++  "]") |> |]  
 
 type TimeZone_md = Base_md
@@ -76,7 +76,7 @@ tzToStr (tz, bmd) = (h ++ ":" ++ m, bmd)
            where (h,m) = splitAt 3 (show tz)
 
 
-[pads| type Phex32FW (size :: Int) = transform StringFW size => Int using <| (hexStr2Int,int2HexStr size) |> |]  
+[pads| type Phex32FW (size :: Int) = obtain Int from StringFW size using <| (hexStr2Int,int2HexStr size) |> |]  
 
 hexStr2Int :: Pos -> (StringFW, Base_md) -> (Int, Base_md)
 hexStr2Int src_pos (s,md) = if good then (intList2Int ints 0, md)
