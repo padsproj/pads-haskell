@@ -57,5 +57,6 @@ hasRep :: PadsTy -> Bool
 hasRep (PExpression l) = False
 hasRep (PTycon "EOF")  = False
 hasRep (PTycon "EOR")  = False
+hasRep (PTycon "Void") = False
 hasRep _               = True
 

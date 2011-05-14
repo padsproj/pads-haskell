@@ -1,33 +1,7 @@
-{-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
+    FlexibleInstances, TypeSynonymInstances #-}
 {-
-** *********************************************************************
-*                                                                      *
-*              This software is part of the pads package               *
-*           Copyright (c) 2005-2011 AT&T Knowledge Ventures            *
-*                      and is licensed under the                       *
-*                        Common Public License                         *
-*                      by AT&T Knowledge Ventures                      *
-*                                                                      *
-*                A copy of the License is available at                 *
-*                    www.padsproj.org/License.html                     *
-*                                                                      *
-*  This program contains certain software code or other information    *
-*  ("AT&T Software") proprietary to AT&T Corp. ("AT&T").  The AT&T     *
-*  Software is provided to you "AS IS". YOU ASSUME TOTAL RESPONSIBILITY*
-*  AND RISK FOR USE OF THE AT&T SOFTWARE. AT&T DOES NOT MAKE, AND      *
-*  EXPRESSLY DISCLAIMS, ANY EXPRESS OR IMPLIED WARRANTIES OF ANY KIND  *
-*  WHATSOEVER, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF*
-*  MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, WARRANTIES OF  *
-*  TITLE OR NON-INFRINGEMENT.  (c) AT&T Corp.  All rights              *
-*  reserved.  AT&T is a registered trademark of AT&T Corp.             *
-*                                                                      *
-*                   Network Services Research Center                   *
-*                          AT&T Labs Research                          *
-*                           Florham Park NJ                            *
-*                                                                      *
-*              Kathleen Fisher <kfisher@research.att.com>              *
-*                                                                      *
-************************************************************************
+
 -}
 
 module Language.Pads.BaseTypes where
@@ -46,10 +20,16 @@ import Text.PrettyPrint.Mainland
 
 import qualified Data.Char as C
 import qualified Data.List as L
+import Data.Data
 
 
 [pads|
-  type Line a = (a, EOR)
+
+type Line a = (a, EOR)
+
+old data Maybe a = Just a
+                 | Nothing Void
+
 |]
 
 
@@ -57,13 +37,13 @@ import qualified Data.List as L
 
 
 
-[pads| type  Pstringln = Line (constrain x :: PstringSE <| RE "$" |> where <| True |>)           |]
-[pads| type  Stringln =  Line (constrain x :: PstringSE <| RE "$" |> where <| True |>)           |]
-[pads| type StringlnP (p :: String -> bool) = constrain s :: Stringln where <| p (toString s) |> |]
+[pads| type  Pstringln = Line (constrain x :: StringC '$' where <| True |>)           |]
+[pads| type  Stringln =  Line (constrain x :: StringC '$' where <| True |>)           |]
+[pads| type StringlnP (p :: String -> bool) = constrain s :: Stringln where <| p s |> |]
 
 
 
-[pads| type DateFSE (fmt :: String, se :: RE) = transform PstringSE se => UTCTime using <| (strToUTC fmt, utcToStr fmt) |> 
+[pads| type DateFSE (fmt :: String, se :: RE) = transform StringSE se => UTCTime using <| (strToUTC fmt, utcToStr fmt) |> 
        type DateFC (fmt::String, c::Char) = DateFSE <|(fmt, RE ("[" ++ [c] ++  "]")) |> |]  
 
 type UTCTime_md = Base_md
@@ -71,37 +51,37 @@ instance Pretty UTCTime where
   ppr utc = text (show utc)
 
 
-strToUTC :: String -> Pos -> (PstringSE, Base_md) -> (UTCTime, Base_md)
-strToUTC fmt pos (PstringSE input, input_bmd) = 
+strToUTC :: String -> Pos -> (StringSE, Base_md) -> (UTCTime, Base_md)
+strToUTC fmt pos (input, input_bmd) = 
   case parseTime defaultTimeLocale fmt input of 
        Nothing -> (gdef, mergeBaseMDs [mkErrBasePD (TransformToDstFail "DateFSE" input " (conversion failed)") (Just pos), input_bmd])
        Just t  -> (t, input_bmd)
 
-utcToStr :: String -> (UTCTime, Base_md) -> (PstringSE, Base_md) 
-utcToStr fmt (utcTime, bmd) = (PstringSE (formatTime defaultTimeLocale fmt utcTime), bmd)
+utcToStr :: String -> (UTCTime, Base_md) -> (StringSE, Base_md) 
+utcToStr fmt (utcTime, bmd) = (formatTime defaultTimeLocale fmt utcTime, bmd)
 
-[pads| type TimeZoneSE (se :: RE) = transform PstringSE se =>  TimeZone using <| (strToTz, tzToStr) |> 
+[pads| type TimeZoneSE (se :: RE) = transform StringSE se =>  TimeZone using <| (strToTz, tzToStr) |> 
        type TimeZoneC (c::Char) = TimeZoneSE <|RE ("[" ++ [c] ++  "]") |> |]  
 
 type TimeZone_md = Base_md
 instance Pretty TimeZone where
   ppr tz = text (show tz)
 
-strToTz :: Pos -> (PstringSE, Base_md) -> (TimeZone, Base_md)
-strToTz pos (PstringSE input, input_bmd) = 
+strToTz :: Pos -> (StringSE, Base_md) -> (TimeZone, Base_md)
+strToTz pos (input, input_bmd) = 
   case parseTime defaultTimeLocale "%z" input of 
        Nothing -> (gdef,  mergeBaseMDs [mkErrBasePD (TransformToDstFail "TimeZoneSE" input " (conversion failed)") (Just pos), input_bmd])
        Just t  -> (t, input_bmd)
 
-tzToStr ::  (TimeZone, Base_md) -> (PstringSE, Base_md) 
-tzToStr (tz, bmd) = (PstringSE (h ++ ":" ++ m), bmd)
+tzToStr ::  (TimeZone, Base_md) -> (StringSE, Base_md) 
+tzToStr (tz, bmd) = (h ++ ":" ++ m, bmd)
            where (h,m) = splitAt 3 (show tz)
 
 
-[pads| type Phex32FW (size :: Int) = transform PstringFW size => Pint using <| (hexStr2Int,int2HexStr size) |> |]  
+[pads| type Phex32FW (size :: Int) = transform StringFW size => Int using <| (hexStr2Int,int2HexStr size) |> |]  
 
-hexStr2Int :: Pos -> (PstringFW, Base_md) -> (Pint, Base_md)
-hexStr2Int src_pos (PstringFW s,md) = if good then (Pint (intList2Int ints 0), md)
+hexStr2Int :: Pos -> (StringFW, Base_md) -> (Int, Base_md)
+hexStr2Int src_pos (s,md) = if good then (intList2Int ints 0, md)
                                       else (0, mkErrBasePD  (TransformToDstFail "StrHex" s " (non-hex digit)") (Just src_pos))
   where
     hc2int c = if C.isHexDigit c then (C.digitToInt c,True) else (0,False)
@@ -111,12 +91,12 @@ hexStr2Int src_pos (PstringFW s,md) = if good then (Pint (intList2Int ints 0), m
         []     -> a
         (d:ds) -> intList2Int ds ((16 * a) + d)
 
-int2HexStr :: Int -> (Pint, Base_md) -> (PstringFW, Base_md)
-int2HexStr size (Pint x,md) = if (length result == size) && wasPos  then (PstringFW result, md)       
+int2HexStr :: Int -> (Int, Base_md) -> (StringFW, Base_md)
+int2HexStr size (x,md) = if (length result == size) && wasPos  then (result, md)       
                               else if not wasPos then 
-                                   (PstringFW (Prelude.take size result),    
+                                   (Prelude.take size result,    
                                     mkErrBasePD (TransformToSrcFail "StrHex" (show x) (" (Expected positive number)")) Nothing)
-                              else (PstringFW (Prelude.take size result),
+                              else (Prelude.take size result,
                                     mkErrBasePD (TransformToSrcFail "StrHex" (show x) (" (too big to fit in "++ (show size) ++" characters)")) Nothing)
   where
    cvt rest a = if rest < 16 then {- reverse $ -} (C.intToDigit rest) : a

@@ -125,11 +125,10 @@ bar2_result  = bar2_parseS "56,23:46;29"
 bar2_expects = ((Pint 56,(Pint 23,Pint 46),Pint 29), 0 ,"")
 bar2_test    = mkTestCase "bar2" bar2_expects bar2_result
 
-[pads| type BazR = Line (Pint, ',',Pint) |]                  -- type that consumes a line boundary.
+[pads| type BazR = Line (Pint, ',', Pint) |]                  -- type that consumes a line boundary.
 bazr_result = bazR_parseS "33,33\n"
 bazr_expects = ((Pint 33,Pint 33),0,"")
 bazr_test    = mkTestCase "bazr" bazr_expects bazr_result
-
 
 [pads| type MyInt = Pint |]                                     -- Integer base type
 myInt_result  = myInt_parseS "23"

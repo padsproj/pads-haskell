@@ -325,5 +325,12 @@ result54 = t54 == ppt54
     ppt    = case pt of Left e -> show e ; Right r -> pretty 150 (ppDeclList r)
     result = t == ppt
 
+(t57,pt57,ppt57,result57) = (t,pt,ppt,result)
+  where
+    t      = "type BazR = Line (Pint, ',', Pint)"
+    pt     = testParsePadsDecls t
+    ppt    = case pt of Left e -> show e ; Right r -> pretty 150 (ppDeclList r)
+    result = t == ppt
+
 
 

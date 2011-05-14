@@ -27,26 +27,11 @@ data Switcher (x::Int) = case x of
 type Triple = (Int, (transform Int => Char using <|(bi,ib)|>, Int)) 
 
 
-type Void = ()
-
 data May a = Jus a
            | Noth ()
 |]
 
-[pads|
 
-olddata Maybe a = Just a
-                | Nothing ""
-
-
-
-
-
-{-
-oldtype Maybe a = Just a
-                | Nothing ()
--}
-|]
 
 
 bi::a->(Int,Int_md)->(Char,Char_md)

@@ -55,7 +55,7 @@ parsePadsDecls fileName line column input
 lexer :: PT.TokenParser ()
 lexer = PT.makeTokenParser (haskellStyle 
              { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", reMark ],
-               reservedNames   = ["data", "type", "newtype", "oldtype", "olddata", "existing", "deriving",
+               reservedNames   = ["data", "type", "newtype", "old", "existing", "deriving",
                                    "using", "where", "terminator", "length", "of",
                                    "case", "constrain", "transform" ]})
 
@@ -81,6 +81,7 @@ brackets      = PT.brackets    lexer
 -------------------------
 
 
+
 padsDecls :: Parser [PadsDecl]
 padsDecls = option [] (many1 topDecl)
 
@@ -91,8 +92,8 @@ topDecl
 
 typeDecl :: Parser PadsDecl
 typeDecl 
-  = do { old <- (reserved "type" >> return False)
-            <|> (reserved "oldtype" >> return True)
+  = do { old <- ((reserved "type" >> return False)
+            <|> try (reserved "old" >> reserved "type" >> return True))
        ; (id,env,pat) <- declLHS
        ; rhs <- ptype env
        ; return (PadsDeclType old id env pat rhs)
@@ -101,7 +102,7 @@ typeDecl
 dataDecl :: Parser PadsDecl
 dataDecl 
   = do { old <- (reserved "data" >> return False)
-            <|> (reserved "olddata" >> return True)
+            <|> (reserved "old" >> reserved "data" >> return True)
        ; (id,env,pat) <- declLHS
        ; rhs <- dataRHS env; drvs <- option [] derives
        ; return (PadsDeclData old id env pat rhs drvs)
