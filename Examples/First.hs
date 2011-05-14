@@ -2,7 +2,7 @@
 
 module Examples.First where
 import Language.Pads.Padsc
-import Test.HUnit
+import Test.HUnit hiding (test)
 import System.IO.Unsafe (unsafePerformIO)
 
 --import qualified Text.Regex.ByteString as BRE
@@ -11,7 +11,7 @@ import System.IO.Unsafe (unsafePerformIO)
 ---- PADS EXAMPLES
 
 -- Regression expects to be run from the Examples directory.
-tests_result = runTestTT tests
+test = runTestTT tests
 
 
 tests = TestList[ TestLabel "MyChar"  myChar_test
