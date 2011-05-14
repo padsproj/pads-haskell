@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, NamedFieldPuns, ScopedTypeVariables #-}
 module Examples.AI where
-import Language.Pads.Padsc hiding (str)
+import Language.Pads.Padsc 
 import Language.Pads.GenPretty       
 import Control.Monad
 
@@ -70,11 +70,10 @@ test = ai_file_take 20
 
 printAI n = putStrLn(pretty 100 (ppr (ai_file_take n)))
 
-{-
 result n  = do 
      { (AI rep, md) <- parseFile ai_file
      ; return (Prelude.take n ai_rep)
      } 
--}
+
 
 

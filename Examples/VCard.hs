@@ -226,7 +226,7 @@ data IndividualNames =  IndividualNames { familyName        :: NameSs
                                         , honorificSuffixes :: NameSs
                                         }
 
-data TZone = TzText ("VALUE=text:", Stringln)
+data TZone = TzText ("VALUE=text:", StringLn)
            | TzInt  (TimeZoneSE <| RE "$" |>)
 
 
@@ -271,7 +271,7 @@ data VCardData = VURI    ("VALUE=uri:", VCardString)
                | VBinary ("ENCODING=b", Maybe(';', TypeS), ':', WrappedEncoding )
                | VBase64 ("BASE64:", WrappedEncoding)
 
-type WrappedEncoding = [Line (StringlnP startsWithSpace)]
+type WrappedEncoding = [Line (StringLnP startsWithSpace)]
 
 
 -- | Classifies the vCard's intended access level.
@@ -290,8 +290,8 @@ type NameSs = [VCardString | ','] terminator ';'
 type NameRs = [VCardString | ','] terminator EOR
 
 
-type TypeS = (typeRE, '=', [VCardString|','] terminator (Try (Void, '[:;]')))
-type TypeL a = [(typeRE, '=', [a|','] terminator Try (Void, ';')) | ';'] terminator ':'
+type TypeS = (typeRE, '=', [VCardString|','] terminator Try (Lit '[:;]'))
+type TypeL a = [(typeRE, '=', [a|','] terminator Try (Lit ';')) | ';'] terminator ':'
 
 |]
 type CommonName = String
