@@ -94,6 +94,7 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "Literal"  whiteSpace_test
                 , TestLabel "Literal"  whiteSpace2_test
                 , TestLabel "Regular Expression"  rE_ty_test
+                , TestLabel "Discipline" disc_test
                 ]
 
 getTotalErrors :: PadsMD md => md -> Int
@@ -674,3 +675,8 @@ rE_ty_result = rE_ty_parseS rE_ty_input
 rE_ty_expects = (("t","aaaa"),0,"")
 rE_ty_test = mkTestCase "regular expression abbreviation for StringME" rE_ty_expects rE_ty_result
 
+[pads| type Disc = (Int, EOR, Int, EOR, (partition (Int, EOR, Int, EOR) using windows), Int, EOR) |]
+disc_input = "1\n2\n3\r\n4\r\n5\n"        
+disc_result = disc_parseS disc_input
+disc_expects = ((1,2,(3,4),5),0,"")
+disc_test = mkTestCase "multiple record disciplines" disc_expects disc_result

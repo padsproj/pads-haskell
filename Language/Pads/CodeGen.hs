@@ -143,6 +143,7 @@ mkNewRepMDDecl old name args branch ds
 
 mkRepTy ::  PadsTy -> Type
 mkRepTy ty = case ty of
+  PPartition pty exp          -> mkRepTy pty
   PConstrain pat pty exp      -> mkRepTy pty 
   PTransform tySrc tyDest exp -> mkRepTy tyDest 
   PList ty sep term           -> mkRepList ty
@@ -173,6 +174,7 @@ mkRepTuple tys = case reps of
 
 mkMDTy ::  PadsTy -> Type
 mkMDTy ty = case ty of
+  PPartition pty exp          -> mkMDTy pty
   PConstrain pat pty exp      -> mkMDTy pty 
   PTransform tySrc tyDest exp -> mkMDTy tyDest 
   PList ty sep term           -> mkMDList ty
@@ -462,6 +464,7 @@ genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred
 
 genPrintTy :: PadsTy -> (Exp,Exp) -> Q Exp
 genPrintTy (PConstrain pat ty exp) (r,m)   = genPrintConstrain pat ty exp (r,m)
+genPrintTy (PPartition ty exp) (r,m)       = genPrintPartition pat ty exp (r,m)
 genPrintTy (PTransform src dest exp) (r,m) = genPrintTrans src dest exp (r,m)
 genPrintTy (PList ty sep term) (r,m)       = genPrintList ty sep term (r,m)
 genPrintTy (PApp tys argE) (r,m)           = genPrintTyApp tys argE (r,m)
