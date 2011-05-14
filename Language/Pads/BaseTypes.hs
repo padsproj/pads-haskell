@@ -23,23 +23,16 @@ import Data.Data
 
 [pads|
 
-type Line a = (a, EOR)
+type Line a   = (a, EOR)
+type StringLn = [Char] terminator EOR
+type StringLnP (p :: String -> Bool) = constrain s :: StringLn where <| p s |> 
 
 old data Maybe a = Just a
                  | Nothing Void
 
-type Lit (x::string) = (Void, x)
+type Lit (x::String) = (Void, x)
 
 |]
-
-
-
-
-
-
-[pads| type  Pstringln = Line (constrain x :: StringC '$' where <| True |>)           |]
-[pads| type  Stringln =  Line (constrain x :: StringC '$' where <| True |>)           |]
-[pads| type StringlnP (p :: String -> bool) = constrain s :: Stringln where <| p s |> |]
 
 
 
