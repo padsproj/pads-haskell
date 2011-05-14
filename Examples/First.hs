@@ -590,7 +590,7 @@ test_switchOther = mkTestCase "switchOther" expect_switchOther result_switchOthe
 
 
 
-result_stringln = stringln_parseS "hello\ngoodbye"
+result_stringln = stringLn_parseS "hello\ngoodbye"
 expect_stringln = ("hello",0,"goodbye")
 test_stringln = mkTestCase "stringln" expect_stringln result_stringln
 
