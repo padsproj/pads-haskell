@@ -28,6 +28,8 @@ type Line a = (a, EOR)
 old data Maybe a = Just a
                  | Nothing Void
 
+type Lit (x::string) = (Void, x)
+
 |]
 
 
