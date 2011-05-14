@@ -27,6 +27,7 @@ data PadsDecl = PadsDeclType  Bool UString [LString] (Maybe Pat) PadsTy
 data PadsTy = PConstrain Pat PadsTy Exp
             | PTransform PadsTy PadsTy Exp
             | PList PadsTy (Maybe PadsTy) (Maybe TermCond)
+            | PPartition PadsTy Exp
             | PApp [PadsTy] (Maybe Exp)
             | PTuple [PadsTy] 
             | PExpression Exp

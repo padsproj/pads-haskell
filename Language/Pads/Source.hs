@@ -28,7 +28,7 @@ data RecordDiscipline = Single Word8
                       | NoDiscipline  -- No discipline is currently installed; all input data is in 'rest' field
 
 newline = Single (chrToWord8 '\n')
-windows = Multi  (B.pack (strToWord8s ('\r':['\n'])))
+windows = Multi  (B.pack (strToWord8s "\r\n"))
 
 {- SOURCE LOCATIONS -}
 data Loc = Loc { lineNumber :: Int64,

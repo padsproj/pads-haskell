@@ -56,8 +56,8 @@ lexer :: PT.TokenParser ()
 lexer = PT.makeTokenParser (haskellStyle 
              { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", reMark ],
                reservedNames   = ["data", "type", "newtype", "old", "existing", "deriving",
-                                   "using", "where", "terminator", "length", "of",
-                                   "case", "constrain", "transform" ]})
+                                   "using", "where", "terminator", "length", "of", "from",
+                                   "case", "constrain", "obtain", "partition" ]})
 
 whiteSpace    = PT.whiteSpace  lexer
 identifier    = PT.identifier  lexer
@@ -139,8 +139,9 @@ ptype :: Env -> Parser PadsTy
 ptype env 
   =  constrain env
  <|> transform env
+ <|> partition env
  <|> listTy env
- <|> arrow env
+ <|> btype env
  <?> "Pads Pads type expression"
 
 constrain :: Env -> Parser PadsTy
@@ -154,10 +155,10 @@ constrain env
 
 transform :: Env -> Parser PadsTy
 transform env
-  = do { reserved "transform"; src <- ptype env
-       ; reservedOp "=>"; dst <- ptype env
+  = do { reserved "obtain"; src <- ptype env
+       ; reservedOp "from"; dst <- ptype env
        ; reserved "using"; exp <- expression 
-       ; return (PTransform src dst exp)
+       ; return (PTransform dst src exp)
        } <?> "Pads transform type"
 
 
@@ -179,13 +180,12 @@ listEnd env
     (  do {reservedOp "terminator"; t<-ptype env; return (LTerm t)}
    <|> do {reservedOp "length"; e<-expression; return (LLen e)})
 
-arrow env
-  = do { bs <- btype env `sepBy` reservedOp "->"
-       ; return $ case length bs of
-           0 -> PTuple []
-           1 -> head bs
-           _ -> PApp (PTycon "(->)" : bs) Nothing
-       }
+partition :: Env -> Parser PadsTy
+partition env
+  = do { reserved "partition"; ty <- ptype env
+       ; reserved "using"; exp <- expression 
+       ; return (PPartition ty exp)
+       } <?> "Pads partition type"
 
 btype :: Env -> Parser PadsTy
 btype env
