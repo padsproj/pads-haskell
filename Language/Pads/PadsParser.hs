@@ -12,11 +12,6 @@ import Char
 
 import Control.Monad
 
-{- Parsing Monad -}
-
-newtype PadsParser a = PadsParser { (#) :: S.Source -> Result (a,S.Source) }
-type Result a = (a,Bool)
-
 
 
 parseStringInput :: PadsParser a -> String -> (a,String)
@@ -34,7 +29,14 @@ parseFileInput pp file =  do
   ; case pp # source of ((r,rest),b) -> return r
   }
 
+
+------------------------------------------------------------------
                         
+{- Parsing Monad -}
+
+newtype PadsParser a = PadsParser { (#) :: S.Source -> Result (a,S.Source) }
+type    Result a = (a,Bool)
+
 instance Functor PadsParser where
   fmap f p = PadsParser $ \bs -> let ((x,bs'),b) = p # bs in
                                    ((f x, bs'),b)
@@ -88,7 +90,7 @@ replaceSource bs ((v,_),b) = ((v,bs),b)
 
 
 -------------------------
--------------------------
+
 
 -- The monad is non-backtracking. The only choice point is at ChoiceP
 
@@ -105,21 +107,6 @@ p <||> q = PadsParser $ \bs -> (p # bs) <++> (q # bs)
 
 
 
--------------------------
-
-parseMaybe :: PadsMD md => 
-    PadsParser (rep,md) -> PadsParser (Maybe rep, (Base_md, Maybe md))
-parseMaybe p = parseJust p <||> parseNothing
-
-parseJust :: PadsMD md => 
-    PadsParser (rep,md) -> PadsParser (Maybe rep, (Base_md, Maybe md))
-parseJust p = do
-  (r,md) <- p
-  return (Just r, (get_md_header md, Just md))
-
-parseNothing :: PadsParser (Maybe t, (Base_md, Maybe s))
-parseNothing = return (Nothing, (cleanBasePD, Nothing))
-                        
 
 -----------------------
 
@@ -380,14 +367,6 @@ digitListToInt isNeg digits = if isNeg then negate raw else raw
 
 
 -------------------------
-
-parseLine :: PadsMD md => PadsParser (r,md) -> PadsParser (r,md)
-parseLine p =  do 
-   (_,bmd) <- doLineBegin
-   (r, md) <- p
-   (_,emd) <- doLineEnd
-   let new_hd = mergeBaseMDs [bmd, get_md_header md, emd]
-   return (r, replace_md_header md new_hd)
 
 
 doLineBegin :: PadsParser ((), Base_md)
