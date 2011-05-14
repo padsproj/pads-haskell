@@ -1,10 +1,4 @@
 {-# LANGUAGE NamedFieldPuns #-}
-{-
-
-
-
-
--}
 
 module Language.Pads.PadsParser where
 
@@ -30,10 +24,15 @@ parseStringInput pp cs = case pp #  (S.padsSourceFromString cs) of
                            ((r,rest),b) -> (r, S.padsSourceToString rest)  
 
 
--- parseByteStringInput :: PadsParser a -> ByteString -> a
+parseByteStringInput :: PadsParser a -> S.RawStream -> a
 parseByteStringInput pp cs = case pp #  (S.padsSourceFromByteString cs) of
                            ((r,rest),b) -> r
 
+parseFileInput :: PadsParser a -> FilePath -> IO a 
+parseFileInput pp file =  do
+  { source <- S.padsSourceFromFile file
+  ; case pp # source of ((r,rest),b) -> return r
+  }
 
                         
 instance Functor PadsParser where

@@ -40,7 +40,7 @@ import Language.Pads.PadsParser
 import qualified Language.Pads.Errors as E
 import qualified Language.Pads.Source as S
 import Language.Pads.LazyList
-import qualified Data.ByteString.Lazy.Char8 as B
+import qualified Data.ByteString as B
 import qualified Control.Exception as CE
 import Data.Data
 import Data.Generics.Aliases (extB, ext1B)
@@ -65,7 +65,7 @@ parseFile :: Pads rep md => FilePath -> IO (rep, md)
 parseFile file = parseFileWith parsePP file
 
 printS :: Pads rep md => (rep,md) -> String
-printS = B.unpack . printBS
+printS = S.byteStringToStr . printBS
 
 printBS :: Pads rep md => (rep,md) -> B.ByteString
 printBS r = printFL r B.empty
@@ -88,7 +88,7 @@ parseFile1 :: Pads1 arg rep md => arg-> FilePath -> IO (rep, md)
 parseFile1 arg file = parseFileWith (parsePP1 arg) file
 
 printS1 :: Pads1 arg rep md => arg -> (rep,md) -> String
-printS1 arg (rep,md) = B.unpack (printBS1 arg (rep,md))
+printS1 arg (rep,md) = S.byteStringToStr (printBS1 arg (rep,md))
 
 printBS1 :: Pads1 arg rep md => arg -> (rep,md) -> B.ByteString
 printBS1 arg r = printFL1 arg r B.empty
@@ -99,17 +99,11 @@ printFile1 arg filepath r = B.writeFile filepath (printBS1 arg r)
 
 parseFileWith  :: (Data rep, PadsMD md) => PadsParser (rep,md) -> FilePath -> IO (rep,md)
 parseFileWith p file = do
-   result <- CE.try (parseFileWithRaw p file)
+   result <- CE.try (parseFileInput p file)
    case result of
      Left (e::CE.SomeException) -> return (gdef, replace_md_header gdef
                                                  (mkErrBasePD (E.FileError (show e) file) Nothing))
      Right r -> return r
-
-parseFileWithRaw :: PadsParser (rep,md) -> FilePath -> IO (rep,md)
-parseFileWithRaw p file = do
-       { bs <- B.readFile file
-       ; return (parseByteStringInput p bs)
-       }
 
 
 
