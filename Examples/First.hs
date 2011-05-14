@@ -89,8 +89,8 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "Stringln" test_stringln
                 , TestLabel "Compound" test_myData
                 , TestLabel "Compound" test_hp_data
---                , TestLabel "Doc"  test_hp_data_file_parse
---                , TestLabel "Doc"  myDoc_test
+                , TestLabel "Doc"  test_hp_data_file_parse
+                , TestLabel "Doc"  myDoc_test
                 , TestLabel "Literal"  litRec_test
                 , TestLabel "Literal"  whiteSpace_test
                 , TestLabel "Literal"  whiteSpace2_test
@@ -630,24 +630,24 @@ expect_hp_data = ([HP {student_num = 8, student_name = "Hermione"},
 test_hp_data = mkTestCase "HP Data" expect_hp_data result_hp_data
 
 
-{-
+
 test_file = "Examples/data/test_file"
-result_hp_data_file_parse :: (HP_data, HP_data_md) = unsafePerformIO $
-                                                     parseFile test_file
+result_hp_data_file_parse :: (HP_data, HP_data_md) = unsafePerformIO $ parseFileWith hP_data_parseM test_file
+
 expect_hp_data_file_parse = 
   ( [HP {student_num = 8, student_name = "Hermione"},
      HP {student_num = 3, student_name = "Ron"},
      HP {student_num = 5, student_name = "Harry"}], 0)
 test_hp_data_file_parse = mkFileTestCase "HP file" expect_hp_data_file_parse result_hp_data_file_parse
--}
 
-{-
-[pads| type MyDoc = Text |]
+
+
+[pads| newtype MyDoc = MyDoc Text |]
 myDoc_input_file = "Examples/data/test_file"
-myDoc_result :: (Text, Base_md) = unsafePerformIO $ parseFile myDoc_input_file
-myDoc_expects = ("8,Hermione\n3,Ron\n5,Harry\n",0)
+myDoc_result :: (MyDoc, MyDoc_md) = unsafePerformIO $ parseFile myDoc_input_file
+myDoc_expects = (MyDoc "8,Hermione\n3,Ron\n5,Harry\n",0)
 myDoc_test = mkFileTestCase "myDoc" myDoc_expects myDoc_result
--}
+
 
 acomma = ","
 [pads| data LitRec = LitRec { fstField :: Int, acomma, sndField :: Int} |]
@@ -676,8 +676,3 @@ rE_ty_result = rE_ty_parseS rE_ty_input
 rE_ty_expects = (("t","aaaa"),0,"")
 rE_ty_test = mkTestCase "regular expression abbreviation for StringME" rE_ty_expects rE_ty_result
 
-
----- Play space
--- re = BRE.mkRegexWithOptsS "^a+" True True
--- re_results1 = BRE.matchRegexAllS re "aaaab"
--- re_results2 = BRE.matchRegexAllS re "caaaab"
