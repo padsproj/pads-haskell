@@ -112,9 +112,9 @@ getNamedTys' answers worklist =
         otherwise -> do {report True ("getTyNames: pattern didn't match for " ++ (nameBase ty_name)); return answers'} 
    }
 
-baseTypeNames = S.fromList [ ''Pint, ''Pchar, ''Pdigit, ''Ptext, ''Pstring, ''PstringFW, ''PstringME 
-                           , ''PstringSE, ''String, ''Char, ''COff, ''EpochTime, ''FileMode, ''Int, ''Word, ''Int64
-                           , ''Language.Pads.Errors.ErrInfo, ''Bool, ''Pbinary, ''Pre, ''Base_md, ''UTCTime, ''TimeZone
+baseTypeNames = S.fromList [ ''Int, ''Char, ''Digit, ''Text, ''String, ''StringFW, ''StringME 
+                           , ''StringSE, ''COff, ''EpochTime, ''FileMode, ''Int, ''Word, ''Int64
+                           , ''Language.Pads.Errors.ErrInfo, ''Bool, ''Binary, ''Base_md, ''UTCTime, ''TimeZone
                            ]
 
 mkPrettyInstance :: TH.Name -> Q [TH.Dec]

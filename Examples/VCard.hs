@@ -35,7 +35,7 @@ data VCard = VCard  ("BEGIN:", vcardRE, EOR, [Entry|EOR] terminator "END:", vcar
 
 data Entry = Entry { prefix   :: Maybe ("item", Int, '.'),
                      tag      :: Tag, 
-                     sep      :: PstringME semicommaRE, 
+                     sep      :: StringME semicommaRE, 
                      property :: VCardProperty tag }
 
 data Tag = VERSION | N | FN | NICKNAME | PHOTO | BDAY | ADR | LABEL
@@ -70,7 +70,7 @@ data VCardProperty (tag :: Tag) = case tag of
 
     -- | Specifies the birth date of the VCard entity. E.g.,
     --
-    | BDAY -> Birthday { bdayType :: Maybe "value=date:"
+    | BDAY -> Birthday { bdayType :: Maybe ("value=date:", ())
                        , bdate    :: DateFSE <| ("%Y-%m-%d", RE "$") |>
                        }
     -- | A physical address associated with the vCard entity. E.g.,
@@ -232,13 +232,13 @@ data TZone = TzText ("VALUE=text:", Stringln)
 
 
 -- | Represents the various types or properties of an address.
-data AddrType   = AddrDomestic (PstringME "DOM|dom")
-                | AddrInternational (PstringME "INTL|intl")
-                | AddrPostal (PstringME "POSTAL|postal")
-                | AddrParcel (PstringME "PARCEL|parcel")
-                | AddrHome (PstringME "HOME|home")
-                | AddrWork (PstringME "WORK|work")
-                | AddrPreferred (PstringME "PREF|pref")
+data AddrType   = AddrDomestic (StringME "DOM|dom")
+                | AddrInternational (StringME "INTL|intl")
+                | AddrPostal (StringME "POSTAL|postal")
+                | AddrParcel (StringME "PARCEL|parcel")
+                | AddrHome (StringME "HOME|home")
+                | AddrWork (StringME "WORK|work")
+                | AddrPreferred (StringME "PREF|pref")
 
 -- | Represents the various types or properties of a telephone number.
 data TelType    = TelHome "HOME"
@@ -254,13 +254,13 @@ data TelType    = TelHome "HOME"
                 | TelCar "CAR"
                 | TelISDN "ISDN"
                 | TelPCS "PCS"
-                | TelPreferred (PstringME "PREF|pref")
+                | TelPreferred (StringME "PREF|pref")
 
 
 -- | Represents the various types or properties of an email address.
 data EmailType = EmailInternet "INTERNET"
                | EmailX400  "X400"
-               | EmailPreferred (PstringME "PREF|pref")
+               | EmailPreferred (StringME "PREF|pref")
 
 -- | Represents the data associated with a vCard's Agent. This could be a URI
 -- to such a vCard or the embedded contents of the vCard itself.
@@ -268,9 +268,9 @@ data AgentData = AgentURI ("VALUE=uri:", VCardString)
                | AgentVCard VCard
 
 -- | Represents the various types of data that can be included in a vCard.
-data VCardData = URI    ("VALUE=uri:", VCardString) 
-               | Binary ("ENCODING=b", Maybe(';', TypeS), ':', WrappedEncoding )
-               | Base64 ("BASE64:", WrappedEncoding)
+data VCardData = VURI    ("VALUE=uri:", VCardString) 
+               | VBinary ("ENCODING=b", Maybe(';', TypeS), ':', WrappedEncoding )
+               | VBase64 ("BASE64:", WrappedEncoding)
 
 type WrappedEncoding = [Line (StringlnP startsWithSpace)]
 
@@ -300,7 +300,7 @@ vcardRE = REd "VCARD|vCard" "VCARD"
 typeRE = REd "TYPE|type" "TYPE"
 
 
-startsWithSpace (PstringSE s) = case s of 
+startsWithSpace s = case s of 
    [] -> False
    ' ':s' -> True
    '\t':s' -> True
