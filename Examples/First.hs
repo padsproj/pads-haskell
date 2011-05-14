@@ -75,19 +75,19 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "List" test_digitListTermB
                 , TestLabel "List" test_digitListTermSepG
                 , TestLabel "List" test_digitListTermSepB
---                , TestLabel "Try"  test_tryTest
---                , TestLabel "Try"  test_tryTestDG
---                , TestLabel "Try"  test_tryTestDB
---                , TestLabel "Try"  test_ListWithTry
---                , TestLabel "Void" test_WithVoid
---                , TestLabel "Void" test_voidEntry1
---                , TestLabel "Void" test_voidEntry2
---                , TestLabel "Void" test_voidEntry3
---                , TestLabel "Switch" test_switch0
---                , TestLabel "Switch" test_switch1
---                , TestLabel "Switch" test_switchOther
+                , TestLabel "Try"  test_tryTest
+                , TestLabel "Try"  test_tryTestDG
+                , TestLabel "Try"  test_tryTestDB
+                , TestLabel "Try"  test_ListWithTry
+                , TestLabel "Void" test_WithVoid
+                , TestLabel "Void" test_voidEntry1
+                , TestLabel "Void" test_voidEntry2
+                , TestLabel "Void" test_voidEntry3
+                , TestLabel "Switch" test_switch0
+                , TestLabel "Switch" test_switch1
+                , TestLabel "Switch" test_switchOther
                 , TestLabel "Stringln" test_stringln
---                , TestLabel "Compound" test_myData
+                , TestLabel "Compound" test_myData
                 , TestLabel "Compound" test_hp_data
 --                , TestLabel "Doc"  test_hp_data_file_parse
 --                , TestLabel "Doc"  myDoc_test
@@ -157,7 +157,7 @@ baz_expects = (("cat",123),0,"")
 baz_test    = mkTestCase "baz" baz_expects baz_results
 
 {- Regular expression types -}
-[pads| type StrME = StringME <|RE "a+"|> |]
+[pads| type StrME = StringME 'a+' |]
 input_strME = "aaaab"
 strME_results = strME_parseS input_strME
 
@@ -514,22 +514,21 @@ result_digitListTermSepB = digitListTermSep_parseS input_digitListTermSepB
 expect_digitListTermSepB = ([1,2,3,4,5],1,"hello")
 test_digitListTermSepB =   mkTestCase "digitListTermSepB" expect_digitListTermSepB result_digitListTermSepB
 
-{- Reinstate when Try is implemented
-[pads| type TryTest = (Try Pchar, StringFW 3) |]
+[pads| type TryTest = (Try Char, StringFW 3) |]
 input_tryTest = "abc123"
 result_tryTest = tryTest_parseS input_tryTest
-expect_tryTest = (TryTest (Pchar 'a',"abc"),0,"123")
+expect_tryTest = (('a',"abc"),0,"123")
 test_tryTest = mkTestCase "tryTest" expect_tryTest result_tryTest
 
 [pads| type TryTestD = (Try Digit, StringFW 3) |]
 input_tryTestDG = "123abc"
 result_tryTestDG = tryTestD_parseS input_tryTestDG
-expect_tryTestDG = (TryTestD (1,"123"),0,"abc")
+expect_tryTestDG = ((1,"123"),0,"abc")
 test_tryTestDG = mkTestCase "tryTestDG" expect_tryTestDG result_tryTestDG
 
 input_tryTestDB = "abc123"
 result_tryTestDB = tryTestD_parseS input_tryTestDB
-expect_tryTestDB = (TryTestD (0,"abc"),1, "123")
+expect_tryTestDB = ((0,"abc"),1, "123")
 test_tryTestDB = mkTestCase "tryTestDB" expect_tryTestDB result_tryTestDB
 
 {- ((TryTestD (0,"abc"),
@@ -539,26 +538,25 @@ test_tryTestDB = mkTestCase "tryTestDB" expect_tryTestDB result_tryTestDB
 -}
 
 
-[pads| type ListWithTry = ([Pchar] terminator (Try Digit), Digit) |]
+[pads| type ListWithTry = ([Char] terminator (Try Digit), Digit) |]
 input_ListWithTry = "cat123"
 result_ListWithTry = listWithTry_parseS input_ListWithTry
-expect_ListWithTry = (ListWithTry ([Pchar 'c',Pchar 'a',Pchar 't'],1),0,"23")
+expect_ListWithTry = ((['c', 'a', 't'],1),0,"23")
 test_ListWithTry = mkTestCase "ListWithTry" expect_ListWithTry result_ListWithTry
 
--}
 
-{- Reinstate when Void is implemented 
-[pads| type WithVoid = (Pchar, ',', Void, '|') |]
+
+[pads| type WithVoid = (Char, ',', Void, '|') |]
 input_WithVoid = "a,|rest"
 result_WithVoid = withVoid_parseS input_WithVoid
-expect_WithVoid =  (Pchar 'a',0,"rest")
+expect_WithVoid =  ('a',0,"rest")
 test_WithVoid = mkTestCase "WithVoid" expect_WithVoid result_WithVoid
 
 [pads| data VoidOpt   = PDigit Digit | Pcolor "red" | Pnothing Void 
        type VoidEntry = (VoidOpt, StringFW 3)                    |]
 input_voidEntry1 = "9abcdef"
 result_voidEntry1 = voidEntry_parseS input_voidEntry1
-expect_voidEntry1 = ((PDigit (9),"abc"),0,"def")
+expect_voidEntry1 = ((PDigit 9,"abc"),0,"def")
 test_voidEntry1 = mkTestCase "VoidEntry1" expect_voidEntry1 result_voidEntry1
 
 input_voidEntry2 = "redabcdef"
@@ -573,7 +571,7 @@ test_voidEntry3 = mkTestCase "VoidEntry3" expect_voidEntry3 result_voidEntry3
 
 [pads| data Switch (which :: Int) =  
          case <| which |> of
-             0 ->         Even  where <| even `mod` 2 == 0 |>
+             0 ->         Even Int where <| even `mod` 2 == 0 |>
            | 1 ->         Comma   ','
            | otherwise -> Missing Void |] 
 input_switch0 = "2hello"
@@ -592,13 +590,12 @@ result_switchOther = switch_parseS 2 input_switchOther
 expect_switchOther = (Missing,0,"hello")
 test_switchOther = mkTestCase "switchOther" expect_switchOther result_switchOther
 
--}
+
 
 result_stringln = stringln_parseS "hello\ngoodbye"
 expect_stringln = ("hello",0,"goodbye")
 test_stringln = mkTestCase "stringln" expect_stringln result_stringln
 
-{- Reinstate when Void is implemented.
 [pads| data MyBody (which::Int) = 
          case <| which |> of
             0         -> First Int
@@ -608,21 +605,21 @@ test_stringln = mkTestCase "stringln" expect_stringln result_stringln
        data MyEntry = MyEntry 
           { header  :: Int, ','
           , body    :: MyBody header, ','
-          , trailer :: Pchar}  
+          , trailer :: Char}  
 
        type MyData = [Line MyEntry] terminator EOF      |]
 
 input_myData = "0,23,a\n1,hello,b\n2,,c\n"
 result_myData = myData_parseS input_myData
-expect_myData = (MyData [MyEntry {header = 0, body = First (23), trailer = Pchar 'a'},
-                         MyEntry {header = 1, body = Second ("hello"), trailer = Pchar 'b'},
-                         MyEntry {header = 2, body = Other, trailer = Pchar 'c'}],0, "")
+expect_myData = ([MyEntry {header = 0, body = First (23), trailer = 'a'},
+                  MyEntry {header = 1, body = Second ("hello"), trailer = 'b'},
+                  MyEntry {header = 2, body = Other, trailer = 'c'}],0, "")
 test_myData = mkTestCase "MyData" expect_myData result_myData
--}
+
 
 
 [pads| data HP = HP { student_num  :: Int, ',', 
-                      student_name :: StringFW <|student_num|> }
+                      student_name :: StringFW student_num }
        type HP_data = [Line HP] terminator EOF |]   
 
 input_hp_data = "8,Hermione\n3,Ron\n5,Harry\n"
@@ -659,7 +656,7 @@ litRec_result = litRec_parseS litRec_input
 litRec_expects = (LitRec {fstField = 12, sndField = 34},0,"")
 litRec_test = mkTestCase "Haskell identifier literal" litRec_expects litRec_result
 
-[pads| type WhiteSpace = (Int, <|RE "[ \t]+"|>, Int) |]
+[pads| type WhiteSpace = (Int, '[ \t]+', Int) |]
 whiteSpace_input = "12      34"
 whiteSpace_result = whiteSpace_parseS whiteSpace_input
 whiteSpace_expects = ((12,34),0,"")
