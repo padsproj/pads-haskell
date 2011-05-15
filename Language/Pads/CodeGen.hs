@@ -151,7 +151,7 @@ mkRepTy ty = case ty of
   PTuple tys                  -> mkRepTuple tys
   PExpression _               -> ConT ''()
   PTycon c                    -> ConT (mkRepName c)
-  PTyvar v                    -> VarT (mkName v)     -- should be gensym'ed
+  PTyvar v                    -> VarT (mkName v)  
 
 mkRepList :: PadsTy -> Type
 mkRepList ty = AppT ListT (mkRepTy ty)
@@ -182,7 +182,7 @@ mkMDTy ty = case ty of
   PTuple tys                  -> mkMDTuple tys
   PExpression _               -> ConT ''Base_md
   PTycon c                    -> ConT (mkMDName c)
-  PTyvar v                    -> VarT (mkName v)     -- should be gensym'ed
+  PTyvar v                    -> VarT (mkName v)  
 
 mkMDList :: PadsTy -> Type
 mkMDList ty = mkTupleT [ConT ''Base_md, ListT `AppT` mkMDTy ty]    
@@ -367,7 +367,7 @@ mkParseTycon "EOR" = VarE 'eor_parseM
 mkParseTycon c     = VarE (mkTyParserName c)
 
 mkParseTyvar :: String -> Exp
-mkParseTyvar v = VarE (mkVarParserName v)
+mkParseTyvar v = VarE (mkVarParserName v) -- should gensym these, but probably ok
 
 
 ----------------------------------------------------------
@@ -421,8 +421,11 @@ buildConstr_md fnMD conMD tys
 
 genParseRecord :: UString -> [FieldInfo] -> (Maybe Exp) -> Q (Dec,Exp)
 genParseRecord c fields pred = do
-  { labMDs  <- sequence [genLabMDName l | (l,(_,_),_) <- fields] 
-  ; let fnMDLabs  = applyE $ map VarE (mkfnMDName c : labMDs)
+  { c_md <- newName (strToLower c)
+  ; let con_md = buildConstr_md c_md (ConE (mkConstrIMDName c))
+                       [ty | (_,(_,ty),_) <- fields]
+  ; labMDs  <- sequence [genLabMDName l | (l,(_,_),_) <- fields] 
+  ; let fnMDLabs  = applyE $ map VarE (c_md : labMDs)
   ; doStmts <- sequence [genParseField f xn | (f,xn) <- zip fields labMDs]
   ; returnStmt <- [| return ($(return conLabs),$(return fnMDLabs)) |]
   ; return (con_md, DoE (doStmts ++ [NoBindS returnStmt]))
@@ -430,8 +433,6 @@ genParseRecord c fields pred = do
   where
     labs    = [mkName lab | (Just lab,(_,ty),_) <- fields, hasRep ty]
     conLabs = applyE (ConE (mkConstrName c) : map VarE labs)
-    con_md  = buildConstr_md (mkfnMDName c) (ConE (mkConstrIMDName c))
-                [ty | (_,(_,ty),_) <- fields]
 
 genLabMDName (Just lab) = return (mkFieldMDName lab)
 genLabMDName Nothing    = newName "x"

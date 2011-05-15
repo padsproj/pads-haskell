@@ -30,12 +30,12 @@ type Triple = (Int, (obtain Char from Int using <|(bi,ib)|>, Int))
 
 type MyVoid = ()
 
-|]
-
-[pads| 
 
 data May a = Jus a
            | Noth ()
+
+
+data Exxy a = Exxy {a_p :: Int, aa :: a}
 
 |]
 
