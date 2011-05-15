@@ -88,7 +88,7 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "Stringln" test_stringln
                 , TestLabel "Compound" test_myData
                 , TestLabel "Compound" test_hp_data
---                , TestLabel "Doc"  test_hp_data_file_parse
+                , TestLabel "Doc"  test_hp_data_file_parse
                 , TestLabel "Doc"  myDoc_test
                 , TestLabel "Literal"  litRec_test
                 , TestLabel "Literal"  whiteSpace_test
@@ -629,7 +629,7 @@ expect_hp_data = ([HP {student_num = 8, student_name = "Hermione"},
 test_hp_data = mkTestCase "HP Data" expect_hp_data result_hp_data
 
 
-{-
+
 test_file = "Examples/data/test_file"
 result_hp_data_file_parse :: (HP_data, HP_data_md) = unsafePerformIO $ parseFileWith hP_data_parseM test_file
 
@@ -638,7 +638,7 @@ expect_hp_data_file_parse =
      HP {student_num = 3, student_name = "Ron"},
      HP {student_num = 5, student_name = "Harry"}], 0)
 test_hp_data_file_parse = mkFileTestCase "HP file" expect_hp_data_file_parse result_hp_data_file_parse
--}
+
 
 
 [pads| newtype MyDoc = MyDoc Text |]

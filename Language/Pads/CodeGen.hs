@@ -193,7 +193,7 @@ mkMDApp tys = foldl1 AppT [mkMDTy ty | ty <- tys, hasRep ty]
 mkMDTuple :: [PadsTy] -> Type
 mkMDTuple tys = case mds of  
     []     -> ConT ''Base_md
-    [m]    -> m
+    [m]    -> mkTupleT [ConT ''Base_md, m] 
     (m:ms) -> mkTupleT [ConT ''Base_md, mkTupleT mds]
   where
     mds = [mkMDTy ty | ty <- tys, hasRep ty]
@@ -202,8 +202,6 @@ mkMDTuple tys = case mds of
 -----------------------------------------------------------------
 -- GENERATING INSTANCE DECLARATIONS FROM DATA/NEW DECLARATION
 ------------------------------------------------------------------
-
--- Doesn't yet work for higher kinded Pads types
 
 mkPadsInstance :: UString -> [LString] -> Maybe Type -> Dec
 mkPadsInstance str args Nothing 
@@ -318,7 +316,7 @@ genParsePartition :: PadsTy -> Exp -> Q Exp
 genParsePartition ty dis = [| parsePartition $(genParseTy ty) $(return dis) |]
 
 genParseTuple :: [PadsTy] -> Q Exp
-genParseTuple [] = [| return ((), cleanBasePD) |]
+genParseTuple []  = [| return ((), cleanBasePD) |]
 genParseTuple tys = do
   { let f_rep = buildF_rep vars_frep
   ; let f_md  = buildF_md vars_fmd vars_frep 
