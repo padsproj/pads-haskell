@@ -90,8 +90,8 @@ data VCardProperty (tag :: Tag) = case tag of
     --
     -- > Label  [AddrParcel, AddrPostal]
     -- >        ["Michael Schade", "PO Box 935", "Fenton, MO 63026"]
-    | LABEL -> Label { lblType   :: TypeL AddrType
-                     , lbl       :: VCardString
+    | LABEL -> Label { labelType :: TypeL AddrType
+                     , label     :: VCardString
                      }
     -- | A telephone number for the VCard entity, as well as a list of
     -- properties describing the telephone number. E.g.,

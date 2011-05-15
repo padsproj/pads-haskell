@@ -45,12 +45,14 @@ parsePadsDecls fileName line column input
   = PP.parse (do { setPosition (newPos fileName line column)
                  ; whiteSpace
                  ; x <- padsDecls
-                 ; eof
+                 ; whiteSpace
+                 ; eof <|> errorParse
                  ; return x
                  }) fileName input
 
-
-
+errorParse = do 
+  { rest <- manyTill anyToken eof
+  ; unexpected rest }
 
 lexer :: PT.TokenParser ()
 lexer = PT.makeTokenParser (haskellStyle 
