@@ -138,7 +138,7 @@ mkNewRepMDDecl old name args branch ds
 
 
 -----------------------------------------------------------
--- GENERATE TYPE REPRESENTATION OF TYPE EXPRESSION
+-- GENERATE REPRESENTATION TYPE OF A TYPE EXPRESSION
 -----------------------------------------------------------
 
 mkRepTy ::  PadsTy -> Type
@@ -151,7 +151,7 @@ mkRepTy ty = case ty of
   PTuple tys                  -> mkRepTuple tys
   PExpression _               -> ConT ''()
   PTycon c                    -> ConT (mkRepName c)
-  PTyvar v                    -> VarT (mkName v)
+  PTyvar v                    -> VarT (mkName v)     -- should be gensym'ed
 
 mkRepList :: PadsTy -> Type
 mkRepList ty = AppT ListT (mkRepTy ty)
@@ -182,10 +182,10 @@ mkMDTy ty = case ty of
   PTuple tys                  -> mkMDTuple tys
   PExpression _               -> ConT ''Base_md
   PTycon c                    -> ConT (mkMDName c)
-  PTyvar v                    -> VarT (mkName v)
+  PTyvar v                    -> VarT (mkName v)     -- should be gensym'ed
 
 mkMDList :: PadsTy -> Type
-mkMDList ty = mkTupleT [ConT ''Base_md, AppT ListT (mkMDTy ty)]    
+mkMDList ty = mkTupleT [ConT ''Base_md, ListT `AppT` mkMDTy ty]    
 
 mkMDApp :: [PadsTy] -> Type
 mkMDApp tys = foldl1 AppT [mkMDTy ty | ty <- tys, hasRep ty]
@@ -193,7 +193,7 @@ mkMDApp tys = foldl1 AppT [mkMDTy ty | ty <- tys, hasRep ty]
 mkMDTuple :: [PadsTy] -> Type
 mkMDTuple tys = case mds of  
     []     -> ConT ''Base_md
-    [m]    -> mkTupleT [ConT ''Base_md, m]
+    [m]    -> m
     (m:ms) -> mkTupleT [ConT ''Base_md, mkTupleT mds]
   where
     mds = [mkMDTy ty | ty <- tys, hasRep ty]

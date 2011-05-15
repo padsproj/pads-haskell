@@ -28,6 +28,7 @@ data Switcher (x::Int) = case x of
 
 type Triple = (Int, (obtain Char from Int using <|(bi,ib)|>, Int)) 
 
+type MyVoid = ()
 
 |]
 
