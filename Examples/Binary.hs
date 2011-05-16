@@ -27,7 +27,7 @@ tests = TestList[TestLabel "Calls" call_test
        type CallsNoRecInstall = partition CallsNoRec using none
 |]
 
-call_input_file = "Examples/data/calls10"
+call_input_file = "Examples/data/calls10.b"
 call_result :: (Calls, Calls_md) = unsafePerformIO $ parseFileWith callsB_parseM call_input_file
 call_expect = ([Call {onpa = 221, obase = 2360199, dpna = 936, dbase = 3615299, con = 96977709, dur = 71},Call {onpa = 221, obase = 2360399, dpna = 855, dbase = 5445599, con = 96978527, dur = 126},Call {onpa = 221, obase = 2390199, dpna = 974, dbase = 4298199, con = 96980122, dur = 990},Call {onpa = 221, obase = 2390399, dpna = 855, dbase = 5404599, con = 96976885, dur = 35},Call {onpa = 222, obase = 2332099, dpna = 426, dbase = 6814599, con = 96977173, dur = 4850},Call {onpa = 222, obase = 2332099, dpna = -15, dbase = 9999999, con = 96978457, dur = 533},Call {onpa = 222, obase = 2340599, dpna = 855, dbase = 8442799, con = 96980047, dur = 8},Call {onpa = 222, obase = 2341299, dpna = 855, dbase = 7081599, con = 96979104, dur = 11},Call {onpa = 223, obase = 2340099, dpna = 855, dbase = 2484499, con = 96977739, dur = 564},Call {onpa = 223, obase = 2340199, dpna = -15, dbase = 9999999, con = 96979345, dur = 143}],0)
 call_test = mkFileTestCase "Call" call_expect call_result

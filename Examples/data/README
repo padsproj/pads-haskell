@@ -1,0 +1,24 @@
+This directory contains data for example programs.
+
+For Examples/First.hs
+  Examples/data/test_file
+
+For Examples/AI.hs
+  Examples/data/ai.3000
+  Examples/data/ai.big
+
+For Examples/Binary.hs
+  Examples/data/binary		  -- Small input test file
+  Call Detail Records
+    Examples/data/a2b.c           -- C program to convert ascii records to binary
+       				  -- To compile: cc -o a2b a2b.c
+				  -- To run: a2b < calls10.a > calls10.b
+    Examples/data/calls10.a,      -- ASCII call detail records
+    Examples/data/calls10.b,      -- Corresponding binary records
+  
+  Binary base type tseting
+    Examples/data/genBin.c,       -- C program to convert ascii records to binary
+       				  -- To compile: cc -o genBin binTest.a
+				  -- To run: genBin < binTest.a > binTest.b
+    Examples/data/binTest.a, 
+    Examples/data/binTest.b
