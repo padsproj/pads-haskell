@@ -7,7 +7,7 @@ Name:                pads-haskell
 -- The package version. See the Haskell package versioning policy
 -- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
 -- standards guiding when and how versions should be incremented.
-Version:             0.1
+Version:             0.2
 
 -- A short (one-line) description of the package.
 Synopsis:            PADS data description language for Haskell
@@ -19,13 +19,13 @@ Synopsis:            PADS data description language for Haskell
 Homepage:            http://www.padsproj.org
 
 -- The license under which the package is released.
-License:             OtherLicense
+License:             BSD3
 
 -- The file containing the license text.
 License-file:        LICENSE
 
 -- The package author(s).
-Author:              Kathleen Fisher
+Author:              Kathleen Fisher and John Launchbury
 
 -- An email address to which users can send suggestions, bug reports,
 -- and patches.
@@ -40,7 +40,7 @@ Build-type:          Simple
 
 -- Extra files to be distributed with the package, such as examples or
 -- a README.
--- Extra-source-files:  
+Extra-source-files:  Examples/AI.hs Examples/First.hs Examples/Binary.hs
 
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.2
@@ -53,7 +53,7 @@ Library
                        Language.Pads.Syntax,    Language.Pads.Parser,
                        Language.Pads.Generic,   Language.Pads.RegExp
                        Language.Pads.Pretty,    Language.Pads.Source, 
-                       Language.Pads.TH
+                       Language.Pads.TH,        Language.Pads.Testing
 
 
 
@@ -66,13 +66,12 @@ Library
                     template-haskell,
                     Glob,
                     regex-posix,
---                    regex-bytestring,
                     bytestring,
---                    haskell-src-exts,
                     haskell-src-meta >= 0.4,
                     parsec >= 3.1.0,
                     mainland-pretty >= 0.1.0.2,
-                    HUnit   
+                    HUnit,
+                    byteorder
   
   -- Modules not exported by this package.
   Other-modules:       Language.Pads.CodeGen,

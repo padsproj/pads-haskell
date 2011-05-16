@@ -1,5 +1,14 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 
+{-
+** *********************************************************************
+*                                                                      *
+*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
+*              John Launchbury <john.launchbury@gmail.com>             *
+*                                                                      *
+************************************************************************
+-}
+
 module Language.Pads.RegExp where
 import Data.Data
 

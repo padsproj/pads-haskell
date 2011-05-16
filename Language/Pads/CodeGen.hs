@@ -1,6 +1,14 @@
 {-# LANGUAGE TemplateHaskell, NamedFieldPuns, ScopedTypeVariables,
              RecordWildCards, UndecidableInstances #-}
 
+{-
+** *********************************************************************
+*                                                                      *
+*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
+*              John Launchbury <john.launchbury@gmail.com>             *
+*                                                                      *
+************************************************************************
+-}
 
 module Language.Pads.CodeGen where
 

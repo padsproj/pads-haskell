@@ -2,6 +2,16 @@
     FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
 
 
+{-
+** *********************************************************************
+*                                                                      *
+*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
+*              John Launchbury <john.launchbury@gmail.com>             *
+*                                                                      *
+************************************************************************
+-}
+
+
 module Language.Pads.BaseTypes where
 
 import Language.Pads.Source

@@ -1,3 +1,13 @@
+{-
+** *********************************************************************
+*                                                                      *
+*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
+*              John Launchbury <john.launchbury@gmail.com>             *
+*                                                                      *
+************************************************************************
+-}
+
+
 module Language.Pads.Testing (
     module Test.HUnit ,
     mkTestCase,
