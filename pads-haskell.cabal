@@ -40,7 +40,10 @@ Build-type:          Simple
 
 -- Extra files to be distributed with the package, such as examples or
 -- a README.
-Extra-source-files:  Examples/AI.hs Examples/First.hs Examples/Binary.hs
+Extra-source-files:  Examples/AI.hs Examples/First.hs Examples/Binary.hs,
+                     Examples/data/ai.3000, Examples/data/ai.big,
+                     Examples/data/binary, Examples/data/calls10,
+                     Examples/data/calls10.a
 
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.2
@@ -67,11 +70,14 @@ Library
                     Glob,
                     regex-posix,
                     bytestring,
+                    haskell-src,
                     haskell-src-meta >= 0.4,
                     parsec >= 3.1.0,
                     mainland-pretty >= 0.1.0.2,
                     HUnit,
-                    byteorder
+                    byteorder,
+                    old-locale,
+                    time
   
   -- Modules not exported by this package.
   Other-modules:       Language.Pads.CodeGen,

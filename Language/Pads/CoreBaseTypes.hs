@@ -58,6 +58,8 @@ baseTypesList = [
   ("PstringME", (''String,  [''RE])),
   ("PstringSE", (''String,  [''RE])),
   ("Int",       (''Int, [])),
+  ("Int32",     (''Int32, [])),
+  ("Word32",    (''Word32, [])),
   ("Char",      (''Char, [])),
   ("Double",    (''Double, [])),
   ("Void",      (''Void, []))
@@ -503,6 +505,79 @@ handleEOR val str p
 ----------------------------------
 -- BINARY TYPES --
 ----------------------------------
+
+-- type Int8 : 8-bit, signed integers
+type Int8_md = Base_md
+
+int8_parseM :: PadsParser (Int8,Base_md)
+int8_parseM =
+  handleEOF def "Int8" $
+  handleEOR def "Int8" $ do
+    bytes <- takeBytesP 1
+    if B.length bytes == 1 
+      then returnClean (fromIntegral (bytes `B.index` 0))
+      else returnError def (E.Insufficient (B.length bytes) 1)
+
+instance Pads Int8 Base_md where
+  parsePP = int8_parseM
+  printFL = int8_printFL
+
+int8_printFL :: (Int8, Base_md) -> FList
+int8_printFL (i, bmd) = addBString ( B.singleton (fromIntegral i))
+
+
+-- type Int16 : 16-bit, signed integers; bytes assembled in order
+type Int16_md = Base_md
+
+int16_parseM :: PadsParser (Int16,Base_md)
+int16_parseM =
+  handleEOF def "Int16" $
+  handleEOR def "Int16" $ do
+    bytes <- takeBytesP 2
+    if B.length bytes == 2 
+      then returnClean (bytesToInt16 Native bytes)
+      else returnError def (E.Insufficient (B.length bytes) 2)
+
+instance Pads Int16 Base_md where
+  parsePP = int16_parseM
+  printFL = int16_printFL
+
+int16_printFL :: (Int16, Base_md) -> FList
+int16_printFL (i, bmd) = addBString (int16ToBytes Native i)
+
+
+--type Int16sbh : signed byte high, 16-bit, signed integers
+type Int16sbh_md = Base_md
+type Int16sbh = Int16
+
+int16sbh_parseM :: PadsParser (Int16,Base_md)
+int16sbh_parseM =
+  handleEOF def "Int16sbh" $
+  handleEOR def "Int16sbh" $ do
+    bytes <- takeBytesP 2
+    if B.length bytes == 2 
+      then returnClean (bytesToInt16 SBH bytes)
+      else returnError def (E.Insufficient (B.length bytes) 2)
+
+int16sbh_printFL :: (Int16, Base_md) -> FList
+int16sbh_printFL (i, bmd) = addBString (int16ToBytes SBH i)
+
+--type Int16sbl : signed byte low, 16-bit, signed integers
+type Int16sbl_md = Base_md
+type Int16sbl = Int16
+
+int16sbl_parseM :: PadsParser (Int16,Base_md)
+int16sbl_parseM =
+  handleEOF def "Int16sbl" $
+  handleEOR def "Int16sbl" $ do
+    bytes <- takeBytesP 2
+    if B.length bytes == 2 
+      then returnClean (bytesToInt16 SBL bytes)
+      else returnError def (E.Insufficient (B.length bytes) 2)
+
+int16sbl_printFL :: (Int16, Base_md) -> FList
+int16sbl_printFL (i, bmd) = addBString (int16ToBytes SBL i)
+
 -- type Int32 : 32-bit, signed integers; bytes assembled in order
 type Int32_md = Base_md
 
@@ -555,6 +630,80 @@ int32sbl_parseM =
 
 int32sbl_printFL :: (Int32, Base_md) -> FList
 int32sbl_printFL (i, bmd) = addBString (int32ToBytes SBL i)
+
+-- UNSIGNED INTEGERS --
+-- type Word8 : 8-bit, unsigned integers
+type Word8_md = Base_md
+
+word8_parseM :: PadsParser (Word8,Base_md)
+word8_parseM =
+  handleEOF def "Word8" $
+  handleEOR def "Word8" $ do
+    bytes <- takeBytesP 1
+    if B.length bytes == 1 
+      then returnClean (bytes `B.index` 0)
+      else returnError def (E.Insufficient (B.length bytes) 1)
+
+instance Pads Word8 Base_md where
+  parsePP = word8_parseM
+  printFL = word8_printFL
+
+word8_printFL :: (Word8, Base_md) -> FList
+word8_printFL (i, bmd) = addBString ( B.singleton i)
+
+
+--type Word16 :  16-bit, unsigned integers, raw order
+type Word16_md = Base_md
+
+word16_parseM :: PadsParser (Word16,Base_md)
+word16_parseM =
+  handleEOF def "Word16" $
+  handleEOR def "Word16" $ do
+    bytes <- takeBytesP 2
+    if B.length bytes == 2 
+      then returnClean (bytesToWord16 Native bytes)
+      else returnError def (E.Insufficient (B.length bytes) 2)
+
+instance Pads Word16 Base_md where
+  parsePP = word16_parseM
+  printFL = word16_printFL
+
+word16_printFL :: (Word16, Base_md) -> FList
+word16_printFL (i, bmd) = addBString (word16ToBytes Native i)
+
+
+--type Word16sbh : signed byte high, 16-bit, unsigned integers
+type Word16sbh_md = Base_md
+type Word16sbh = Word16
+
+word16sbh_parseM :: PadsParser (Word16,Base_md)
+word16sbh_parseM =
+  handleEOF def "Word16sbh" $
+  handleEOR def "Word16sbh" $ do
+    bytes <- takeBytesP 2
+    if B.length bytes == 2 
+      then returnClean (bytesToWord16 SBH bytes)
+      else returnError def (E.Insufficient (B.length bytes) 2)
+
+word16sbh_printFL :: (Word16, Base_md) -> FList
+word16sbh_printFL (i, bmd) = addBString (word16ToBytes SBH i)
+
+--type Word16sbl : signed byte low, 16-bit, unsigned integers
+type Word16sbl_md = Base_md
+type Word16sbl = Word16
+
+word16sbl_parseM :: PadsParser (Word16,Base_md)
+word16sbl_parseM =
+  handleEOF def "Word16sbl" $
+  handleEOR def "Word16sbl" $ do
+    bytes <- takeBytesP 2
+    if B.length bytes == 2 
+      then returnClean (bytesToWord16 SBL bytes)
+      else returnError def (E.Insufficient (B.length bytes) 2)
+
+word16sbl_printFL :: (Word16, Base_md) -> FList
+word16sbl_printFL (i, bmd) = addBString (word16ToBytes SBL i)
+
 
 --type Word32 :  32-bit, unsigned integers, raw order
 type Word32_md = Base_md
@@ -624,11 +773,49 @@ mkStr c = "'" ++ [c] ++ "'"
 -- machine.
 data Endian = SBH | SBL | Native
 
+bytesToInt16 :: Endian -> B.ByteString -> Int16
+bytesToInt16 endian = fromIntegral . (bytesToWord16 endian)
+
+int16ToBytes :: Endian -> Int16 -> B.ByteString
+int16ToBytes endian = (word16ToBytes endian) . fromIntegral
+
+
 bytesToInt32 :: Endian -> B.ByteString -> Int32
 bytesToInt32 endian = fromIntegral . (bytesToWord32 endian)
 
 int32ToBytes :: Endian -> Int32 -> B.ByteString
 int32ToBytes endian = (word32ToBytes endian) . fromIntegral
+
+
+bytesToWord16 :: Endian -> B.ByteString -> Word16
+bytesToWord16 endian b = 
+  let  b0 :: Word16 = fromIntegral (b `B.index` 0)
+       b1 :: Word16 = fromIntegral (b `B.index` 1)
+  in
+    case (endian, byteOrder) of
+     (SBH, BigEndian)    ->   assembleWord16 (b1, b0)
+     (SBH, LittleEndian) ->   assembleWord16 (b0, b1)
+     (SBL, BigEndian)    ->   assembleWord16 (b0, b1)
+     (SBL, LittleEndian) ->   assembleWord16 (b1, b0)
+     (Native,  BigEndian)    ->   assembleWord16 (b0, b1)
+     (Native, LittleEndian)  ->   assembleWord16 (b1, b0)
+
+
+word16ToBytes :: Endian -> Word16 -> B.ByteString 
+word16ToBytes endian word16 = 
+  let w0 :: Word8 = fromIntegral (shiftR (word16 .&. 0xFF00)  8)
+      w1 :: Word8 = fromIntegral         (word16 .&. 0x00FF)  
+  in case (endian, byteOrder) of
+     (SBH, BigEndian)    ->   B.pack [w1,w0]
+     (SBH, LittleEndian) ->   B.pack [w0,w1]
+     (SBL, BigEndian)    ->   B.pack [w0,w1]
+     (SBL, LittleEndian) ->   B.pack [w1,w0]
+     (Native, BigEndian) ->   B.pack [w0,w1]
+     (Native, LittleEndian) ->   B.pack [w1,w0]
+      
+
+assembleWord16 :: (Word16, Word16) -> Word16
+assembleWord16 (b0, b1) = shift b0 8 .|. b1
 
 
 

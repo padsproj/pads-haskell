@@ -35,11 +35,13 @@ data Source = Source { current  :: B.ByteString
 data RecordDiscipline = Single Word8
                       | Multi B.ByteString
                       | Bytes Int
+                      | NoPartition
                       | NoDiscipline  -- No discipline is currently installed; all input data is in 'rest' field
 
 newline = Single (chrToWord8 '\n')
 windows = Multi  (B.pack (strToWord8s "\r\n"))
 bytes n = Bytes n
+none = NoPartition
 
 {- SOURCE LOCATIONS -}
 data Loc = Loc { lineNumber :: Int64,
@@ -157,6 +159,7 @@ unputCurrentLine (s @ Source {current, rest, loc, disc, eorAtEOF}) =
                          loc'  = if B.null current then loc else decLineNumber loc
                     in Source {current = B.empty, rest = rest', loc = loc', disc = NoDiscipline, eorAtEOF = False}
         Bytes n -> Source {current = B.empty, rest = B.append current rest, loc = decLineNumber loc, disc = NoDiscipline, eorAtEOF = False}            
+        NoPartition -> Source {current = B.empty, rest = current, loc = decLineNumber loc, disc = NoDiscipline, eorAtEOF = False}            
         NoDiscipline -> s
 
 
@@ -172,6 +175,7 @@ breakUsingDisc bs rd = case rd of
               in  (nextLine, residual, eorAtEOF)
   Bytes n ->  let (nextLine, residual) = B.splitAt n bs
               in  (nextLine, residual, False)
+  NoPartition -> (bs, B.empty, False)
   NoDiscipline -> error "Pads Source: Attempt to partition source using internal discipline 'NoDiscipline'"
 
              
