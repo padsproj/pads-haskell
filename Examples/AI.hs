@@ -5,7 +5,6 @@ import Language.Pads.GenPretty
 import Control.Monad
 
 import System.IO.Unsafe (unsafePerformIO)
-import qualified Data.ByteString.Lazy.Char8 as B
 
 [pads|
   newtype AI    = AI ([Line Entry] terminator EOF)

@@ -1,5 +1,14 @@
 {-# LANGUAGE NamedFieldPuns, RecordWildCards, DeriveDataTypeable #-}
 
+{-
+** *********************************************************************
+*                                                                      *
+*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
+*              John Launchbury <john.launchbury@gmail.com>             *
+*                                                                      *
+************************************************************************
+-}
+
 module Language.Pads.Source where
 
 import qualified Data.ByteString as B   -- abstraction for input data
@@ -25,10 +34,12 @@ data Source = Source { current  :: B.ByteString
 
 data RecordDiscipline = Single Word8
                       | Multi B.ByteString
+                      | Bytes Int
                       | NoDiscipline  -- No discipline is currently installed; all input data is in 'rest' field
 
 newline = Single (chrToWord8 '\n')
 windows = Multi  (B.pack (strToWord8s "\r\n"))
+bytes n = Bytes n
 
 {- SOURCE LOCATIONS -}
 data Loc = Loc { lineNumber :: Int64,
@@ -145,8 +156,8 @@ unputCurrentLine (s @ Source {current, rest, loc, disc, eorAtEOF}) =
                                 else B.concat [current, rest]
                          loc'  = if B.null current then loc else decLineNumber loc
                     in Source {current = B.empty, rest = rest', loc = loc', disc = NoDiscipline, eorAtEOF = False}
+        Bytes n -> Source {current = B.empty, rest = B.append current rest, loc = decLineNumber loc, disc = NoDiscipline, eorAtEOF = False}            
         NoDiscipline -> s
-
 
 
 breakUsingDisc :: B.ByteString -> RecordDiscipline -> (B.ByteString, B.ByteString, Bool)
@@ -159,6 +170,9 @@ breakUsingDisc bs rd = case rd of
                   residual = B.drop (B.length s) raw_residual
                   eorAtEOF =  (B.null residual) && (not $ B.null raw_residual)
               in  (nextLine, residual, eorAtEOF)
+  Bytes n ->  let (nextLine, residual) = B.splitAt n bs
+              in  (nextLine, residual, False)
+  NoDiscipline -> error "Pads Source: Attempt to partition source using internal discipline 'NoDiscipline'"
 
              
 
@@ -191,14 +205,6 @@ takeHead (s @ Source{current,loc, ..}) =
          (word8ToChr $ B.head current, s{current = B.tail current, loc = incOffset loc})
 
 
-matchString :: String -> Source -> Maybe(String, Source)
-matchString str s = 
-   let pstr = strToByteString str 
-   in if B.isPrefixOf pstr (current s)
-      then let (res,source) = Language.Pads.Source.take (B.length pstr) s
-            in Just(str, source)            
-      else Nothing
-
 takeHeadStr :: String -> Source -> (Bool, Source)
 takeHeadStr str s = 
    let pstr = strToByteString str 
@@ -206,6 +212,15 @@ takeHeadStr str s =
       then let (res,source) = Language.Pads.Source.take (B.length pstr) s
             in (True, source)            
       else (False, s)
+
+
+matchString :: String -> Source -> Maybe(String, Source)
+matchString str s = 
+   let pstr = strToByteString str 
+   in if B.isPrefixOf pstr (current s)
+      then let (res,source) = Language.Pads.Source.take (B.length pstr) s
+            in Just(str, source)            
+      else Nothing
 
 
 breakSubstring :: B.ByteString -- ^ String to search for
@@ -245,19 +260,17 @@ scanString str (s @ Source{current,loc, ..}) =
      else let len = B.length pat
           in Just (byteStringToStr before, s{current= B.drop len after, loc = incOffsetBy loc len})
 
-take :: Int -> Source -> (String, Source)                
-take n (s @ Source{current,loc, ..}) = 
+takeBytes :: Int -> Source -> (B.ByteString, Source)
+takeBytes n (s @ Source{current,loc, ..}) = 
      let (head, tail) = B.splitAt n current
          incOffset    = B.length head
-     in (byteStringToStr head, s{current= tail, loc = incOffsetBy loc incOffset})
+     in (head, s{current= tail, loc = incOffsetBy loc incOffset})
 
 
-take' :: Int  -> Source -> Maybe (String, Source)
-take' n (s @ Source{current,loc, ..}) = 
-     if n > B.length current then Nothing
-     else let (head, tail) = B.splitAt n current
-              incOffset    = B.length head
-          in Just (byteStringToStr head, s{current=tail, loc=incOffsetBy loc incOffset})
+take :: Int -> Source -> (String, Source)                
+take n s = let (bs, s') = takeBytes n s
+           in (byteStringToStr bs, s')
+
 
 regexMatch :: RE -> Source -> (Maybe String, Source)
 regexMatch (RE re_str_raw) (s @ Source{current,loc,..}) = 
@@ -308,14 +321,10 @@ scanTo chr (src @ Source{current,loc, ..}) =
           Pos    {begin, end=Just endErrLoc})
 
 
-
-{-
-printEOR :: B.ByteString
-printEOR = B.pack "\n"
-
-printEOF:: B.ByteString
-printEOF = B.pack []
--}
+lift :: (String -> [(a, String)]) -> (Source -> (Maybe a, Source))
+lift f s = case f (byteStringToStr $ current s) of 
+  [] -> (Nothing, s)
+  (x,residual):rest -> (Just x, s{current= (strToByteString residual)})
 
 {- Helper routines -}
 

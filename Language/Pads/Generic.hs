@@ -1,5 +1,14 @@
 {-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, FlexibleContexts, Rank2Types, FlexibleInstances #-}
 
+{-
+** *********************************************************************
+*                                                                      *
+*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
+*              John Launchbury <john.launchbury@gmail.com>             *
+*                                                                      *
+************************************************************************
+-}
+
 
 module Language.Pads.Generic where
 

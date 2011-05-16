@@ -1,5 +1,14 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
+{-
+** *********************************************************************
+*                                                                      *
+*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
+*              John Launchbury <john.launchbury@gmail.com>             *
+*                                                                      *
+************************************************************************
+-}
+
 module Language.Pads.PadsParser where
 
 -- These are the combinators used to build PADS parsers
@@ -305,17 +314,15 @@ ifEOFP = do { b <- isEOFP; if b then return () else badReturn ()}
 ifEORP = do { b <- isEORP; if b then return () else badReturn ()}
 
 
-{- Is this what we should do if there isn't sufficient input? -}
-takeP_new :: Int -> PadsParser String
-takeP_new n = liftStoP (S.take' (fromInt n)) (take n def)
-  where
-    def = '0':def
-
 takeP :: Integral a => a -> PadsParser String
 takeP n = primPads (S.take (fromInt n))
 
+takeBytesP :: Integral a => a -> PadsParser S.RawStream
+takeBytesP n = primPads (S.takeBytes (fromInt n))
+
 fromInt :: (Integral a1, Num a) => a1 -> a
 fromInt n = fromInteger $ toInteger n
+
 
 
 -------------------------------------------------

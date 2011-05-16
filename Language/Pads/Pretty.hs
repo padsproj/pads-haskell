@@ -1,5 +1,15 @@
 {-# LANGUAGE NamedFieldPuns,RecordWildCards #-}
 
+
+{-
+** *********************************************************************
+*                                                                      *
+*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
+*              John Launchbury <john.launchbury@gmail.com>             *
+*                                                                      *
+************************************************************************
+-}
+
 module Language.Pads.Pretty where
 import Char (isPrint, ord)
 import qualified Data.Map as M

@@ -4,7 +4,7 @@
 
 module Examples.First where
 import Language.Pads.Padsc
-import Test.HUnit hiding (test)
+import Language.Pads.Testing
 import System.IO.Unsafe (unsafePerformIO)
 
 --import qualified Text.Regex.ByteString as BRE
@@ -98,15 +98,16 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "Regular Expression"  rE_ty_test
                 , TestLabel "Discipline" disc_test
                 , TestLabel "Overlap" exxy_test
+                , TestLabel "Discipline" linesFW_test
                 ]
 
+{-
 getTotalErrors :: PadsMD md => md -> Int
 getTotalErrors md = numErrors $ get_md_header md
 mdToError ((rep,md), residual) = (rep, getTotalErrors md, residual)
 mkTestCase s expected seen = TestCase(assertEqual s expected  (mdToError seen))
-
-mdFileToError (rep,md) = (rep, getTotalErrors md)
 mkFileTestCase s expected seen = TestCase(assertEqual s expected (mdFileToError seen))
+-}
 
 [pads| type MyChar = Char |]
 myChar_result = myChar_parseS "ab"
@@ -691,3 +692,12 @@ exxy_result = exxyInt_parseS exxy_input
 exxy_expects = (Exxy {exxy = 32635, aa = 'd'},0,"ef")
 exxy_test = mkTestCase "label overlap" exxy_expects exxy_result
 
+[pads| type OneLine  = [Char] terminator EOR
+       type Lines    = [OneLine] terminator EOF 
+       type LinesFW  = partition Lines using <| bytes 3 |>
+|]
+
+linesFW_input  = "123456789"
+linesFW_result = linesFW_parseS linesFW_input
+linesFW_expects = (["123","456","789"],0,"")
+linesFW_test = mkTestCase "fixed-width record discpline" linesFW_expects linesFW_result

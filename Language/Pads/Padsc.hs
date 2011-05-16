@@ -2,6 +2,16 @@
              ScopedTypeVariables, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances,
              UndecidableInstances, NamedFieldPuns, RecordWildCards, StandaloneDeriving   #-}
 
+{-
+** *********************************************************************
+*                                                                      *
+*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
+*              John Launchbury <john.launchbury@gmail.com>             *
+*                                                                      *
+************************************************************************
+-}
+
+
 
 module Language.Pads.Padsc (
      {- FIX: Languages.Pads.Source exports "take", which clashes with 
