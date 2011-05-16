@@ -28,13 +28,17 @@ data Switcher (x::Int) = case x of
 
 type Triple = (Int, (obtain Char from Int using <|(bi,ib)|>, Int)) 
 
+type MyVoid = ()
 
-|]
-
-[pads| 
 
 data May a = Jus a
            | Noth ()
+
+
+data Exxy a = Exxy {exxy :: Int, aa :: a}
+
+type IntPair = (Int,"|",Int)
+
 
 |]
 

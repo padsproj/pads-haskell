@@ -146,7 +146,7 @@ mkNewRepMDDecl old name args branch ds
 
 
 -----------------------------------------------------------
--- GENERATE TYPE REPRESENTATION OF TYPE EXPRESSION
+-- GENERATE REPRESENTATION TYPE OF A TYPE EXPRESSION
 -----------------------------------------------------------
 
 mkRepTy ::  PadsTy -> Type
@@ -159,7 +159,7 @@ mkRepTy ty = case ty of
   PTuple tys                  -> mkRepTuple tys
   PExpression _               -> ConT ''()
   PTycon c                    -> ConT (mkRepName c)
-  PTyvar v                    -> VarT (mkName v)
+  PTyvar v                    -> VarT (mkName v)  
 
 mkRepList :: PadsTy -> Type
 mkRepList ty = AppT ListT (mkRepTy ty)
@@ -190,10 +190,10 @@ mkMDTy ty = case ty of
   PTuple tys                  -> mkMDTuple tys
   PExpression _               -> ConT ''Base_md
   PTycon c                    -> ConT (mkMDName c)
-  PTyvar v                    -> VarT (mkName v)
+  PTyvar v                    -> VarT (mkName v)  
 
 mkMDList :: PadsTy -> Type
-mkMDList ty = mkTupleT [ConT ''Base_md, AppT ListT (mkMDTy ty)]    
+mkMDList ty = mkTupleT [ConT ''Base_md, ListT `AppT` mkMDTy ty]    
 
 mkMDApp :: [PadsTy] -> Type
 mkMDApp tys = foldl1 AppT [mkMDTy ty | ty <- tys, hasRep ty]
@@ -201,7 +201,7 @@ mkMDApp tys = foldl1 AppT [mkMDTy ty | ty <- tys, hasRep ty]
 mkMDTuple :: [PadsTy] -> Type
 mkMDTuple tys = case mds of  
     []     -> ConT ''Base_md
-    [m]    -> mkTupleT [ConT ''Base_md, m]
+    [m]    -> mkTupleT [ConT ''Base_md, m] 
     (m:ms) -> mkTupleT [ConT ''Base_md, mkTupleT mds]
   where
     mds = [mkMDTy ty | ty <- tys, hasRep ty]
@@ -210,8 +210,6 @@ mkMDTuple tys = case mds of
 -----------------------------------------------------------------
 -- GENERATING INSTANCE DECLARATIONS FROM DATA/NEW DECLARATION
 ------------------------------------------------------------------
-
--- Doesn't yet work for higher kinded Pads types
 
 mkPadsInstance :: UString -> [LString] -> Maybe Type -> Dec
 mkPadsInstance str args Nothing 
@@ -326,7 +324,7 @@ genParsePartition :: PadsTy -> Exp -> Q Exp
 genParsePartition ty dis = [| parsePartition $(genParseTy ty) $(return dis) |]
 
 genParseTuple :: [PadsTy] -> Q Exp
-genParseTuple [] = [| return ((), cleanBasePD) |]
+genParseTuple []  = [| return ((), cleanBasePD) |]
 genParseTuple tys = do
   { let f_rep = buildF_rep vars_frep
   ; let f_md  = buildF_md vars_fmd vars_frep 
@@ -377,7 +375,7 @@ mkParseTycon "EOR" = VarE 'eor_parseM
 mkParseTycon c     = VarE (mkTyParserName c)
 
 mkParseTyvar :: String -> Exp
-mkParseTyvar v = VarE (mkVarParserName v)
+mkParseTyvar v = VarE (mkVarParserName v) -- should gensym these, but probably ok
 
 
 ----------------------------------------------------------
@@ -431,8 +429,11 @@ buildConstr_md fnMD conMD tys
 
 genParseRecord :: UString -> [FieldInfo] -> (Maybe Exp) -> Q (Dec,Exp)
 genParseRecord c fields pred = do
-  { labMDs  <- sequence [genLabMDName l | (l,(_,_),_) <- fields] 
-  ; let fnMDLabs  = applyE $ map VarE (mkfnMDName c : labMDs)
+  { c_md <- newName (strToLower c)
+  ; let con_md = buildConstr_md c_md (ConE (mkConstrIMDName c))
+                       [ty | (_,(_,ty),_) <- fields]
+  ; labMDs  <- sequence [genLabMDName l | (l,(_,_),_) <- fields] 
+  ; let fnMDLabs  = applyE $ map VarE (c_md : labMDs)
   ; doStmts <- sequence [genParseField f xn | (f,xn) <- zip fields labMDs]
   ; returnStmt <- [| return ($(return conLabs),$(return fnMDLabs)) |]
   ; return (con_md, DoE (doStmts ++ [NoBindS returnStmt]))
@@ -440,8 +441,6 @@ genParseRecord c fields pred = do
   where
     labs    = [mkName lab | (Just lab,(_,ty),_) <- fields, hasRep ty]
     conLabs = applyE (ConE (mkConstrName c) : map VarE labs)
-    con_md  = buildConstr_md (mkfnMDName c) (ConE (mkConstrIMDName c))
-                [ty | (_,(_,ty),_) <- fields]
 
 genLabMDName (Just lab) = return (mkFieldMDName lab)
 genLabMDName Nothing    = newName "x"
@@ -469,75 +468,94 @@ genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred
 ------------------------------------------
 
 {-
-
-genPrintTy :: PadsTy -> (Exp,Exp) -> Q Exp
-genPrintTy (PConstrain pat ty exp) (r,m)   = genPrintConstrain pat ty exp (r,m)
-genPrintTy (PPartition ty exp) (r,m)       = genPrintPartition pat ty exp (r,m)
-genPrintTy (PTransform src dest exp) (r,m) = genPrintTrans src dest exp (r,m)
-genPrintTy (PList ty sep term) (r,m)       = genPrintList ty sep term (r,m)
-genPrintTy (PApp tys argE) (r,m)           = genPrintTyApp tys argE (r,m)
-genPrintTy (PTuple tys) (r,m)              = genPrintTuple tys (r,m)
-genPrintTy (PExpression exp) (r,m)         = genPrintExp exp (r,m)
-genPrintTy (PTycon c) (r,m)                = genPrintTycon c (r,m)
-genPrintTy (PTyvar v) (r,m)                = genPrintTyvar v (r,m)
-
-genPrintConstrain pat ty exp = undefined
-
-
-genPrintTrans :: PadsTy -> PadsTy -> (Exp,Exp) -> Q Exp
-genPrintTrans tySrc tyDest (r,m)
-  = [| parseTransform $(genParseTy tySrc) $(return r) |]
-
-genPrintList ty sep term (r,m) = undefined
-
-genPrintTyApp tys argE (r,m) = undefined
-
-genPrintTycon c (r,m) 
-  = [| $(varE (mkPrintFLName c)) ($(return r), $(return m)) |]
-
-genPrintTuple :: [PadsTy] -> (Exp,Exp) -> Q Exp
-genPrintTuple tys (repE,mdE) = undefined
-  
+genPrintTy :: PadsTy -> Exp -> Q Exp
+genPrintTy (PConstrain pat ty exp) rm   = genPrintTy ty rm  -- doesn't check the constraint
+genPrintTy (PTransform src dest exp) rm = genPrintTrans src exp rm
+--genPrintTy (PList ty sepM termM) rm     = genPrintList ty sepM termM rm
+--genPrintTy (PPartition ty exp) rm       = genPrintPartition ty exp rm
+--genPrintTy (PApp tys expM) rm           = genPrintTyApp tys expM rm
+genPrintTy (PTuple tys) rm              = genPrintTuple tys rm
+--genPrintTy (PExpression exp) rm         = genPrintExpression exp rm
+--genPrintTy (PTycon c) rm                = return $ VarE (mkPrintFLName c)
+--genPrintTy (PTyvar v) rm                = return $ VarE (mkPrintFLVarName v)
 
 
 
-printTuple :: [PadsTy] -> Exp -> Exp -> Q Exp
-printTuple tys repE mdE = do
-  { (repEs, repPs) <- genPEforTuple tys "rep"
-  ; (mdEs,  mdPs ) <- genPEforTuple tys "md"
-  ; expE <- sequence [genPrintTy t (r,m) | (t,r,m) <- zip3 tys repEs mdEs]
-  ; return $ CaseE (TupE [repE,mdE])
-                [Match (TupP [TupP repPs, TupP [WildP, (TupP mdPs)]]) 
-                       (NormalB (VarE 'concatFL `AppE` ListE expE))
+genPrintTrans :: PadsTy -> Exp -> Exp -> Q Exp
+genPrintTrans tySrc exp rm = do
+  { rm' <- [| snd $(return exp) $(return rm) |]
+  ; genPrintTy tySrc rm'
+  }
+
+{-
+genPrintList :: PadsTy -> Maybe PadsTy -> Maybe TermCond -> (Exp,Exp) -> Q Exp
+genPrintList ty sepM termM rm
+  = [| printList $(genPrintTy ty) $psep $pterm $(return rm) |]
+  where
+    psep  = maybe [| nil |] (\t -> genPrintTyMD t m) sepM
+    pterm = maybe [| nil |] (\t -> genPrintTermCondt m) termM
+
+
+genPrintTyApp :: [PadsTy] -> Maybe Exp -> Exp -> Q Exp
+genPrintTyApp tys expM rm = do
+  { prtys <- mapM genPrintTy tys
+  ; return (foldr1 AppE (prtys ++ maybe [] (\e->[e]) expM))
+  }
+-}
+
+{-
+intPair_printFL (r,m)
+  = case (r,m) of
+      ((r1,r2),(_,(m1,m2)))
+        -> int_PrintFL (r1,m1) +++
+           addString "|" +++
+           int_PrintFL (r2,m2)
+-}
+
+genPrintTuple :: [PadsTy] -> Exp ->  Q Exp
+genPrintTuple tys rm = do
+  { repNamesM <- genNamesforTuple "rep" tys
+  ; let repVars = map VarE (Maybe.concatMaybe repNames)
+  ; let repPats = map VarP (Maybe.concatMaybe repNames)
+  ; mdNamesM  <- genNamesforTuple "md" tys
+  ; let mdVars = map VarE (Maybe.concatMaybe mdNames)
+  ; let mdPats = map VarP (Maybe.concatMaybe mdNames)
+  ; inners <- sequence [genPrintTy t (TupE [r,m]) | (t,r,m) <- zip3 tys repVars mdVars]
+  ; return $ CaseE rm
+          [Match (TupP [TupP repPats, TupP [WildP, (TupP mdPats)]]) 
+                       (NormalB (VarE 'concatFL `AppE` ListE inners))
                        []]
   }
+
+genPEforTuple :: String -> [PadsTy] -> Q ([Exp], [Pat])
+genPEforTuple str tys =
+  sequence [if hasRep ty then fmap Just (newName str) else return Nothing | ty <- tys]
+
+
+-}
+
+
+{-
+genPrintExp :: Exp -> Q Exp
+genPrintExp e@(LitE l)  = [| addString [$(return e)] |]
+genPrintExp exp         = [| addString (show $(return exp)) |]
+
+genPrintTycon :: UString -> Q Exp
+genPrintTycon c = undefined
+
+genPrintTyvar :: LString -> Q Exp
+genPrintTyvar v = undefined
+
+
+genPrintTermCond = undefined
+-}
+
+
   
-genPEforTuple :: [PadsTy] -> Q ([Exp], [Pat])
-genPEforTuple tys = do 
-  { es  <- mapM genEforTy tys
-  ; pMs <- mapM genPforTy tys
-  ; return (es, Maybe.catMaybes pMs)
-  }
-
-genEforTy :: String -> PadsTy -> Q Exp
-genEforTy str ty
-  | hasRep ty = fmap Just (doGenE str)
-  | otherwise = Nothing
-
-genPforTy :: String -> PadsTy -> Q (Maybe Pat)
-genPforTy str ty
-  | hasRep ty = fmap Just (doGenP str)
-  | otherwise = Nothing
-
-doGenE str = undefined
-doGenP str = undefined
 
 
 
-genPrintExp :: Exp -> (Exp,Exp) -> Q Exp
-genPrintExp e@(LitE (CharL c)) (_,_)   = [| addString [$(return e)] |]
-genPrintExp e@(LitE (StringL s)) (_,_) = [| addString $(return e) |]
-genPrintExp exp (_,_)                = [| addString (show $(return exp)) |]
+
 
 
 {-
@@ -562,8 +580,7 @@ printE' (ty, repE, mdE) = case ty of
 
 -}
 
-genPrintTyvar v (r,m) = undefined
--}
+
 
 ------------------------------------
 -- Name manipulation functions 
@@ -609,7 +626,8 @@ mkVarParserName str = mkName (str ++ "__p")
 
 -- Naming Printers
 
-mkPrintFLName str = mkName ((strToLower str) ++ "_printFL")
+mkPrintFLName str    = mkName ((strToLower str) ++ "_printFL")
+mkPrintFLVarName str = mkName (str ++ "__pr")
 
 
  

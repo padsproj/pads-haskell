@@ -1,4 +1,6 @@
-{-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, 
+             MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
+             DeriveDataTypeable, ScopedTypeVariables #-}
 
 module Examples.First where
 import Language.Pads.Padsc
@@ -95,6 +97,7 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "Literal"  whiteSpace2_test
                 , TestLabel "Regular Expression"  rE_ty_test
                 , TestLabel "Discipline" disc_test
+                , TestLabel "Overlap" exxy_test
                 , TestLabel "Discipline" linesFW_test
                 ]
 
@@ -681,6 +684,13 @@ disc_input = "1\n2\n3\r\n4\r\n5\n"
 disc_result = disc_parseS disc_input
 disc_expects = ((1,2,(3,4),5),0,"")
 disc_test = mkTestCase "multiple record disciplines" disc_expects disc_result
+
+[pads| data Exxy a = Exxy {exxy :: Int, aa :: a}
+       type ExxyInt = Exxy Char |]
+exxy_input = "32635def"
+exxy_result = exxyInt_parseS exxy_input
+exxy_expects = (Exxy {exxy = 32635, aa = 'd'},0,"ef")
+exxy_test = mkTestCase "label overlap" exxy_expects exxy_result
 
 [pads| type OneLine  = [Char] terminator EOR
        type Lines    = [OneLine] terminator EOF 
