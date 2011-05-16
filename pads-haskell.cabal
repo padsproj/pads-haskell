@@ -43,7 +43,8 @@ Build-type:          Simple
 Extra-source-files:  Examples/AI.hs Examples/First.hs Examples/Binary.hs,
                      Examples/data/ai.3000, Examples/data/ai.big,
                      Examples/data/binary, Examples/data/calls10,
-                     Examples/data/calls10.a
+                     Examples/data/calls10.a, Examples/data/genBin.c,
+                     Examples/data/binTest.a, Examples/data/binTest.b
 
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.2
