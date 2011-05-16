@@ -35,7 +35,10 @@ data May a = Jus a
            | Noth ()
 
 
-data Exxy a = Exxy {a_p :: Int, aa :: a}
+data Exxy a = Exxy {exxy :: Int, aa :: a}
+
+type IntPair = (Int,"|",Int)
+
 
 |]
 
