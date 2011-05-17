@@ -39,7 +39,6 @@ declLHS	-> tycon \{tyvar\} [pattern]
 \f1\b =\
 
 \f0\b0 \
-\
 derives	-> qtycls\
 		 | 
 \f1\b ( 
@@ -119,32 +118,8 @@ atype	->
 \f0\b0 		
 \f2\i  (list type, no qualifiers)
 \f0\i0 \
-		 | gtycon\
+		 | qtycon\
 		 | tyvar\
-\
-gtycon	-> qtycon						 
-\f2\i (qualified type consctructor)
-\f0\i0 \
-		 | 
-\f1\b ()
-\f0\b0 							 
-\f2\i (unit type)\
-
-\f0\i0 		 | 
-\f1\b []
-\f0\b0 							 
-\f2\i (list constructor)
-\f0\i0 \
-		 | 
-\f1\b (,
-\f0\b0 \{
-\f1\b ,
-\f0\b0 \}
-\f1\b )
-\f0\b0 						 
-\f2\i (tupling constructors)
-\f0\i0 \
-\
 \
 \
 -- 

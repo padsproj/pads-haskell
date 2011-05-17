@@ -54,35 +54,10 @@ errorParse = do
   { rest <- manyTill anyToken eof
   ; unexpected rest }
 
-lexer :: PT.TokenParser ()
-lexer = PT.makeTokenParser (haskellStyle 
-             { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", reMark ],
-               reservedNames   = ["data", "type", "newtype", "old", "existing", "deriving",
-                                   "using", "where", "terminator", "length", "of", "from",
-                                   "case", "constrain", "obtain", "partition" ]})
-
-whiteSpace    = PT.whiteSpace  lexer
-identifier    = PT.identifier  lexer
-operator      = PT.operator    lexer
-reserved      = PT.reserved    lexer
-reservedOp    = PT.reservedOp  lexer
-charLiteral   = PT.charLiteral lexer
-stringLiteral = PT.stringLiteral  lexer
-integer       = PT.integer     lexer
-commaSep1     = PT.commaSep1   lexer
-parens        = PT.parens      lexer
-braces        = PT.braces      lexer
-brackets      = PT.brackets    lexer
-
-
-
-
 
 -------------------------
--- PADS syntax parsing
+-- PADS DECLARATIONS
 -------------------------
-
-
 
 padsDecls :: Parser [PadsDecl]
 padsDecls = option [] (many1 topDecl)
@@ -135,6 +110,8 @@ derives
 	<|> parens (commaSep1 qtycl))
 
 
+-------------------------
+-- PADS TYPES
 -------------------------
 
 ptype :: Env -> Parser PadsTy
@@ -216,13 +193,15 @@ tuple :: Env -> Parser PadsTy
 tuple env
   =  do { tys <- parens $ option [] (commaSep1 (ptype env))
        ; if length tys==1 then return (head tys)
+         else if length tys==0 then return (PTycon "Void")
          else return (PTuple tys)
        }
   <?> "Pads tuple type"
 
 
-
--------------------------
+------------------------------
+-- PADS DATA DECLARATIONS
+------------------------------
 
 dataRHS :: Env -> Parser PadsData
 dataRHS env
@@ -244,23 +223,25 @@ branch env
        } <?> "Pads switch branch"
 
 constrs :: Env -> Parser [BranchInfo]
-constrs env = constr env `sepBy1` reservedOp "|"
+constrs env = do
+  { clauses <- constr env `sepBy1` reservedOp "|"
+  ; if and (map noArg clauses) then return (map addLiteral clauses)
+  else return clauses       -- Provides literals on enumeration types
+  }
+  where
+    noArg (BConstr _ [] Nothing) = True
+    noArg _                      = False
+    addLiteral (BConstr c [] Nothing) = BConstr c [mkId c] Nothing
+    mkId id = (NotStrict, PExpression (LitE (StringL id)))
 
 constr :: Env -> Parser BranchInfo
-constr env =  constructor env
---         <|> constructorOp env
-
-constructor :: Env -> Parser BranchInfo
-constructor env
+constr env
   = do { id  <- upperId;
        ; do { args <- record env; predM <- optionMaybe predic
             ; return (BRecord id args predM)}
-     <|> do { args <- option (mkId id) (constrArgs env)
+     <|> do { args <- option [] (constrArgs env)
             ; predM <- optionMaybe predic
             ; return (BConstr id args predM)}}                 
-  where
-    mkId id = [(NotStrict, PExpression (LitE (StringL id)))]
-              -- Provides the expansion e.g.: Tue -> Tue "Tue"
 
 constrArgs :: Env -> Parser [ConstrArg]
 constrArgs env
@@ -293,8 +274,9 @@ ftype env
 predic = do { reservedOp "where"; expression }
 
 
-
--------------------------
+-------------------------------
+-- PADS NEW TYPE DECLARATIONS
+-------------------------------
 
 newRHS :: Env -> Parser BranchInfo
 newRHS env
@@ -327,8 +309,9 @@ field1 env
        ; return (Just id, (NotStrict,ty), predM)
        }
 
--------------------------
-
+-----------------------------------
+-- HASKELL IN PADS DECLARATIONS
+-----------------------------------
 expression :: Parser Exp
 expression =  haskellExp
           <|> literal
@@ -397,3 +380,26 @@ upperId = try (do { id <- identifier
 
 p << q = do {x<-p;q;return x}
 mymany p = option [] (many1 p)
+
+
+lexer :: PT.TokenParser ()
+lexer = PT.makeTokenParser (haskellStyle 
+             { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", reMark ],
+               reservedNames   = ["data", "type", "newtype", "old", "existing", "deriving",
+                                   "using", "where", "terminator", "length", "of", "from",
+                                   "case", "constrain", "obtain", "partition" ]})
+
+whiteSpace    = PT.whiteSpace  lexer
+identifier    = PT.identifier  lexer
+operator      = PT.operator    lexer
+reserved      = PT.reserved    lexer
+reservedOp    = PT.reservedOp  lexer
+charLiteral   = PT.charLiteral lexer
+stringLiteral = PT.stringLiteral  lexer
+integer       = PT.integer     lexer
+commaSep1     = PT.commaSep1   lexer
+parens        = PT.parens      lexer
+braces        = PT.braces      lexer
+brackets      = PT.brackets    lexer
+
+

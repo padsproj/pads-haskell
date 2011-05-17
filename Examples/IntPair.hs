@@ -10,6 +10,7 @@ import Language.Pads.CoreBaseTypes
 import Language.Pads.Quote
 import Language.Pads.RegExp
 import Language.Pads.LazyList
+import Language.Pads.BaseTypes
 
 import Data.Data
 
@@ -19,6 +20,8 @@ import Data.Data
 [pads| 
 
 type IntPair a = (Int,":",a)
+
+data MyVoid = Myvoid Void
 
 |]
 

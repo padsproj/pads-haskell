@@ -38,8 +38,10 @@ type StringLn = [Char] terminator EOR
 type StringLnP (p :: String -> Bool) = constrain s :: StringLn where <| p s |> 
 
 old data Maybe a = Just a
-                 | Nothing Void
+                 | Nothing
+|]
 
+[pads|
 type Lit   (x::String) = (Void, x)
 type LitRE (x::RE)     = (Void, x)
 

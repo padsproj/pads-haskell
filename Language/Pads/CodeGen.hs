@@ -51,7 +51,8 @@ genPadsDecl (PadsDeclType old name args pat padsTy) = do
   { let typeDecs = mkTyRepMDDecl old name args padsTy
   ; parseM  <- genPadsParseM name args pat padsTy
   ; parseS  <- genPadsParseS name args pat
-  ; printFL <- genPadsPrintFL name args pat padsTy
+  ; printFL <- -- genPadsPrintFL name args pat padsTy
+               return []
   ; return (typeDecs ++ parseM ++ parseS ++ printFL)
   }
 
@@ -155,18 +156,12 @@ mkRepTy ty = case ty of
   PPartition pty exp          -> mkRepTy pty
   PConstrain pat pty exp      -> mkRepTy pty 
   PTransform tySrc tyDest exp -> mkRepTy tyDest 
-  PList ty sep term           -> mkRepList ty
-  PApp tys expM               -> mkRepApp tys
+  PList ty sep term           -> ListT `AppT` mkRepTy ty
+  PApp tys expM               -> foldl1 AppT [mkRepTy ty | ty <- tys, hasRep ty]
   PTuple tys                  -> mkRepTuple tys
   PExpression _               -> ConT ''()
   PTycon c                    -> ConT (mkRepName c)
   PTyvar v                    -> VarT (mkName v)  
-
-mkRepList :: PadsTy -> Type
-mkRepList ty = AppT ListT (mkRepTy ty)
-
-mkRepApp :: [PadsTy] -> Type
-mkRepApp tys = foldl1 AppT [mkRepTy ty | ty <- tys, hasRep ty]
 
 mkRepTuple :: [PadsTy] -> Type
 mkRepTuple tys = case reps of  
@@ -183,21 +178,15 @@ mkRepTuple tys = case reps of
 
 mkMDTy ::  PadsTy -> Type
 mkMDTy ty = case ty of
-  PPartition pty exp          -> mkMDTy pty
-  PConstrain pat pty exp      -> mkMDTy pty 
-  PTransform tySrc tyDest exp -> mkMDTy tyDest 
-  PList ty sep term           -> mkMDList ty
-  PApp tys expM               -> mkMDApp tys
-  PTuple tys                  -> mkMDTuple tys
-  PExpression _               -> ConT ''Base_md
-  PTycon c                    -> ConT (mkMDName c)
-  PTyvar v                    -> VarT (mkName v)  
-
-mkMDList :: PadsTy -> Type
-mkMDList ty = mkTupleT [ConT ''Base_md, ListT `AppT` mkMDTy ty]    
-
-mkMDApp :: [PadsTy] -> Type
-mkMDApp tys = foldl1 AppT [mkMDTy ty | ty <- tys, hasRep ty]
+  PPartition pty exp      -> mkMDTy pty
+  PConstrain pat pty exp  -> mkMDTy pty 
+  PTransform src dest exp -> mkMDTy dest 
+  PList ty sep term       -> mkTupleT [ConT ''Base_md, ListT `AppT` mkMDTy ty]
+  PApp tys expM           -> foldl1 AppT [mkMDTy ty | ty <- tys, hasRep ty]
+  PTuple tys              -> mkMDTuple tys
+  PExpression _           -> ConT ''Base_md
+  PTycon c                -> ConT (mkMDName c)
+  PTyvar v                -> VarT (mkName v)  
 
 mkMDTuple :: [PadsTy] -> Type
 mkMDTuple tys = case mds of  
