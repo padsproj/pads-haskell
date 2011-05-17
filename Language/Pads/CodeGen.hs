@@ -229,34 +229,28 @@ dummyPrintFL = error "printFL is not yet defined"
 genPadsParseM :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
 genPadsParseM name args patM padsTy = do 
   { body  <- genParseTy padsTy
-  ; return [FunD parser_name [Clause parserArgs (NormalB body) []] ]
+  ; return [mkParserFunction name args patM body]
   }
-  where
-    (parser_name,parserArgs) = mkParserNameArgs name args patM
 
 genPadsDataParseM :: UString -> [LString] -> (Maybe Pat) -> PadsData -> Q [Dec] 
 genPadsDataParseM name args patM padsData = do 
   { body  <- genParseData padsData
-  ; return [ FunD parser_name [Clause parserArgs (NormalB body) []] ]
+  ; return [mkParserFunction name args patM body]
   }
-  where
-    (parser_name,parserArgs) = mkParserNameArgs name args patM
 
 genPadsNewParseM :: UString -> [LString] -> (Maybe Pat) -> BranchInfo -> Q [Dec] 
 genPadsNewParseM name args patM branch = do 
   { (dec,exp) <- genParseBranchInfo branch
   ; let body = LetE [dec] exp
-  ; return [ FunD parser_name [Clause parserArgs (NormalB body) []] ]
+  ; return [mkParserFunction name args patM body]
   }
-  where
-    (parser_name,parserArgs) = mkParserNameArgs name args patM
 
-mkParserNameArgs :: UString -> [LString] -> Maybe Pat -> (Name, [Pat])
-mkParserNameArgs name args patM = (parserName, parserArgs)
+mkParserFunction :: UString -> [LString] -> Maybe Pat -> Exp -> Dec
+mkParserFunction name args patM body
+  = FunD parserName [Clause parserArgs (NormalB body) []]
   where
     parserName = mkTyParserName name    
-    parserArgs = map (VarP . mkVarParserName) args ++ pat
-    pat = Maybe.maybeToList patM
+    parserArgs = map (VarP . mkVarParserName) args ++ Maybe.maybeToList patM
 
 
 --------------------------------------------------------------
@@ -265,14 +259,13 @@ mkParserNameArgs name args patM = (parserName, parserArgs)
 
 genPadsParseS :: UString -> [LString] -> Maybe Pat -> Q [Dec]
 genPadsParseS name args patM = do 
-  { bodyS <- [| parseStringInput $(return foo) |]
-  ; return [ FunD (mkTyParserSName name) [Clause parserArgs (NormalB bodyS) []] ]
+  { body <- [| parseStringInput $(return parserWithArgs) |]
+  ; return [ FunD (mkTyParserSName name) [Clause parserArgs (NormalB body) []] ]
   }
   where
-    parserName = mkTyParserName name    
-    parserArgs = map (VarP . mkVarParserName) args ++ pat
-    foo = applyE (VarE (mkTyParserName name) : map patToExp parserArgs)
-    pat = Maybe.maybeToList patM
+    parserWithArgs = foldr1 AppE (VarE parserName : map patToExp parserArgs)
+    parserName     = mkTyParserName name    
+    parserArgs     = map (VarP . mkVarParserName) args ++ Maybe.maybeToList patM
 
 
 ------------------------------------------------------
@@ -297,8 +290,8 @@ genParseConstrain patQ ty expQ = [| parseConstraint $(genParseTy ty) $pred |]
     pred = lamE [patQ, varP (mkName "md")] expQ
 
 genParseTyTrans :: PadsTy -> PadsTy -> Q Exp -> Q Exp
-genParseTyTrans tySrc tyDest expQ
-  = [| parseTransform $(genParseTy tySrc) (fst $expQ) |]
+genParseTyTrans src dest expQ
+  = [| parseTransform $(genParseTy src) (fst $expQ) |]
 
 genParseList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> Q Exp
 genParseList ty sep term =
@@ -311,7 +304,7 @@ genParseList ty sep term =
     (Just sep, Just (LTerm term))-> [| parseListSepTerm $(genParseTy sep) $(genParseTy term) $(genParseTy ty) |]
 
 genParsePartition :: PadsTy -> Exp -> Q Exp
-genParsePartition ty dis = [| parsePartition $(genParseTy ty) $(return dis) |]
+genParsePartition ty disc = [| parsePartition $(genParseTy ty) $(return disc) |]
 
 genParseTuple :: [PadsTy] -> Q Exp
 genParseTuple []  = [| return ((), cleanBasePD) |]
@@ -346,7 +339,6 @@ mkMergeBaseMDs :: [Exp] -> Exp
 mkMergeBaseMDs [e] = e
 mkMergeBaseMDs es  = VarE 'mergeBaseMDs `AppE` ListE es
 
-genMergeBaseMDs e = return (mkMergeBaseMDs e)
 
 genParseExp :: Exp -> Q Exp
 genParseExp (LitE (CharL c))   = [| charLit_parseM c |]
@@ -451,6 +443,7 @@ genParseRecConstrain :: Pat -> Pat -> PadsTy -> Exp -> Q Exp
 genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred |]
   where
     pred = return (LamE [labP, xnP] exp)
+
 
 
 ----------------------------------------------------
@@ -712,55 +705,7 @@ mkTyPrinterVarName str = mkName (str ++ "__pr")
 
 
 
-{-
-getBranchMDNameU str = mkName ((strToUpper str)++"_md")
-getBranchNameU str = mkName (strToUpper str)
 
-getBranchMDNameL str = mkName ((strToLower str)++"_md")
-getBranchNameL   str = mkName  (strToLower str)
--}
-
-{-
-
-mkPadsInstance parse_name print_name ty_name md_ty mpat_info = 
-  let (inst, parsePP, printFL) = case mpat_info of
-                          Nothing -> (AppT (AppT (ConT ''Pads) (ConT ty_name)) md_ty,   -- Pads RepTy MDTy
-                                      mkName "parsePP",
-                                      mkName "printFL")
-                          Just (p,arg_ty) -> 
-                                     (AppT 
-                                        (AppT (AppT (ConT ''Pads1) arg_ty) (ConT ty_name)) 
-                                        md_ty,   -- Pads Arg RepTy MDTy
-                                      mkName "parsePP1",
-                                      mkName "printFL1")
-      parsePP_method = ValD (VarP parsePP) (NormalB (VarE parse_name)) []
-      printFL_method = ValD (VarP printFL) (NormalB (VarE print_name)) []
-  in [InstanceD [] inst [parsePP_method, printFL_method]]
-
-   
--}
-
-
---   printFL :: [Dec]           <- genPadsPrintFL p_name print_name    ty_name md_ty_name padsTy arg_info_opt
-
-{-
-accumulator: String -> String
-when apply to a string, it appends a string on the front of whatever you apply it to
-
-let p = \x . "hello world" ++ x
-let q = \y -> "holiday" ++ y
-
-new accumulator is: p . q
-left-linear tree of compositions
-apply accumulator to end of string
-associativity for composition starts building string up over one one pass.
-
-define own datatype
- binary tree datatype w/strings at the leaves; want to keep it relatively balanced, an AVL tree (maybe in library)
- put strings on the end, then you could start putting strings 
-
-pair of lists to encode a queue
--}
 
 {-
 
@@ -791,25 +736,6 @@ printE repN mdN ty = do
 wrapRepP :: Name -> PadsTy -> Pat -> Pat
 wrapRepP repN ty repP = ConP repN [repP]
 
-
-printE' :: (PadsTy, Exp, Exp) -> Q Exp
-printE' (ty, repE, mdE) = case ty of
-  Plit  PS.EorL        -> return       (VarE(getPrintFLName "PeorLit"))                           
-  Plit  PS.EofL        -> return       (VarE(getPrintFLName "PeofLit"))                           
-  Plit  PS.VoidL       -> return       (VarE(getPrintFLName "PvoidLit"))            
-  Plit  l              -> return (AppE (VarE 'litPrint) (litToExp l))
-  Pname p_name   -> return (AppE  (VarE (getPrintFLName p_name))  (TupE [repE, mdE]))
-  Ptuple ptys    -> printTuple ptys repE mdE 
-  Pline ty'      -> printLine (ty', repE, mdE)
-  Papp ty' argE  -> printApp (ty', argE, repE, mdE)
-  Ptrans tySrc tyDst trans    -> printTrans(tySrc,tyDst,trans,repE,mdE)
-  Ptypedef pat ty pred  -> printTypeDef (ty, repE, mdE)
-  Precord recName fieldInfo -> printRecord (mkRepName recName) fieldInfo repE mdE
-  Punion  unionName fieldInfo -> printUnion (mkRepName unionName) fieldInfo repE mdE
-  Pmaybe ty -> printMaybe ty repE mdE
-  Plist elemTy optSepTy optTermCond -> genPrintList elemTy optSepTy optTermCond repE mdE
-  Ptry ty -> return (VarE('printNothing))
-  Pswitch unionName whichE patBranches -> printUnion (mkRepName unionName) (map snd patBranches) repE mdE
 
 genPrintList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> Exp -> Exp -> Q Exp
 genPrintList ty sepOpt termCondOpt repE mdE = do 
