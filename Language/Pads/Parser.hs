@@ -35,7 +35,7 @@ import System.FilePath.Glob
 
 
 type Parser = PS.Parser
-type Env    = [UString]
+type Env    = [String]
 
 -- The main entry point for the QuasiQuoter is parsePadsDecls.
 
@@ -106,8 +106,8 @@ patLHS
 
 derives 
   = reserved "deriving" >> 
-    (do { q <- qtycl; return [q] }
-	<|> parens (commaSep1 qtycl))
+    (do { q <- qualUpper; return [q] }
+	<|> parens (commaSep1 qualUpper))
 
 
 -------------------------
@@ -186,14 +186,14 @@ atype env
   =  try (tuple env)
  <|> do { (elm,sepM) <- brackets (listInside env)
         ; return (PList elm sepM Nothing)}
- <|> fmap PTycon qtycon
+ <|> fmap PTycon qualUpper
  <|> fmap PTyvar (tyvar env)
 
 tuple :: Env -> Parser PadsTy
 tuple env
   =  do { tys <- parens $ option [] (commaSep1 (ptype env))
        ; if length tys==1 then return (head tys)
-         else if length tys==0 then return (PTycon "Void")
+         else if length tys==0 then return (PTycon ["Void"])
          else return (PTuple tys)
        }
   <?> "Pads tuple type"
@@ -360,12 +360,20 @@ reLiteral = do { reservedOp reMark
                }
 reMark = "'"
 
+qualUpper :: Parser QString
+qualUpper = do
+  { n <- upperId
+  ; do { reservedOp "."
+       ; ns <- qualUpper
+       ; return (n:ns)
+       }
+  <|> return [n]
+  }
+
+tyvar env = try $ do { v <- var; guard (v `elem` env); return v }
+
 var = lowerId
 con = upperId
-tyvar env = try $ do { v <- var; guard (v `elem` env); return v }
-qtycl = con
-qtycon = tycon
-tycon =  con
 
 lowerId :: Parser String
 lowerId = try (do { id <- identifier
@@ -384,7 +392,7 @@ mymany p = option [] (many1 p)
 
 lexer :: PT.TokenParser ()
 lexer = PT.makeTokenParser (haskellStyle 
-             { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", reMark ],
+             { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", reMark, "." ],
                reservedNames   = ["data", "type", "newtype", "old", "existing", "deriving",
                                    "using", "where", "terminator", "length", "of", "from",
                                    "case", "constrain", "obtain", "partition" ]})

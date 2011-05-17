@@ -18,9 +18,9 @@ import Language.Haskell.TH
 
 
 
-data PadsDecl = PadsDeclType  Bool UString [LString] (Maybe Pat) PadsTy
-              | PadsDeclData  Bool UString [LString] (Maybe Pat) PadsData [UString]
-              | PadsDeclNew   Bool UString [LString] (Maybe Pat) BranchInfo [UString]
+data PadsDecl = PadsDeclType  Bool String [String] (Maybe Pat) PadsTy
+              | PadsDeclData  Bool String [String] (Maybe Pat) PadsData [QString]
+              | PadsDeclNew   Bool String [String] (Maybe Pat) BranchInfo [QString]
    deriving (Eq, Data, Typeable, Show)
 
 
@@ -31,8 +31,8 @@ data PadsTy = PConstrain Pat PadsTy Exp
             | PApp [PadsTy] (Maybe Exp)
             | PTuple [PadsTy] 
             | PExpression Exp
-            | PTycon UString
-            | PTyvar LString
+            | PTycon QString
+            | PTyvar String
    deriving (Eq, Data, Typeable, Show)
 
 data TermCond = LTerm PadsTy | LLen Exp
@@ -43,21 +43,23 @@ data PadsData = PUnion [BranchInfo]
               | PSwitch Exp [(Pat,BranchInfo)]
   deriving (Eq, Data, Typeable, Show)
 
-data BranchInfo = BRecord UString [FieldInfo] (Maybe Exp)
-                | BConstr UString [ConstrArg] (Maybe Exp)
+data BranchInfo = BRecord String [FieldInfo] (Maybe Exp)
+                | BConstr String [ConstrArg] (Maybe Exp)
   deriving (Eq, Data, Typeable, Show)
 
-type FieldInfo = (Maybe LString, ConstrArg, Maybe Exp)
+type FieldInfo = (Maybe String, ConstrArg, Maybe Exp)
 type ConstrArg = (Strict, PadsTy)
 
-type UString = String
-type LString = String
+type QString = [String]  -- qualified names
 
 
 hasRep :: PadsTy -> Bool
-hasRep (PExpression l) = False
-hasRep (PTycon "EOF")  = False
-hasRep (PTycon "EOR")  = False
-hasRep (PTycon "Void") = False
-hasRep _               = True
+hasRep (PExpression l)   = False
+hasRep (PTycon ["EOF"])  = False
+hasRep (PTycon ["EOR"])  = False
+hasRep (PTycon ["Void"]) = False
+hasRep _                 = True
 
+qName :: QString -> String
+qName [n] = n
+qName (n:ms) = n ++ "." ++ qName ms

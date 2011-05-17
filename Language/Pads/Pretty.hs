@@ -34,8 +34,8 @@ ppro False = text ""
 ppr_decl_lhs id args patOpt = text id <> ppr_args args <> ppr_optArgPat patOpt
 ppr_derives cons = case cons of 
                         []  -> empty
-                        [l] -> space <> text l
-                        ls  -> space <> tuple (map text cons)
+                        [l] -> space <> text (qName l)
+                        ls  -> space <> tuple (map (text . qName) cons)
 
 ppr_args args = case args of [] -> empty ; _ -> space <> (spread (map text args))
             
@@ -94,7 +94,7 @@ instance Pretty PadsTy where
     ppr (PApp argTys expArgOpt) = spread (map ppr_alpha argTys) <> ppr_opt expArgOpt
     ppr (PTuple tys) = tuple (map ppr tys)
     ppr (PExpression exp) = ppr exp
-    ppr (PTycon con) = text con
+    ppr (PTycon con) = text (qName con)
     ppr (PTyvar var) = text var
 
 instance Pretty TH.Pat where

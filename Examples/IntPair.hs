@@ -10,7 +10,7 @@ import Language.Pads.CoreBaseTypes
 import Language.Pads.Quote
 import Language.Pads.RegExp
 import Language.Pads.LazyList
-import Language.Pads.BaseTypes
+import qualified Language.Pads.BaseTypes as BT
 
 import Data.Data
 
@@ -19,14 +19,14 @@ import Data.Data
 
 [pads| 
 
-type IntPair a = (Int,":",a)
+type IntPair a = (BT.Line Int,":",a)
+
+type Line a = (a, "||")
+
 
 data MyVoid = Myvoid Void
 
-|]
 
-{-
-[pads| 
 
 type Trip = (Int, ";;", Lst CharPair, Foo Int , EOR) 
 
@@ -45,7 +45,7 @@ data Switcher (x::Int) = case x of
 
 type Triple = (Int, (obtain Char from Int using <|(bi,ib)|>, Int)) 
 
-type MyVoid = ()
+type MyOtherVoid = ()
 
 
 data May a = Jus a
@@ -66,6 +66,6 @@ bi::a->(Int,Int_md)->(Char,Char_md)
 bi x = undefined
 ib y = undefined
 
--}
+
 
 

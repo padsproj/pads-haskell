@@ -98,7 +98,7 @@ mkTyRepMDDecl old name args ty
 -- GENERATE REP/MD DATA DECLARATIONS
 -----------------------------------------------------------
 
-mkDataRepMDDecl :: Bool -> UString -> [LString] -> PadsData -> [UString] -> [Dec]
+mkDataRepMDDecl :: Bool -> UString -> [LString] -> PadsData -> [QString] -> [Dec]
 mkDataRepMDDecl old name args branches ds
   = (if old then [] else [dataDecl]) ++ [mdDecl, imdDecl]
   where
@@ -127,16 +127,16 @@ mkMDUnion (BRecord c fields expM) = RecC (mkConstrIMDName c) lmds
   where   
     lmds = [(mkFieldMDName l,NotStrict,mkMDTy ty) | (Just l,(_,ty),_) <- fields, hasRep ty]
 
-derive :: [UString] -> [Name]
-derive ds =  map mkName ds
-  ++ [mkName d | d<-["Show","Eq","Typeable","Data","Ord"], not (d `elem` ds)]
+derive :: [QString] -> [Name]
+derive ds =  map (mkName . qName) ds
+  ++ [mkName d | d<-["Show","Eq","Typeable","Data","Ord"], not (d `elem` map last ds)]
 
 
 -----------------------------------------------------------
 -- GENERATE REP/MD NEWTYPE DECLARATIONS
 -----------------------------------------------------------
 
-mkNewRepMDDecl :: Bool -> UString -> [LString] -> BranchInfo -> [UString] -> [Dec]
+mkNewRepMDDecl :: Bool -> UString -> [LString] -> BranchInfo -> [QString] -> [Dec]
 mkNewRepMDDecl old name args branch ds
   = (if old then [] else [dataDecl]) ++ [mdDecl, imdDecl]
   where
@@ -160,7 +160,7 @@ mkRepTy ty = case ty of
   PApp tys expM               -> foldl1 AppT [mkRepTy ty | ty <- tys, hasRep ty]
   PTuple tys                  -> mkRepTuple tys
   PExpression _               -> ConT ''()
-  PTycon c                    -> ConT (mkRepName c)
+  PTycon c                    -> ConT (mkRepQName c)
   PTyvar v                    -> VarT (mkName v)  
 
 mkRepTuple :: [PadsTy] -> Type
@@ -185,7 +185,7 @@ mkMDTy ty = case ty of
   PApp tys expM           -> foldl1 AppT [mkMDTy ty | ty <- tys, hasRep ty]
   PTuple tys              -> mkMDTuple tys
   PExpression _           -> ConT ''Base_md
-  PTycon c                -> ConT (mkMDName c)
+  PTycon c                -> ConT (mkMDQName c)
   PTyvar v                -> VarT (mkName v)  
 
 mkMDTuple :: [PadsTy] -> Type
@@ -351,10 +351,10 @@ genParseTyApp tys expM = do
   ; return (foldl1 AppE (fs ++ Maybe.maybeToList expM))
   }
 
-mkParseTycon :: String -> Exp
-mkParseTycon "EOF" = VarE 'eof_parseM
-mkParseTycon "EOR" = VarE 'eor_parseM
-mkParseTycon c     = VarE (mkTyParserName c)
+mkParseTycon :: QString -> Exp
+mkParseTycon ["EOF"] = VarE 'eof_parseM
+mkParseTycon ["EOR"] = VarE 'eor_parseM
+mkParseTycon c     = VarE (mkTyParserQName c)
 
 mkParseTyvar :: String -> Exp
 mkParseTyvar v = VarE (mkVarParserName v) -- should gensym these, but probably ok
@@ -453,19 +453,12 @@ genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred
 genPadsPrintFL :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
 genPadsPrintFL name args patM padsTy = do 
   { body  <- genPrintTy padsTy (Just (TupE (map VarE rm)))
-  ; return [FunD printer_name [Clause (printerArgs ++ [TupP (map VarP rm)]) (NormalB body) []] ]
+  ; return [FunD printerName [Clause (printerArgs ++ [TupP (map VarP rm)]) (NormalB body) []] ]
   }
   where
-    (printer_name,printerArgs) = mkPrinterNameArgs name args patM
     rm = [mkName "rep", mkName "md"]
-
-
-mkPrinterNameArgs :: UString -> [LString] -> Maybe Pat -> (Name, [Pat])
-mkPrinterNameArgs name args patM = (parserName, parserArgs)
-  where
-    parserName = mkTyPrinterName name    
-    parserArgs = map (VarP . mkTyPrinterVarName) args ++ pat
-    pat = Maybe.maybeToList patM
+    printerName = mkTyPrinterName name    
+    printerArgs = map (VarP . mkTyPrinterVarName) args ++ Maybe.maybeToList patM
 
 
 
@@ -551,9 +544,9 @@ genPrintExp e@(LitE (CharL c)) _ = [| addString [$(return e)] |]
 genPrintExp e@(LitE (StringL s)) _ = [| addString $(return e) |]
 genPrintExp exp        _ = [| addString (show $(return exp)) |]
 
-genPrintTycon :: UString -> Maybe Exp -> Q Exp
+genPrintTycon :: QString -> Maybe Exp -> Q Exp
 genPrintTycon c Nothing = undefined
-genPrintTycon c (Just rm) = return (VarE (mkTyPrinterName c) `AppE` rm)
+genPrintTycon c (Just rm) = return (VarE (mkTyPrinterQName c) `AppE` rm)
 
 genPrintTyVar :: LString -> Maybe Exp -> Q Exp
 genPrintTyVar v (Just rm) = return (VarE (mkTyPrinterVarName v) `AppE` rm)
@@ -600,49 +593,59 @@ printE' (ty, repE, mdE) = case ty of
 
 -- Naming types, and accessing the names of types
 
+mkRepName :: String -> Name
 mkRepName str = mkName str
 
+mkRepQName :: QString -> Name
+mkRepQName str = mkName (qName str)
+
+mkMDName :: String -> Name
 mkMDName str = case M.lookup str baseTypesMap of
          Nothing -> mkName (str ++ "_md")
          Just _ -> ''Base_md         
 
+mkMDQName :: QString -> Name
+mkMDQName str = case M.lookup (last str) baseTypesMap of
+         Nothing -> mkName (appendTo str "_md")
+         Just _ -> ''Base_md         
 
-mkIMDName name = mkName (name ++ "_imd")
-
-
-mkRepNameTQ str = return (ConT (mkRepName str))
-mkMDNameTQ str = return (ConT (mkMDName str))
-
+mkIMDName name  = mkName (name ++ "_imd")
 mkMDVarName name = mkName (name ++ "_md")
 
 
 -- Naming fields and constructors
 
 mkFieldName str   = mkName str
-mkFieldMDName str = mkName (str++"_md")
+mkFieldMDName str = mkName (str ++ "_md")
 
 
 
 mkConstrName   str  = mkName str
-mkConstrIMDName str = mkName (str++"_imd")
+mkConstrIMDName str = mkName (str ++ "_imd")
 mkfnMDName str      = mkName (strToLower str ++ "_md")
 
 
 -- Naming Parsers
 
-mkTyParserName  str = mkName ((strToLower str) ++ "_parseM")
-mkTyParserSName str = mkName ((strToLower str) ++ "_parseS")
+mkTyParserName  str = mkName (strToLower str ++ "_parseM")
+mkTyParserSName str = mkName (strToLower str ++ "_parseS")
 
-mkVarParserName str = mkName (str ++ "__p")
+mkTyParserQName  str = mkName (appendLower str "_parseM")
+mkTyParserSQName str = mkName (appendLower str "_parseS")
+
+mkVarParserName str = mkName (strToLower str ++ "__p")
 
 
 -- Naming Printers
 
-mkTyPrinterName str    = mkName ((strToLower str) ++ "_printFL")
+mkTyPrinterName str    = mkName (strToLower str ++ "_printFL")
+mkTyPrinterQName str    = mkName (appendTo str "_printFL")
 mkTyPrinterVarName str = mkName (str ++ "__pr")
 
-
  
+appendTo :: QString -> String -> String
+appendTo ms s    = qName (init ms ++ [last ms ++ s])
+appendLower ms s = qName (init ms ++ [strToLower (last ms) ++ s])
 
 
 
@@ -654,9 +657,8 @@ mkTyPrinterVarName str = mkName (str ++ "__pr")
 
 
 
-
-
-
+type UString = String
+type LString = String
 
 
 
