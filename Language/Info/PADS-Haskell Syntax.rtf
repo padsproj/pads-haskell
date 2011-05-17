@@ -176,12 +176,6 @@ constr	-> con \{[
 \f2\i \
 
 \f0\i0 		 | con record [pred]\
-		 | conoparg conop conoparg [pred]\
-\
-conoparg -> etype\
-	     | 
-\f1\b !
-\f0\b0  atype\
 \
 record 	-> 
 \f1\b \{
@@ -205,7 +199,7 @@ data Foo = Baz (x::Int) (Int Int where <| c==a+b |>\
 \
 \
 -- 
-\f1\b newtype (only one represented type one the constructor)
+\f1\b newtype (only one represented type on the constructor)
 \f0\b0 \
 \
 newtypeRHS	 -> con \{expression\} atype \{expression\} [pred]\

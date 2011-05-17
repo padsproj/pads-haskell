@@ -2,14 +2,28 @@
     MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
     DeriveDataTypeable, ScopedTypeVariables #-}
 module Examples.IntPair where
-import Language.Pads.Padsc
+import Language.Pads.Source
+import Language.Pads.Errors 
+import Language.Pads.Generic
+import Language.Pads.MetaData
+import Language.Pads.CoreBaseTypes
+import Language.Pads.Quote
+import Language.Pads.RegExp
+import Language.Pads.LazyList
+
 import Data.Data
 
-test = parseStringInput trip_parseM "354;;23|53|43(652%%35)4;hefd"
+--test = parseStringInput trip_parseM "354;;23|53|43(652%%35)4;hefd"
 
 
 [pads| 
 
+type IntPair a = (Int,":",a)
+
+|]
+
+{-
+[pads| 
 
 type Trip = (Int, ";;", Lst CharPair, Foo Int , EOR) 
 
@@ -37,7 +51,6 @@ data May a = Jus a
 
 data Exxy a = Exxy {exxy :: Int, aa :: a}
 
-type IntPair = (Int,"|",Int)
 
 
 |]
@@ -50,6 +63,6 @@ bi::a->(Int,Int_md)->(Char,Char_md)
 bi x = undefined
 ib y = undefined
 
-
+-}
 
 

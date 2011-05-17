@@ -49,9 +49,10 @@ genPadsDecl :: PadsDecl -> Q [Dec]
 
 genPadsDecl (PadsDeclType old name args pat padsTy) = do
   { let typeDecs = mkTyRepMDDecl old name args padsTy
-  ; parseM <- genPadsParseM name args pat padsTy
-  ; parseS <- genPadsParseS name args pat
-  ; return (typeDecs ++ parseM ++ parseS) --  ++ printFL)
+  ; parseM  <- genPadsParseM name args pat padsTy
+  ; parseS  <- genPadsParseS name args pat
+  ; printFL <- genPadsPrintFL name args pat padsTy
+  ; return (typeDecs ++ parseM ++ parseS ++ printFL)
   }
 
 genPadsDecl (PadsDeclData old name args pat padsData derives) = do
@@ -463,28 +464,51 @@ genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred
     pred = return (LamE [labP, xnP] exp)
 
 
+----------------------------------------------------
+-- GENERATING PRINTING FUNCTION FROM A DECLARATION
+----------------------------------------------------
+
+genPadsPrintFL :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
+genPadsPrintFL name args patM padsTy = do 
+  { body  <- genPrintTy padsTy (Just (TupE (map VarE rm)))
+  ; return [FunD printer_name [Clause (printerArgs ++ [TupP (map VarP rm)]) (NormalB body) []] ]
+  }
+  where
+    (printer_name,printerArgs) = mkPrinterNameArgs name args patM
+    rm = [mkName "rep", mkName "md"]
+
+
+mkPrinterNameArgs :: UString -> [LString] -> Maybe Pat -> (Name, [Pat])
+mkPrinterNameArgs name args patM = (parserName, parserArgs)
+  where
+    parserName = mkTyPrinterName name    
+    parserArgs = map (VarP . mkTyPrinterVarName) args ++ pat
+    pat = Maybe.maybeToList patM
+
+
+
 ------------------------------------------
--- PRINTING FUNCTIONS
+-- GENERATE PRINTING FUNCTION FROM A TYPE
 ------------------------------------------
 
-{-
-genPrintTy :: PadsTy -> Exp -> Q Exp
+genPrintTy :: PadsTy -> Maybe Exp -> Q Exp
 genPrintTy (PConstrain pat ty exp) rm   = genPrintTy ty rm  -- doesn't check the constraint
 genPrintTy (PTransform src dest exp) rm = genPrintTrans src exp rm
 --genPrintTy (PList ty sepM termM) rm     = genPrintList ty sepM termM rm
 --genPrintTy (PPartition ty exp) rm       = genPrintPartition ty exp rm
 --genPrintTy (PApp tys expM) rm           = genPrintTyApp tys expM rm
 genPrintTy (PTuple tys) rm              = genPrintTuple tys rm
---genPrintTy (PExpression exp) rm         = genPrintExpression exp rm
---genPrintTy (PTycon c) rm                = return $ VarE (mkPrintFLName c)
---genPrintTy (PTyvar v) rm                = return $ VarE (mkPrintFLVarName v)
+genPrintTy (PExpression exp) rm         = genPrintExp exp rm
+genPrintTy (PTycon c) rm                = genPrintTycon c rm
+genPrintTy (PTyvar v) rm                = genPrintTyVar v rm
 
 
-
-genPrintTrans :: PadsTy -> Exp -> Exp -> Q Exp
-genPrintTrans tySrc exp rm = do
+genPrintTrans :: PadsTy -> Exp -> Maybe Exp -> Q Exp
+genPrintTrans tySrc exp Nothing
+  = genPrintTy tySrc Nothing
+genPrintTrans tySrc exp (Just rm) = do
   { rm' <- [| snd $(return exp) $(return rm) |]
-  ; genPrintTy tySrc rm'
+  ; genPrintTy tySrc (Just rm')
   }
 
 {-
@@ -512,43 +536,49 @@ intPair_printFL (r,m)
            int_PrintFL (r2,m2)
 -}
 
-genPrintTuple :: [PadsTy] -> Exp ->  Q Exp
-genPrintTuple tys rm = do
+genPrintTuple :: [PadsTy] -> Maybe Exp -> Q Exp
+genPrintTuple tys (Just rm) = do
   { repNamesM <- genNamesforTuple "rep" tys
-  ; let repVars = map VarE (Maybe.concatMaybe repNames)
-  ; let repPats = map VarP (Maybe.concatMaybe repNames)
+  ; let repVars = map VarE (Maybe.catMaybes repNamesM)
+  ; let repPats = map VarP (Maybe.catMaybes repNamesM)
   ; mdNamesM  <- genNamesforTuple "md" tys
-  ; let mdVars = map VarE (Maybe.concatMaybe mdNames)
-  ; let mdPats = map VarP (Maybe.concatMaybe mdNames)
-  ; inners <- sequence [genPrintTy t (TupE [r,m]) | (t,r,m) <- zip3 tys repVars mdVars]
+  ; let mdVars = map VarE (Maybe.catMaybes mdNamesM)
+  ; let mdPats = map VarP (Maybe.catMaybes mdNamesM)
+  ; inners <- sequence [genPrintTupleInner t r m | (t,r,m) <- zip3 tys repNamesM mdNamesM]
   ; return $ CaseE rm
-          [Match (TupP [TupP repPats, TupP [WildP, (TupP mdPats)]]) 
+                [Match (TupP [TupP repPats, TupP [WildP, (TupP mdPats)]]) 
                        (NormalB (VarE 'concatFL `AppE` ListE inners))
                        []]
   }
+genPrintTuple tys Nothing = do
+  { inners <- sequence [genPrintTy t Nothing | t <- tys]
+  ; return (VarE 'concatFL `AppE` ListE inners)
+  }
 
-genPEforTuple :: String -> [PadsTy] -> Q ([Exp], [Pat])
-genPEforTuple str tys =
+genNamesforTuple :: String -> [PadsTy] -> Q [Maybe Name]
+genNamesforTuple str tys =
   sequence [if hasRep ty then fmap Just (newName str) else return Nothing | ty <- tys]
 
+genPrintTupleInner t (Just r) (Just m) = genPrintTy t (Just (TupE [VarE r,VarE m])) 
+genPrintTupleInner t Nothing Nothing   = genPrintTy t Nothing
 
--}
 
 
-{-
-genPrintExp :: Exp -> Q Exp
-genPrintExp e@(LitE l)  = [| addString [$(return e)] |]
-genPrintExp exp         = [| addString (show $(return exp)) |]
+genPrintExp :: Exp -> Maybe Exp -> Q Exp
+genPrintExp e@(LitE (CharL c)) _ = [| addString [$(return e)] |]
+genPrintExp e@(LitE (StringL s)) _ = [| addString $(return e) |]
+genPrintExp exp        _ = [| addString (show $(return exp)) |]
 
-genPrintTycon :: UString -> Q Exp
-genPrintTycon c = undefined
+genPrintTycon :: UString -> Maybe Exp -> Q Exp
+genPrintTycon c Nothing = undefined
+genPrintTycon c (Just rm) = return (VarE (mkTyPrinterName c) `AppE` rm)
 
-genPrintTyvar :: LString -> Q Exp
-genPrintTyvar v = undefined
+genPrintTyVar :: LString -> Maybe Exp -> Q Exp
+genPrintTyVar v (Just rm) = return (VarE (mkTyPrinterVarName v) `AppE` rm)
 
 
 genPrintTermCond = undefined
--}
+
 
 
   
@@ -626,8 +656,8 @@ mkVarParserName str = mkName (str ++ "__p")
 
 -- Naming Printers
 
-mkPrintFLName str    = mkName ((strToLower str) ++ "_printFL")
-mkPrintFLVarName str = mkName (str ++ "__pr")
+mkTyPrinterName str    = mkName ((strToLower str) ++ "_printFL")
+mkTyPrinterVarName str = mkName (str ++ "__pr")
 
 
  
