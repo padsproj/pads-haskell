@@ -22,14 +22,11 @@ import Language.Pads.RegExp
 
 
 instance Pretty PadsDecl where
-    ppr (PadsDeclType old con vars pat padsty) = ppro old <> text "type" <+> (ppr_decl_lhs con vars pat) <+> text "=" <+> ppr padsty 
-    ppr (PadsDeclData  old  con vars pat padsrhs cons) = ppro old <> text "data" <+> (ppr_decl_lhs con vars pat) <+> text "=" 
+    ppr (PadsDeclType con vars pat padsty) = text "type" <+> (ppr_decl_lhs con vars pat) <+> text "=" <+> ppr padsty 
+    ppr (PadsDeclData con vars pat padsrhs cons) = text "data" <+> (ppr_decl_lhs con vars pat) <+> text "=" 
                                                    <+> ppr padsrhs <> ppr_derives cons 
-    ppr (PadsDeclNew  old  con vars pat branchInfo cons) = ppro old <> text "newtype" <+> (ppr_decl_lhs con vars pat) <+> text "=" 
+    ppr (PadsDeclNew  con vars pat branchInfo cons) = text "newtype" <+> (ppr_decl_lhs con vars pat) <+> text "=" 
                                                    <+> ppr branchInfo <> ppr_derives cons
-
-ppro True = text "old "
-ppro False = text ""
 
 ppr_decl_lhs id args patOpt = text id <> ppr_args args <> ppr_optArgPat patOpt
 ppr_derives cons = case cons of 

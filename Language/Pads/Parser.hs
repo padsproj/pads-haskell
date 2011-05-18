@@ -64,33 +64,40 @@ padsDecls = option [] (many1 topDecl)
 
 topDecl :: Parser PadsDecl
 topDecl 
-  =  typeDecl <|> dataDecl <|> newDecl
+  =  typeDecl <|> dataDecl <|> newDecl <|> obtainDecl
  <?> "Pads declaration keyword"
 
 typeDecl :: Parser PadsDecl
 typeDecl 
-  = do { old <- ((reserved "type" >> return False)
-            <|> try (reserved "old" >> reserved "type" >> return True))
+  = do { reserved "type"
        ; (id,env,pat) <- declLHS
        ; rhs <- ptype env
-       ; return (PadsDeclType old id env pat rhs)
+       ; return (PadsDeclType id env pat rhs)
        } <?> "Pads type declaration"
 
 dataDecl :: Parser PadsDecl
 dataDecl 
-  = do { old <- (reserved "data" >> return False)
-            <|> (reserved "old" >> reserved "data" >> return True)
+  = do { reserved "data"
        ; (id,env,pat) <- declLHS
        ; rhs <- dataRHS env; drvs <- option [] derives
-       ; return (PadsDeclData old id env pat rhs drvs)
+       ; return (PadsDeclData id env pat rhs drvs)
        } <?> "Pads data declaration"
 
 newDecl :: Parser PadsDecl
 newDecl 
   = do { reserved "newtype"; (id,env,pat) <- declLHS
        ; rhs <- newRHS env; drvs <- option [] derives
-       ; return (PadsDeclNew False id env pat rhs drvs)
+       ; return (PadsDeclNew id env pat rhs drvs)
        } <?> "Pads newtype declaration"
+
+obtainDecl :: Parser PadsDecl
+obtainDecl
+  = do { reserved "obtain"; id <- upperId
+       ; env <- option [] (try $ many var)
+       ; reservedOp "from"; rhs <- ptype env
+       ; reserved "using"; exp <- expression 
+       ; return (PadsDeclObtain id env rhs exp)
+       } <?> "Pads transform type"
 
 declLHS
   = do { id <- upperId; env <- option [] (try $ many var)

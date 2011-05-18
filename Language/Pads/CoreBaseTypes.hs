@@ -1,4 +1,6 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables, MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables, 
+             MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances, 
+             FlexibleInstances #-}
 
 {-
 ** *********************************************************************
@@ -506,9 +508,30 @@ handleEOR val str p
 -- BINARY TYPES --
 ----------------------------------
 
--- type Int8 : 8-bit, signed integers
-type Int8_md = Base_md
 
+type Bytes    = S.RawStream
+type Bytes_md = Base_md
+
+bytes_parseM :: Int -> PadsParser (Bytes,Bytes_md)
+bytes_parseM n =
+  handleEOF (def1 n) "Bytes" $
+  handleEOR (def1 n) "Bytes" $ do
+    bytes <- takeBytesP n
+    if B.length bytes == n 
+      then returnClean bytes
+      else returnError (def1 n) (E.Insufficient (B.length bytes) n)
+
+bytes_printFL :: Int -> (Bytes, Bytes_md) -> FList
+bytes_printFL i (bs, bmd) = addBString bs
+
+instance Pads1 Int Bytes Bytes_md where
+  parsePP1 = bytes_parseM
+  printFL1 = bytes_printFL
+
+
+---- All the others can be derived from this: Int8 and Int16 moved to BaseTypes.hs
+
+{-
 int8_parseM :: PadsParser (Int8,Base_md)
 int8_parseM =
   handleEOF def "Int8" $
@@ -524,10 +547,6 @@ instance Pads Int8 Base_md where
 
 int8_printFL :: (Int8, Base_md) -> FList
 int8_printFL (i, bmd) = addBString ( B.singleton (fromIntegral i))
-
-
--- type Int16 : 16-bit, signed integers; bytes assembled in order
-type Int16_md = Base_md
 
 int16_parseM :: PadsParser (Int16,Base_md)
 int16_parseM =
@@ -545,10 +564,13 @@ instance Pads Int16 Base_md where
 int16_printFL :: (Int16, Base_md) -> FList
 int16_printFL (i, bmd) = addBString (int16ToBytes Native i)
 
-
 --type Int16sbh : signed byte high, 16-bit, signed integers
-type Int16sbh_md = Base_md
-type Int16sbh = Int16
+[pads| type Int16sbh = obtain Int16 from Bytes 2 using <| (bToi16sbh,i16sbhTob) |> |]
+
+bToi16sbh :: pos -> (Bytes,Bytes_md) -> (Int16,Int16_md)
+bToi16sbh p (bs,md) = (bytesToInt16 SBH bs, md)
+i16sbhTob = undefined
+
 
 int16sbh_parseM :: PadsParser (Int16,Base_md)
 int16sbh_parseM =
@@ -577,6 +599,7 @@ int16sbl_parseM =
 
 int16sbl_printFL :: (Int16, Base_md) -> FList
 int16sbl_printFL (i, bmd) = addBString (int16ToBytes SBL i)
+-}
 
 -- type Int32 : 32-bit, signed integers; bytes assembled in order
 type Int32_md = Base_md

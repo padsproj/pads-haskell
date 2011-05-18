@@ -47,8 +47,8 @@ make_pads_declarations ds = fmap concat (mapM genPadsDecl ds)
 
 genPadsDecl :: PadsDecl -> Q [Dec]
 
-genPadsDecl (PadsDeclType old name args pat padsTy) = do
-  { let typeDecs = mkTyRepMDDecl old name args padsTy
+genPadsDecl (PadsDeclType name args pat padsTy) = do
+  { let typeDecs = mkTyRepMDDecl name args padsTy
   ; parseM  <- genPadsParseM name args pat padsTy
   ; parseS  <- genPadsParseS name args pat
   ; printFL <- -- genPadsPrintFL name args pat padsTy
@@ -56,20 +56,29 @@ genPadsDecl (PadsDeclType old name args pat padsTy) = do
   ; return (typeDecs ++ parseM ++ parseS ++ printFL)
   }
 
-genPadsDecl (PadsDeclData old name args pat padsData derives) = do
-  { dataDecs <- mkDataRepMDDecl old name args padsData derives
+genPadsDecl (PadsDeclData name args pat padsData derives) = do
+  { dataDecs <- mkDataRepMDDecl name args padsData derives
   ; parseM <- genPadsDataParseM name args pat padsData 
   ; parseS <- genPadsParseS name args pat
   ; let instances = mkPadsInstance name args (fmap patType pat)
   ; return (dataDecs ++ parseM ++ parseS ++ [instances] ) --  ++ printFL)
   }
 
-genPadsDecl (PadsDeclNew old name args pat branch derives) = do
-  { dataDecs <- mkNewRepMDDecl old name args branch derives
+genPadsDecl (PadsDeclNew name args pat branch derives) = do
+  { dataDecs <- mkNewRepMDDecl name args branch derives
   ; parseM <- genPadsNewParseM name args pat branch 
   ; parseS <- genPadsParseS name args pat
   ; let instances = mkPadsInstance name args (fmap patType pat)
   ; return (dataDecs ++ parseM ++ parseS ++ [instances] ) --  ++ printFL)
+  }
+
+genPadsDecl (PadsDeclObtain name args padsTy exp) = do
+  { --let mdDec = mkObtainMDDecl name args padsTy
+    parseM  <- genPadsObtainParseM name args padsTy exp
+--  ; parseS  <- genPadsParseS name args pat
+--  ; printFL <- -- genPadsPrintFL name args pat padsTy
+--               return []
+  ; return (parseM) -- mdDec ++ ++ parseS ++ printFL)
   }
 
 patType :: Pat -> Type
@@ -85,9 +94,9 @@ patType p = case p of
 -- GENERATE REP/MD TYPE DECLARATIONS
 -----------------------------------------------------------
 
-mkTyRepMDDecl :: Bool -> UString -> [UString] -> PadsTy -> [Dec]
-mkTyRepMDDecl old name args ty 
-  = (if old then [] else [repType]) ++ [mdType]
+mkTyRepMDDecl :: UString -> [UString] -> PadsTy -> [Dec]
+mkTyRepMDDecl name args ty 
+  = [repType, mdType]
   where
     repType = TySynD (mkRepName name) tyArgs (mkRepTy ty)
     mdType  = TySynD (mkMDName name) tyArgs (mkMDTy ty)
@@ -98,11 +107,11 @@ mkTyRepMDDecl old name args ty
 -- GENERATE REP/MD DATA DECLARATIONS
 -----------------------------------------------------------
 
-mkDataRepMDDecl :: Bool -> UString -> [LString] -> PadsData -> [QString] -> Q [Dec]
-mkDataRepMDDecl old name args branches ds = do
+mkDataRepMDDecl :: UString -> [LString] -> PadsData -> [QString] -> Q [Dec]
+mkDataRepMDDecl name args branches ds = do
   { bs <- mapM mkMDUnion bs
   ; let imdDecl  = DataD [] (mkIMDName name) tyArgs bs (derive [])
-  ; return ((if old then [] else [dataDecl]) ++ [mdDecl, imdDecl])
+  ; return [dataDecl, mdDecl, imdDecl]
   }
   where
     dataDecl = DataD [] (mkRepName name) tyArgs (map mkRepUnion bs) (derive ds)
@@ -139,11 +148,11 @@ derive ds =  map (mkName . qName) ds
 -- GENERATE REP/MD NEWTYPE DECLARATIONS
 -----------------------------------------------------------
 
-mkNewRepMDDecl :: Bool -> UString -> [LString] -> BranchInfo -> [QString] -> Q [Dec]
-mkNewRepMDDecl old name args branch ds = do
+mkNewRepMDDecl :: UString -> [LString] -> BranchInfo -> [QString] -> Q [Dec]
+mkNewRepMDDecl name args branch ds = do
   { bs <- mkMDUnion branch
   ; let imdDecl  = NewtypeD [] (mkIMDName name) tyArgs bs (derive [])
-  ; return ((if old then [] else [dataDecl]) ++ [mdDecl, imdDecl]) 
+  ; return [dataDecl, mdDecl, imdDecl]
   }
   where
     dataDecl = NewtypeD [] (mkRepName name) tyArgs (mkRepUnion branch) (derive ds)
@@ -151,6 +160,19 @@ mkNewRepMDDecl old name args branch ds = do
     tyArgs   = map (PlainTV . mkName) args
     imdApp   = foldl AppT (ConT (mkIMDName name)) (map (VarT . mkName) args)
 
+
+-----------------------------------------------------------
+-- GENERATE MD TYPE FROM OBTAIN DECLARATIONS -- Design decision not to do this
+-----------------------------------------------------------
+{-
+
+mkObtainMDDecl :: UString -> [UString] -> PadsTy -> [Dec]
+mkObtainMDDecl name args ty
+  = [mdType]
+  where
+    mdType  = TySynD (mkMDName name) tyArgs (mkMDTy ty)
+    tyArgs  = map (PlainTV . mkName) args
+-}
 
 -----------------------------------------------------------
 -- GENERATE REPRESENTATION TYPE OF A TYPE EXPRESSION
@@ -248,6 +270,12 @@ genPadsNewParseM name args patM branch = do
   { (dec,exp) <- genParseBranchInfo branch
   ; let body = LetE [dec] exp
   ; return [mkParserFunction name args patM body]
+  }
+
+genPadsObtainParseM :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
+genPadsObtainParseM name args padsTy exp = do
+  { body  <- genParseTy (PTransform padsTy (PTycon [name]) exp)
+  ; return [mkParserFunction name args Nothing body]
   }
 
 mkParserFunction :: UString -> [LString] -> Maybe Pat -> Exp -> Dec

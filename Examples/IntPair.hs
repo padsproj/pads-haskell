@@ -12,7 +12,14 @@ import Language.Pads.RegExp
 import Language.Pads.LazyList
 import qualified Language.Pads.BaseTypes as BT
 
+
+import Language.Pads.PadsParser
+
+
 import Data.Data
+import Data.Int 
+import qualified Data.ByteString as B  
+import Data.Word
 
 --test = parseStringInput trip_parseM "354;;23|53|43(652%%35)4;hefd"
 
@@ -53,11 +60,7 @@ data May a = Jus a
 
 
 data Exxy a = Exxy {exxy :: Int, Char, aa :: a}
-
-
-
 |]
-
 
 
 

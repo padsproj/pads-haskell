@@ -18,9 +18,10 @@ import Language.Haskell.TH
 
 
 
-data PadsDecl = PadsDeclType  Bool String [String] (Maybe Pat) PadsTy
-              | PadsDeclData  Bool String [String] (Maybe Pat) PadsData [QString]
-              | PadsDeclNew   Bool String [String] (Maybe Pat) BranchInfo [QString]
+data PadsDecl = PadsDeclType   String [String] (Maybe Pat) PadsTy
+              | PadsDeclData   String [String] (Maybe Pat) PadsData [QString]
+              | PadsDeclNew    String [String] (Maybe Pat) BranchInfo [QString]
+              | PadsDeclObtain String [String] PadsTy Exp
    deriving (Eq, Data, Typeable, Show)
 
 

@@ -29,23 +29,68 @@ import Text.PrettyPrint.Mainland
 import qualified Data.Char as C
 import qualified Data.List as L
 import Data.Data
+import qualified Data.ByteString as B  
+import Data.Int
 
 
 [pads|
-
 type Line a   = (a, EOR)
 type StringLn = [Char] terminator EOR
 type StringLnP (p :: String -> Bool) = constrain s :: StringLn where <| p s |> 
 
-old data Maybe a = Just a
-                 | Nothing
+data PMaybe a = PJust a
+              | PNothing
+obtain Maybe a from PMaybe a using <|(pm2m,m2pm)|>
 |]
+type Maybe_md a = PMaybe_md a
+
+pm2m :: Pos -> (PMaybe a, md) -> (Maybe a, md)
+pm2m p (PJust x, md) = (Just x, md)
+pm2m p (PNothing,md) = (Nothing,md)
+
+m2pm :: (Maybe a, Maybe_md a) -> (PMaybe a, PMaybe_md a)
+m2pm (Just x, md) = (PJust x, md)
+m2pm (Nothing,md) = (PNothing,md)
+
 
 [pads|
 type Lit   (x::String) = (Void, x)
 type LitRE (x::RE)     = (Void, x)
-
 |]
+
+
+-- type Int8 : 8-bit, signed integers
+type Int8_md = Base_md
+
+[pads| obtain Int8 from Bytes 1 using <|(bToi8,i8Tob)|> |]
+
+bToi8 :: pos -> (Bytes,Bytes_md) -> (Int8,Int8_md)
+bToi8 p (bytes,md) = (fromIntegral (bytes `B.index` 0), md)
+i8Tob (i,md) = (B.singleton (fromIntegral i), md)
+
+
+-- type Int16 : 16-bit, signed integers; bytes assembled in order
+type Int16_md = Base_md
+[pads| obtain Int16 from Bytes 2 using <| (bToi16,i16Tob) |> |]
+
+bToi16 :: pos -> (Bytes,Bytes_md) -> (Int16,Int16_md)
+bToi16 p (bs,md) = (bytesToInt16 Native bs, md)
+i16Tob (i,md) = (int16ToBytes Native i, md)
+
+--type Int16sbh : signed byte high, 16-bit, signed integers
+[pads| type Int16sbh = obtain Int16 from Bytes 2 using <| (bToi16sbh,i16sbhTob) |> |]
+
+bToi16sbh :: pos -> (Bytes,Bytes_md) -> (Int16,Int16_md)
+bToi16sbh p (bs,md) = (bytesToInt16 SBH bs, md)
+i16sbhTob (i,md) = (int16ToBytes SBH i, md)
+
+--type Int16sbl : signed byte low, 16-bit, signed integers
+[pads| type Int16sbl = obtain Int16 from Bytes 2 using <| (bToi16sbl,i16sblTob) |> |]
+
+bToi16sbl :: pos -> (Bytes,Bytes_md) -> (Int16,Int16_md)
+bToi16sbl p (bs,md) = (bytesToInt16 SBH bs, md)
+i16sblTob (i,md) = (int16ToBytes SBL i, md)
+
 
 
 
