@@ -307,12 +307,12 @@ hexStr2Int src_pos (s,md) = if good then (intList2Int ints 0, md)
         (d:ds) -> intList2Int ds ((16 * a) + d)
 
 int2HexStr :: Int -> (Int, Base_md) -> (StringFW, Base_md)
-int2HexStr size (x,md) = if (length result == size) && wasPos  then (result, md)       
-                              else if not wasPos then 
-                                   (Prelude.take size result,    
-                                    mkErrBasePD (TransformToSrcFail "StrHex" (show x) (" (Expected positive number)")) Nothing)
-                              else (Prelude.take size result,
-                                    mkErrBasePD (TransformToSrcFail "StrHex" (show x) (" (too big to fit in "++ (show size) ++" characters)")) Nothing)
+int2HexStr size (x,md)
+  | length result == size && wasPos = (result, md)       
+  | not wasPos = (Prelude.take size result,    
+                  mkErrBasePD (TransformToSrcFail "StrHex" (show x) (" (Expected positive number)")) Nothing)
+  | otherwise  = (Prelude.take size result,
+                  mkErrBasePD (TransformToSrcFail "StrHex" (show x) (" (too big to fit in "++ (show size) ++" characters)")) Nothing)
   where
    cvt rest a = if rest < 16 then {- reverse $ -} (C.intToDigit rest) : a
                 else cvt (rest `div` 16) (C.intToDigit (rest `mod` 16) : a)

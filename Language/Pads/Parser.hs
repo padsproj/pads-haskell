@@ -230,25 +230,24 @@ branch env
        } <?> "Pads switch branch"
 
 constrs :: Env -> Parser [BranchInfo]
-constrs env = do
-  { clauses <- constr env `sepBy1` reservedOp "|"
-  ; if and (map noArg clauses) then return (map addLiteral clauses)
-  else return clauses       -- Provides literals on enumeration types
-  }
-  where
-    noArg (BConstr _ [] Nothing) = True
-    noArg _                      = False
-    addLiteral (BConstr c [] Nothing) = BConstr c [mkId c] Nothing
-    mkId id = (NotStrict, PExpression (LitE (StringL id)))
+constrs env = constr env `sepBy1` reservedOp "|"
 
 constr :: Env -> Parser BranchInfo
-constr env
+constr env =  constructor env
+--         <|> constructorOp env
+
+constructor :: Env -> Parser BranchInfo
+constructor env
   = do { id  <- upperId;
        ; do { args <- record env; predM <- optionMaybe predic
             ; return (BRecord id args predM)}
-     <|> do { args <- option [] (constrArgs env)
+     <|> do { args <- option (mkId id) (constrArgs env)
             ; predM <- optionMaybe predic
             ; return (BConstr id args predM)}}                 
+  where
+    mkId id = [(NotStrict, PExpression (LitE (StringL id)))]
+              -- Provides the expansion e.g.: Tue -> Tue "Tue"
+              
 
 constrArgs :: Env -> Parser [ConstrArg]
 constrArgs env
