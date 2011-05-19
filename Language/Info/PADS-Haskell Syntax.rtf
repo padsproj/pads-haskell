@@ -39,6 +39,7 @@ declLHS	-> tycon \{tyvar\} [pattern]
 \f1\b =\
 
 \f0\b0 \
+\
 derives	-> qtycls\
 		 | 
 \f1\b ( 
@@ -118,8 +119,32 @@ atype	->
 \f0\b0 		
 \f2\i  (list type, no qualifiers)
 \f0\i0 \
-		 | qtycon\
+		 | gtycon\
 		 | tyvar\
+\
+gtycon	-> qtycon						 
+\f2\i (qualified type consctructor)
+\f0\i0 \
+		 | 
+\f1\b ()
+\f0\b0 							 
+\f2\i (unit type)\
+
+\f0\i0 		 | 
+\f1\b []
+\f0\b0 							 
+\f2\i (list constructor)
+\f0\i0 \
+		 | 
+\f1\b (,
+\f0\b0 \{
+\f1\b ,
+\f0\b0 \}
+\f1\b )
+\f0\b0 						 
+\f2\i (tupling constructors)
+\f0\i0 \
+\
 \
 \
 -- 
@@ -151,6 +176,12 @@ constr	-> con \{[
 \f2\i \
 
 \f0\i0 		 | con record [pred]\
+		 | conoparg conop conoparg [pred]\
+\
+conoparg -> etype\
+	     | 
+\f1\b !
+\f0\b0  atype\
 \
 record 	-> 
 \f1\b \{
@@ -174,7 +205,7 @@ data Foo = Baz (x::Int) (Int Int where <| c==a+b |>\
 \
 \
 -- 
-\f1\b newtype (only one represented type on the constructor)
+\f1\b newtype (only one represented type one the constructor)
 \f0\b0 \
 \
 newtypeRHS	 -> con \{expression\} atype \{expression\} [pred]\
@@ -191,7 +222,7 @@ newtypeRHS	 -> con \{expression\} atype \{expression\} [pred]\
 \f0\b0  [pred]\
 \
 vtype	-> ptype\
-		 | expression\
+		 |\
 \
 -- 
 \f1\b Expression bits

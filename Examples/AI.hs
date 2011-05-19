@@ -6,6 +6,8 @@ import Control.Monad
 
 import System.IO.Unsafe (unsafePerformIO)
 
+-- add ability for users to define default values.
+
 [pads|
   newtype AI    = AI ([Line Entry] terminator EOF)
 
@@ -20,10 +22,12 @@ import System.IO.Unsafe (unsafePerformIO)
       
   data Src = Addr IP_v4 | Name Host  
   type IP_v4 = (IPInt, '.', IPInt, '.', IPInt, '.', IPInt)
-  type Host = StringC ' '
   type IPInt = constrain i :: Int where <| 0 <= i && i < 256 |>   
+  type Host = StringC ' '
 
   data ID = Missing '-' | Id (StringC ' ')
+
+-- :set -ddump-splices
 
   type TimeStamp = ('[', Date, ']')   
   type Date = DateFC <|("%d/%h/%Y:%H:%M:%S %z", ']')|>
@@ -34,9 +38,9 @@ import System.IO.Unsafe (unsafePerformIO)
         ' ',  version :: Version  where <| checkVersion method version |>,  '"'
       }  
 
-  data Method  = GET | PUT | POST | HEAD | DELETE
+  data Method  = GET | PUT | POST | HEAD | DELETE 
                | LINK | UNLINK      -- obsolete after http 1.0
-  data Version = Version {"HTTP/", major :: Int, '.', minor :: Int}
+  data Version = Version {"HTTP/", major :: Int, '.', minor :: Int}  -- add constriants on major and minor mode
 
   type Response = constrain r :: Int where <| 100 <= r && r < 600 |> 
 
@@ -67,7 +71,7 @@ ai_file_length  = Prelude.length ai_rep
 ai_file_take n  = Prelude.take n ai_rep
 test = ai_file_take 20
 
--- printAI n = putStrLn(pretty 100 (ppr (ai_file_take n)))
+printAI n = putStrLn(pretty 100 (ppr (ai_file_take n)))
 
 result n  = do 
      { (AI rep, md) <- parseFile ai_file

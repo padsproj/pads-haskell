@@ -533,7 +533,6 @@ instance Pads1 Int Bytes Bytes_md where
 
 
 
-
 {- Helper functions -}
 mkStr c = "'" ++ [c] ++ "'"
 

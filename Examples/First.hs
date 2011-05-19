@@ -9,6 +9,8 @@ import System.IO.Unsafe (unsafePerformIO)
 
 --import qualified Text.Regex.ByteString as BRE
 
+ws = REd "[\t ]+|$" " "
+
 
 ---- PADS EXAMPLES
 
@@ -666,7 +668,7 @@ whiteSpace_expects = ((12,34),0,"")
 whiteSpace_test = mkTestCase "regular expression literal" whiteSpace_expects whiteSpace_result
 
 
-ws = RE "[ \t]+"
+
 [pads| type WhiteSpace2 = (Int, ws, Int) |]
 whiteSpace2_input = "12      34"
 whiteSpace2_result = whiteSpace2_parseS whiteSpace2_input
@@ -678,6 +680,7 @@ rE_ty_input = "t  aaaa"
 rE_ty_result = rE_ty_parseS rE_ty_input
 rE_ty_expects = (("t","aaaa"),0,"")
 rE_ty_test = mkTestCase "regular expression abbreviation for StringME" rE_ty_expects rE_ty_result
+
 
 [pads| type Disc = (Int, EOR, Int, EOR, (partition (Int, EOR, Int, EOR) using windows), Int, EOR) |]
 disc_input = "1\n2\n3\r\n4\r\n5\n"        
@@ -701,3 +704,8 @@ linesFW_input  = "123456789"
 linesFW_result = linesFW_parseS linesFW_input
 linesFW_expects = (["123","456","789"],0,"")
 linesFW_test = mkTestCase "fixed-width record discpline" linesFW_expects linesFW_result
+
+
+[pads| type Strs = [StringSE ws | ws] terminator EOR |]
+strs_input = "0.700264\n"
+strs_result = strs_parseS strs_input
