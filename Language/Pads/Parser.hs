@@ -15,7 +15,7 @@ module Language.Pads.Parser where
 import Language.Pads.Syntax
 
 
-import Text.Parsec
+import Text.Parsec hiding (upper,lower)
 import qualified Text.Parsec.String as PS
 import Text.Parsec.Error
 import Text.Parsec.Prim as PP
@@ -70,7 +70,7 @@ topDecl
 typeDecl :: Parser PadsDecl
 typeDecl 
   = do { reserved "type"
-       ; (id,env,pat) <- declLHS
+       ; (id,env) <- declLHS; pat <- patLHS
        ; rhs <- ptype env
        ; return (PadsDeclType id env pat rhs)
        } <?> "Pads type declaration"
@@ -78,31 +78,31 @@ typeDecl
 dataDecl :: Parser PadsDecl
 dataDecl 
   = do { reserved "data"
-       ; (id,env,pat) <- declLHS
+       ; (id,env) <- declLHS; pat <- patLHS
        ; rhs <- dataRHS env; drvs <- option [] derives
        ; return (PadsDeclData id env pat rhs drvs)
        } <?> "Pads data declaration"
 
 newDecl :: Parser PadsDecl
 newDecl 
-  = do { reserved "newtype"; (id,env,pat) <- declLHS
+  = do { reserved "newtype"
+       ; (id,env) <- declLHS; pat <- patLHS
        ; rhs <- newRHS env; drvs <- option [] derives
        ; return (PadsDeclNew id env pat rhs drvs)
        } <?> "Pads newtype declaration"
 
 obtainDecl :: Parser PadsDecl
 obtainDecl
-  = do { reserved "obtain"; id <- upperId
-       ; env <- option [] (try $ many var)
+  = do { reserved "obtain"
+       ; (id,env) <- declLHS
        ; reservedOp "from"; rhs <- ptype env
        ; reserved "using"; exp <- expression 
        ; return (PadsDeclObtain id env rhs exp)
        } <?> "Pads transform type"
 
 declLHS
-  = do { id <- upperId; env <- option [] (try $ many var)
-       ; pat <- patLHS
-       ; return (id,env,pat)
+  = do { id <- upper; env <- option [] (try $ many lower)
+       ; return (id,env)
        }
 
 patLHS
@@ -124,7 +124,7 @@ derives
 ptype :: Env -> Parser PadsTy
 ptype env 
   =  constrain env
- <|> transform env
+ <|> obtain env
  <|> partition env
  <|> listTy env
  <|> btype env
@@ -134,13 +134,14 @@ constrain :: Env -> Parser PadsTy
 constrain env
   = do { reserved "constrain"
        ; pat <- haskellParsePatTill "::"; ty <- ptype env
-       ; reserved "where"; exp <- expression
+       ; exp <- predic
        ; return (PConstrain pat ty exp)
        } <?> "Pads constrain type"
 
+predic = do { reservedOp "where"; expression }
 
-transform :: Env -> Parser PadsTy
-transform env
+obtain :: Env -> Parser PadsTy
+obtain env
   = do { reserved "obtain"; dst <- ptype env
        ; reservedOp "from"; src <- ptype env
        ; reserved "using"; exp <- expression 
@@ -176,19 +177,17 @@ partition env
 
 btype :: Env -> Parser PadsTy
 btype env
-  = do { ty <- etype env; tys <- many (atype env)
+  = try (do 
+       { ty <- etype env; tys <- many (atype env)
        ; expM <- optionMaybe (try expression);
-       ; if length tys==0 && expM == Nothing then return ty
-         else return (PApp (ty:tys) expM)
-       }
+       ; if length tys==0 && expM == Nothing 
+         then return ty
+         else return (PApp (ty:tys) expM) })
 
 etype :: Env -> Parser PadsTy
-etype env
-  =  atype env
- <|> fmap PExpression expression
- <?> "Pads etype"
+etype env = atype env
+         <|> try (expression >>= (return . PExpression))
 
-atype :: Env -> Parser PadsTy
 atype env
   =  try (tuple env)
  <|> do { (elm,sepM) <- brackets (listInside env)
@@ -198,10 +197,11 @@ atype env
 
 tuple :: Env -> Parser PadsTy
 tuple env
-  =  do { tys <- parens $ option [] (commaSep1 (ptype env))
-       ; if length tys==1 then return (head tys)
-         else if length tys==0 then return (PTycon ["Void"])
-         else return (PTuple tys)
+  = do { tys <- parens $ option [] (commaSep1 (ptype env))
+       ; case length tys of
+           0 -> return (PTycon ["Void"])
+           1 -> return (head tys)
+           _ -> return (PTuple tys)
        }
   <?> "Pads tuple type"
 
@@ -233,12 +233,8 @@ constrs :: Env -> Parser [BranchInfo]
 constrs env = constr env `sepBy1` reservedOp "|"
 
 constr :: Env -> Parser BranchInfo
-constr env =  constructor env
---         <|> constructorOp env
-
-constructor :: Env -> Parser BranchInfo
-constructor env
-  = do { id  <- upperId;
+constr env
+  = do { id  <- upper;
        ; do { args <- record env; predM <- optionMaybe predic
             ; return (BRecord id args predM)}
      <|> do { args <- option (mkId id) (constrArgs env)
@@ -257,6 +253,7 @@ constrArgs env
     ; return (bang,ty)
     }
 
+
 record :: Env -> Parser [FieldInfo]
 record env
   = do { reservedOp "{"
@@ -267,7 +264,7 @@ record env
 
 field :: Env -> Parser FieldInfo
 field env
-  = do { id <- optionMaybe $ try (lowerId << reservedOp "::")
+  = do { id <- optionMaybe $ try (lower << reservedOp "::")
        ; ty <- ftype env
        ; predM <- optionMaybe predic
        ; return (id, ty, predM)
@@ -277,7 +274,6 @@ ftype env
   =  do { reservedOp "!"; ty <- atype env; return (IsStrict,ty)}
  <|> do { ty <- ptype env; return (NotStrict,ty)}
 
-predic = do { reservedOp "where"; expression }
 
 
 -------------------------------
@@ -286,7 +282,7 @@ predic = do { reservedOp "where"; expression }
 
 newRHS :: Env -> Parser BranchInfo
 newRHS env
-  = do { id  <- upperId;
+  = do { id  <- upper;
        ; do { rec <- record1 env
             ; predM <- optionMaybe predic
             ; return (BRecord id rec predM)}
@@ -310,14 +306,16 @@ record1 env
 
 field1 :: Env -> Parser FieldInfo
 field1 env
-  = do { id <- lowerId; reservedOp "::"; ty <- ptype env
+  = do { id <- lower; reservedOp "::"; ty <- ptype env
        ; predM <- optionMaybe predic
        ; return (Just id, (NotStrict,ty), predM)
        }
 
+
 -----------------------------------
 -- HASKELL IN PADS DECLARATIONS
 -----------------------------------
+
 expression :: Parser Exp
 expression =  haskellExp
           <|> literal
@@ -355,8 +353,8 @@ literal =  fmap (LitE . CharL) (try charLiteral)
        <|> reLiteral
        <|> fmap (LitE . StringL) stringLiteral
        <|> fmap (LitE . IntegerL) (try integer)
-       <|> fmap (VarE . mkName) var
-       <|> fmap (ConE . mkName) con
+       <|> fmap (VarE . mkName) lower
+       <|> fmap (ConE . mkName) upper
        <?> "Pads literal"
 
 reLiteral :: Parser Exp 
@@ -366,28 +364,23 @@ reLiteral = do { reservedOp reMark
                }
 reMark = "'"
 
+
 qualUpper :: Parser QString
-qualUpper = do
-  { n <- upperId
-  ; do { reservedOp "."
-       ; ns <- qualUpper
-       ; return (n:ns)
-       }
-  <|> return [n]
-  }
+qualUpper = try (upper `sepBy1` reservedOp ".")
 
-tyvar env = try $ do { v <- var; guard (v `elem` env); return v }
+upper :: Parser String
+upper = try $ do { id <- identifier
+                 ; guard $ isUpper (head id)
+                 ; return id}
 
-var = lowerId
-con = upperId
+lower :: Parser String
+lower = try $ do { id <- identifier
+                 ; guard $ isLower (head id)
+                 ; return id}
 
-lowerId :: Parser String
-lowerId = try (do { id <- identifier
-                  ; if (isLower . head) id then return id else parserZero })
-
-upperId :: Parser String
-upperId = try (do { id <- identifier
-                  ; if (isUpper . head) id then return id else parserZero })
+tyvar env = try $ do { v <- lower
+                     ; guard (v `elem` env)
+                     ; return v }
 
 
 ---------------
@@ -398,10 +391,10 @@ mymany p = option [] (many1 p)
 
 lexer :: PT.TokenParser ()
 lexer = PT.makeTokenParser (haskellStyle 
-             { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", reMark, "." ],
-               reservedNames   = ["data", "type", "newtype", "old", "existing", "deriving",
-                                   "using", "where", "terminator", "length", "of", "from",
-                                   "case", "constrain", "obtain", "partition" ]})
+  { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", reMark, "." ],
+    reservedNames   = ["data", "type", "newtype", "old", "existing", "deriving",
+                       "using", "where", "terminator", "length", "of", "from",
+                       "case", "constrain", "obtain", "partition","value" ]})
 
 whiteSpace    = PT.whiteSpace  lexer
 identifier    = PT.identifier  lexer

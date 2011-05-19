@@ -73,12 +73,12 @@ genPadsDecl (PadsDeclNew name args pat branch derives) = do
   }
 
 genPadsDecl (PadsDeclObtain name args padsTy exp) = do
-  { --let mdDec = mkObtainMDDecl name args padsTy
-    parseM  <- genPadsObtainParseM name args padsTy exp
+  { let mdDec = mkObtainMDDecl name args padsTy
+  ; parseM  <- genPadsObtainParseM name args padsTy exp
 --  ; parseS  <- genPadsParseS name args pat
 --  ; printFL <- -- genPadsPrintFL name args pat padsTy
 --               return []
-  ; return (parseM) -- mdDec ++ ++ parseS ++ printFL)
+  ; return (mdDec ++ parseM) --  ++ parseS ++ printFL)
   }
 
 patType :: Pat -> Type
@@ -164,7 +164,6 @@ mkNewRepMDDecl name args branch ds = do
 -----------------------------------------------------------
 -- GENERATE MD TYPE FROM OBTAIN DECLARATIONS -- Design decision not to do this
 -----------------------------------------------------------
-{-
 
 mkObtainMDDecl :: UString -> [UString] -> PadsTy -> [Dec]
 mkObtainMDDecl name args ty
@@ -172,7 +171,7 @@ mkObtainMDDecl name args ty
   where
     mdType  = TySynD (mkMDName name) tyArgs (mkMDTy ty)
     tyArgs  = map (PlainTV . mkName) args
--}
+
 
 -----------------------------------------------------------
 -- GENERATE REPRESENTATION TYPE OF A TYPE EXPRESSION
@@ -634,14 +633,10 @@ mkRepQName :: QString -> Name
 mkRepQName str = mkName (qName str)
 
 mkMDName :: String -> Name
-mkMDName str = case M.lookup str baseTypesMap of
-         Nothing -> mkName (str ++ "_md")
-         Just _ -> ''Base_md         
+mkMDName str = mkName (str ++ "_md")
 
 mkMDQName :: QString -> Name
-mkMDQName str = case M.lookup (last str) baseTypesMap of
-         Nothing -> mkName (appendTo str "_md")
-         Just _ -> ''Base_md         
+mkMDQName str = mkName (appendTo str "_md")
 
 mkIMDName name  = mkName (name ++ "_imd")
 mkMDVarName name = mkName (name ++ "_md")

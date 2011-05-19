@@ -17,35 +17,41 @@
 \f1\b Type declarations
 \f0\b0 \
 \
-topdecl	-> [
-\f1\b old
-\f0\b0 ] 
+topdecl	-> 
 \f1\b type
-\f0\b0  declLHS ptype\
-		 | [
-\f1\b old
-\f0\b0 ] 
+\f0\b0     declLHS [pattern] 
+\f1\b = 
+\f0\b0 ptype\
+		 | 
 \f1\b data
-\f0\b0  declLHS dataRHS    [
+\f0\b0     declLHS [pattern] 
+\f1\b = 
+\f0\b0 dataRHS    [
 \f1\b deriving
 \f0\b0  derives]\
 		 | 
 \f1\b newtype
-\f0\b0     declLHS newtypeRHS [
+\f0\b0  declLHS [pattern] 
+\f1\b = 
+\f0\b0 newtypeRHS [
 \f1\b deriving
 \f0\b0  derives]\
-\
-declLHS	-> tycon \{tyvar\} [pattern] 
-\f1\b =\
 
-\f0\b0 \
+\f1\b 		 | obtain  
+\f0\b0 declLHS 
+\f1\b from
+\f0\b0  ptype 
+\f1\b using
+\f0\b0  expression\
 \
-derives	-> qtycls\
+declLHS	-> upper \{lower\} \
+\
+derives	-> qupper\
 		 | 
 \f1\b ( 
-\f0\b0 qtycls \{
+\f0\b0 qupper \{
 \f1\b ,
-\f0\b0  qtycls\} 
+\f0\b0  qupper\} 
 \f1\b )
 \f0\b0 \
 \
@@ -71,12 +77,16 @@ ptype 	->
 \f0\b0  expression	
 \f2\i (transformed type)
 \f0\i0 \
-		 | list [listEnd]\
 		 | 
 \f1\b partition
 \f0\b0  ptype 
 \f1\b using
 \f0\b0  expression\
+          | 
+\f1\b value
+\f0\b0  expression\
+		 | list [listEnd]\
+		 | btype\
 \
 list		-> 
 \f1\b [
@@ -97,13 +107,16 @@ pred 	->
 \f1\b where 
 \f0\b0 expression\
 \
-\
 btype	-> etype \{atype\} [expression]	 	 
-\f2\i (type application)\
+\f2\i (type application of atomic expressions)\
 
 \f0\i0 \
-etype	-> atype\
-		 | expression\
+etype	-> atype
+\f2\i \
+
+\f0\i0 		 | expression						 
+\f2\i (literals)
+\f0\i0 \
 \
 atype	-> 
 \f1\b ( 
@@ -119,44 +132,14 @@ atype	->
 \f0\b0 		
 \f2\i  (list type, no qualifiers)
 \f0\i0 \
-		 | gtycon\
+		 | qupper\
 		 | tyvar\
-\
-gtycon	-> qtycon						 
-\f2\i (qualified type consctructor)
-\f0\i0 \
-		 | 
-\f1\b ()
-\f0\b0 							 
-\f2\i (unit type)\
-
-\f0\i0 		 | 
-\f1\b []
-\f0\b0 							 
-\f2\i (list constructor)
-\f0\i0 \
-		 | 
-\f1\b (,
-\f0\b0 \{
-\f1\b ,
-\f0\b0 \}
-\f1\b )
-\f0\b0 						 
-\f2\i (tupling constructors)
-\f0\i0 \
-\
-\
 \
 -- 
 \f1\b data
 \f0\b0 \
 \
-dataRHS	-> constr \{
-\f1\b |
-\f0\b0  constr\}					 
-\f2\i (union)
-\f0\i0 \
-		 | 
+dataRHS	-> 
 \f1\b case
 \f0\b0  expression 
 \f1\b of
@@ -164,6 +147,11 @@ dataRHS	-> constr \{
 \f1\b |
 \f0\b0  branch\}	 
 \f2\i (switch)
+\f0\i0 \
+		 | constr \{
+\f1\b |
+\f0\b0  constr\}					 
+\f2\i (union)
 \f0\i0 \
 \
 branch	-> pattern
@@ -176,12 +164,6 @@ constr	-> con \{[
 \f2\i \
 
 \f0\i0 		 | con record [pred]\
-		 | conoparg conop conoparg [pred]\
-\
-conoparg -> etype\
-	     | 
-\f1\b !
-\f0\b0  atype\
 \
 record 	-> 
 \f1\b \{
@@ -211,18 +193,16 @@ data Foo = Baz (x::Int) (Int Int where <| c==a+b |>\
 newtypeRHS	 -> con \{expression\} atype \{expression\} [pred]\
 			  | con 
 \f1\b \{
-\f0\b0  \{vtype 
+\f0\b0  \{ftype 
 \f1\b ,
 \f0\b0 \} var 
 \f1\b ::
 \f0\b0  ftype \{
 \f1\b , 
-\f0\b0 vtype\} 
+\f0\b0 ftype\} 
 \f1\b \}
 \f0\b0  [pred]\
 \
-vtype	-> ptype\
-		 |\
 \
 -- 
 \f1\b Expression bits
@@ -247,52 +227,9 @@ literal	-> string\
 		 | var\
           | con\
 \
-\
-\
--- 
-\f1\b variables etc
-\f0\b0 \
-\
-con		-> conid | 
-\f1\b (
-\f0\b0  consym 
-\f1\b )		
-\f0\b0 	
-\f2\i  (constructor)
-\f0\i0 \
-var		-> varid | 
-\f1\b (
-\f0\b0  varsym 
-\f1\b )
-\f0\b0 			 
-\f2\i (variable)
-\f0\i0 \
-conop	-> consym | 
-\f1\b ` 
-\f0\b0 conid 
-\f1\b `
-\f0\b0 			 
-\f2\i (constructor operator)
-\f0\i0 \
-\
-qtycon	-> [modid 
+qupper	-> \{upper 
 \f1\b .
-\f0\b0 ] tycon\
-qtycls	-> [modid 
-\f1\b .
-\f0\b0 ] tycls\
-modid	-> conid						 
-\f2\i (modules)
-\f0\i0 \
-tycon	-> conid | 
-\f1\b (
-\f0\b0  varsym 
-\f1\b )
-\f0\b0 \
-tycls	-> conid\
-tyvar	-> varid						 
-\f2\i (type variables)
-\f0\i0 \
+\f0\b0 \} upper\
 \
 \
 \
@@ -300,14 +237,8 @@ tyvar	-> varid
 \f1\b Lexical classes
 \f0\b0 \
 \
-varid								 
-\f2\i (variables)
-\f0\i0 \
-varsym\
-conid								 
-\f2\i (constructors)
-\f0\i0 \
-consym\
+upper\
+lower\
 string\
 char\
 number\

@@ -41,33 +41,6 @@ import Text.PrettyPrint.Mainland as PP
 import Monad
 
 
-{-  Base types 
-    Pads type name, underlying representation type name, list of parameter types.
--}
-
-baseTypesList = [
-  ("Pint",      (''Int,     [])),
-  ("Pchar",     (''Char,    [])),
-  ("Pdigit",    (''Int,     [])),
-  ("Ptext",     (''String,  [])),
-  ("Pbinary",   (''S.RawStream,  [])),
-  ("Pre",       (''String,  [''String])),
-  ("Pstring",   (''String,  [''Char])),
-  ("StringC",   (''String,  [''Char])),
-  ("PstringFW", (''String,  [''Int])),
-  ("PstringME", (''String,  [''RE])),
-  ("PstringSE", (''String,  [''RE])),
-  ("Int",       (''Int, [])),
-  ("Int32",     (''Int32, [])),
-  ("Word32",    (''Word32, [])),
-  ("Char",      (''Char, [])),
-  ("Double",    (''Double, [])),
-  ("Void",      (''Void, []))
- ]
-
-
-
-baseTypesMap :: M.Map String (Name, [Name]) = M.fromList baseTypesList
 
 
 -----------------------------------------------------------------
