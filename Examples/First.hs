@@ -102,6 +102,7 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "Overlap" exxy_test
                 , TestLabel "Discipline" linesFW_test
                 , TestLabel "Values" vals_test
+                , TestLabel "Values" vals2_test
                 ]
 
 {-
@@ -712,12 +713,18 @@ strs_input = "0.700264\n"
 strs_result = strs_parseS strs_input
 
 [pads| data Vals = Vals { vv :: Int, uu = value <| even vv |> :: Bool, ww::Char} |]
-type Bool_md = Base_md -- should make Bool a pads type
 vals_input  = "123x"
 vals_result = vals_parseS vals_input
 vals_expects = (Vals {vv=123,uu=False,ww='x'},0,"")
 vals_test = mkTestCase "values" vals_expects vals_result
 
+[pads| data Vals2 = Vals2 { vv2 :: (Int,",",Int),
+                            uu2 = value <| fst vv2 `mod` snd vv2 == 0 |> :: Bool,
+                            ww2 :: Char} |]
+vals2_input  = "12,3x"
+vals2_result = vals2_parseS vals2_input
+vals2_expects = (Vals2 {vv2=(12,3),uu2=True,ww2='x'},0,"")
+vals2_test = mkTestCase "values" vals2_expects vals2_result
 
 
 

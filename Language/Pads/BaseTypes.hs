@@ -60,6 +60,10 @@ type Lit   (x::String) = (Void, x)
 type LitRE (x::RE)     = (Void, x)
 |]
 
+[pads| obtain Bool from Bytes 1 using <|(bTobl,blTob)|> |]
+bTobl p (bytes,md) = (fromIntegral (bytes `B.index` 0)==1, md)
+blTob (b,md) = (B.singleton (if b then 1 else 0), md)
+
 
 -- type Int8 : 8-bit, signed integers
 [pads| obtain Int8 from Bytes 1 using <|(bToi8,i8Tob)|> |]
