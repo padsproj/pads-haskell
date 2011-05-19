@@ -202,7 +202,9 @@ restRec = byteStringToStr . current
 
 {- OPERATIONS WITHIN A SINGLE RECORD -}
 head :: Source -> Char
-head = word8ToChr . B.head . current 
+head = word8ToChr . headOrZero . current 
+
+headOrZero s = if B.null s then chrToWord8 '\0' else B.head s
 
 takeHead :: Source -> (Char, Source)
 takeHead (s @ Source{current,loc, ..}) = 

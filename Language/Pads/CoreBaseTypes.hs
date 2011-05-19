@@ -853,4 +853,3 @@ word32ToBytes endian word32 =
 assembleWord32 :: (Word32, Word32, Word32, Word32) -> Word32
 assembleWord32 (b0, b1, b2, b3) = 
   shift b0 24 .|. shift b1 16 .|. shift b2 8 .|. b3
-
