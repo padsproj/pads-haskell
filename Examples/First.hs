@@ -101,6 +101,7 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "Discipline" disc_test
                 , TestLabel "Overlap" exxy_test
                 , TestLabel "Discipline" linesFW_test
+                , TestLabel "Values" vals_test
                 ]
 
 {-
@@ -709,3 +710,14 @@ linesFW_test = mkTestCase "fixed-width record discpline" linesFW_expects linesFW
 [pads| type Strs = [StringSE ws | ws] terminator EOR |]
 strs_input = "0.700264\n"
 strs_result = strs_parseS strs_input
+
+[pads| data Vals = Vals { vv :: Int, uu = value <| even vv |> :: Bool, ww::Char} |]
+type Bool_md = Base_md -- should make Bool a pads type
+vals_input  = "123x"
+vals_result = vals_parseS vals_input
+vals_expects = (Vals {vv=123,uu=False,ww='x'},0,"")
+vals_test = mkTestCase "values" vals_expects vals_result
+
+
+
+

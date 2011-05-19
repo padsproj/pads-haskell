@@ -29,6 +29,7 @@ data PadsTy = PConstrain Pat PadsTy Exp
             | PTransform PadsTy PadsTy Exp
             | PList PadsTy (Maybe PadsTy) (Maybe TermCond)
             | PPartition PadsTy Exp
+            | PValue Exp PadsTy
             | PApp [PadsTy] (Maybe Exp)
             | PTuple [PadsTy] 
             | PExpression Exp

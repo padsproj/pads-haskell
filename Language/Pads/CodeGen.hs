@@ -183,6 +183,7 @@ mkRepTy ty = case ty of
   PConstrain pat pty exp      -> mkRepTy pty 
   PTransform tySrc tyDest exp -> mkRepTy tyDest 
   PList ty sep term           -> ListT `AppT` mkRepTy ty
+  PValue exp pty              -> mkRepTy pty 
   PApp tys expM               -> foldl1 AppT [mkRepTy ty | ty <- tys, hasRep ty]
   PTuple tys                  -> mkRepTuple tys
   PExpression _               -> ConT ''()
@@ -208,6 +209,7 @@ mkMDTy ty = case ty of
   PConstrain pat pty exp  -> mkMDTy pty 
   PTransform src dest exp -> mkMDTy dest 
   PList ty sep term       -> mkTupleT [ConT ''Base_md, ListT `AppT` mkMDTy ty]
+  PValue exp pty          -> mkMDTy pty 
   PApp tys expM           -> foldl1 AppT [mkMDTy ty | ty <- tys] --MD , hasRep ty]
   PTuple tys              -> mkMDTuple tys
   PExpression _           -> ConT ''Base_md
@@ -310,6 +312,7 @@ genParseTy pty = case pty of
     PTransform src dest exp -> genParseTyTrans src dest (return exp)
     PList ty sep term       -> genParseList ty sep term
     PPartition ty exp       -> genParsePartition ty exp
+    PValue exp ty           -> genParseValue exp
     PApp tys argE           -> genParseTyApp tys argE
     PTuple tys              -> genParseTuple tys
     PExpression exp         -> genParseExp exp
@@ -337,6 +340,9 @@ genParseList ty sep term =
 
 genParsePartition :: PadsTy -> Exp -> Q Exp
 genParsePartition ty disc = [| parsePartition $(genParseTy ty) $(return disc) |]
+
+genParseValue :: Exp -> Q Exp
+genParseValue exp = return $ AppE (VarE 'return) (TupE [exp,VarE 'cleanBasePD])
 
 genParseTuple :: [PadsTy] -> Q Exp
 genParseTuple []  = [| return ((), cleanBasePD) |]

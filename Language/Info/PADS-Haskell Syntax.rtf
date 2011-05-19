@@ -26,14 +26,14 @@ topdecl	->
 \f1\b data
 \f0\b0     declLHS [pattern] 
 \f1\b = 
-\f0\b0 dataRHS    [
+\f0\b0 dataRHS  [
 \f1\b deriving
 \f0\b0  derives]\
 		 | 
 \f1\b newtype
 \f0\b0  declLHS [pattern] 
 \f1\b = 
-\f0\b0 newtypeRHS [
+\f0\b0 newtyRHS [
 \f1\b deriving
 \f0\b0  derives]\
 
@@ -54,7 +54,6 @@ derives	-> qupper\
 \f0\b0  qupper\} 
 \f1\b )
 \f0\b0 \
-\
 \
 \
 -- 
@@ -82,10 +81,12 @@ ptype 	->
 \f0\b0  ptype 
 \f1\b using
 \f0\b0  expression\
-          | 
-\f1\b value
-\f0\b0  expression\
 		 | list [listEnd]\
+		 | 
+\f1\b value
+\f0\b0  expression 
+\f1\b ::
+\f0\b0  ptype\
 		 | btype\
 \
 list		-> 
@@ -172,7 +173,11 @@ record 	->
 \f0\b0  field\}] 
 \f1\b \}
 \f0\b0 \
-field	-> [var 
+field	-> [var [
+\f1\b =
+\f0\b0  
+\f1\b value
+\f0\b0  expression] 
 \f1\b ::
 \f0\b0 ] ftype [pred]\
 \
@@ -182,16 +187,12 @@ ftype	-> ptype\
 \f0\b0  atype\
 \
 \
-\
-data Foo = Baz (x::Int) (Int Int where <| c==a+b |>\
-\
-\
 -- 
 \f1\b newtype (only one represented type one the constructor)
 \f0\b0 \
 \
-newtypeRHS	 -> con \{expression\} atype \{expression\} [pred]\
-			  | con 
+newtyRHS	 -> con \{expression\} atype \{expression\} [pred]\
+		  | con 
 \f1\b \{
 \f0\b0  \{ftype 
 \f1\b ,
@@ -224,12 +225,15 @@ expression	->
 literal	-> string\
 		 | char\
 		 | number\
-		 | var\
-          | con\
+          | qupper\
+		 | qlower\
 \
 qupper	-> \{upper 
 \f1\b .
 \f0\b0 \} upper\
+qlower	-> \{upper 
+\f1\b .
+\f0\b0 \} lower\
 \
 \
 \

@@ -101,7 +101,7 @@ obtainDecl
        } <?> "Pads transform type"
 
 declLHS
-  = do { id <- upper; env <- option [] (try $ many lower)
+  = do { id <- upper; env <- try $ many lower
        ; return (id,env)
        }
 
@@ -127,6 +127,7 @@ ptype env
  <|> obtain env
  <|> partition env
  <|> listTy env
+ <|> value env
  <|> btype env
  <?> "Pads Pads type expression"
 
@@ -148,6 +149,12 @@ obtain env
        ; return (PTransform src dst exp)
        } <?> "Pads transform type"
 
+partition :: Env -> Parser PadsTy
+partition env
+  = do { reserved "partition"; ty <- ptype env
+       ; reserved "using"; exp <- expression 
+       ; return (PPartition ty exp)
+       } <?> "Pads partition type"
 
 listTy :: Env -> Parser PadsTy
 listTy env
@@ -167,22 +174,22 @@ listEnd env
     (  do {reservedOp "terminator"; t<-ptype env; return (LTerm t)}
    <|> do {reservedOp "length"; e<-expression; return (LLen e)})
 
-partition :: Env -> Parser PadsTy
-partition env
-  = do { reserved "partition"; ty <- ptype env
-       ; reserved "using"; exp <- expression 
-       ; return (PPartition ty exp)
-       } <?> "Pads partition type"
+value env
+  = do { reserved "value" 
+       ; exp <- expression; reservedOp "::"
+       ; ty <- ptype env
+       ; return (PValue exp ty)
+       }
 
 
 btype :: Env -> Parser PadsTy
 btype env
-  = try (do 
+  = try $ do 
        { ty <- etype env; tys <- many (atype env)
        ; expM <- optionMaybe (try expression);
        ; if length tys==0 && expM == Nothing 
          then return ty
-         else return (PApp (ty:tys) expM) })
+         else return (PApp (ty:tys) expM) }
 
 etype :: Env -> Parser PadsTy
 etype env = atype env
@@ -264,11 +271,23 @@ record env
 
 field :: Env -> Parser FieldInfo
 field env
-  = do { id <- optionMaybe $ try (lower << reservedOp "::")
-       ; ty <- ftype env
-       ; predM <- optionMaybe predic
-       ; return (id, ty, predM)
-       }
+  =  try (do { id <- (lower << reservedOp "::")
+        ; ty <- ftype env
+        ; predM <- optionMaybe predic
+        ; return (Just id, ty, predM)
+        })
+ <|> try (do { id <- lower; reservedOp "="
+        ; reserved "value" 
+        ; exp <- expression; reservedOp "::"
+        ; (strict,ty) <- ftype env
+        ; predM <- optionMaybe predic
+        ; return (Just id, (strict, PValue exp ty), predM)
+        })
+ <|> do { ty <- ftype env
+        ; predM <- optionMaybe predic
+        ; return (Nothing, ty, predM)
+        }
+ <?>  "record field"
 
 ftype env 
   =  do { reservedOp "!"; ty <- atype env; return (IsStrict,ty)}
@@ -353,8 +372,8 @@ literal =  fmap (LitE . CharL) (try charLiteral)
        <|> reLiteral
        <|> fmap (LitE . StringL) stringLiteral
        <|> fmap (LitE . IntegerL) (try integer)
-       <|> fmap (VarE . mkName) lower
-       <|> fmap (ConE . mkName) upper
+       <|> fmap (VarE . mkName . qName) qualLower
+       <|> fmap (ConE . mkName . qName) qualUpper
        <?> "Pads literal"
 
 reLiteral :: Parser Exp 
@@ -365,8 +384,12 @@ reLiteral = do { reservedOp reMark
 reMark = "'"
 
 
-qualUpper :: Parser QString
+qualUpper, qualLower :: Parser QString
 qualUpper = try (upper `sepBy1` reservedOp ".")
+qualLower = try $ do { prefix <- many (upper << reservedOp ".")
+                     ; final <- lower
+                     ; return (prefix ++ [final])
+                     }
 
 upper :: Parser String
 upper = try $ do { id <- identifier
@@ -386,7 +409,6 @@ tyvar env = try $ do { v <- lower
 ---------------
 
 p << q = do {x<-p;q;return x}
-mymany p = option [] (many1 p)
 
 
 lexer :: PT.TokenParser ()

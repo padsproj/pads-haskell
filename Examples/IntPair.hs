@@ -35,7 +35,7 @@ data MyVoid = Myvoid Void
 
 
 
-data Trip = Trip (Int, ";;", Lst CharPair, Foo Int , EOR) 
+data Trip = Trip (Int, ";;", Lst CharPair, value 34::Int, Foo Int , EOR) 
 
 newtype Lst a = Lst ([a | '|'] length 3)
   deriving Read
