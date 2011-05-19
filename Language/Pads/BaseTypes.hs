@@ -42,7 +42,7 @@ type StringLn = [Char] terminator EOR
 type StringLnP (p :: String -> Bool) = constrain s :: StringLn where <| p s |> 
 
 data PMaybe a = PJust a
-              | PNothing
+              | PNothing Void
 obtain Maybe a from PMaybe a using <|(pm2m,m2pm)|>
 |]
 type Maybe_md a = PMaybe_md a
