@@ -47,8 +47,8 @@ make_pads_declarations ds = fmap concat (mapM genPadsDecl ds)
 
 genPadsDecl :: PadsDecl -> Q [Dec]
 
-genPadsDecl (PadsDeclType old name args pat padsTy) = do
-  { let typeDecs = mkTyRepMDDecl old name args padsTy
+genPadsDecl (PadsDeclType name args pat padsTy) = do
+  { let typeDecs = mkTyRepMDDecl name args padsTy
   ; parseM  <- genPadsParseM name args pat padsTy
   ; parseS  <- genPadsParseS name args pat
   ; printFL <- -- genPadsPrintFL name args pat padsTy
@@ -56,20 +56,29 @@ genPadsDecl (PadsDeclType old name args pat padsTy) = do
   ; return (typeDecs ++ parseM ++ parseS ++ printFL)
   }
 
-genPadsDecl (PadsDeclData old name args pat padsData derives) = do
-  { let dataDecs = mkDataRepMDDecl old name args padsData derives
+genPadsDecl (PadsDeclData name args pat padsData derives) = do
+  { dataDecs <- mkDataRepMDDecl name args padsData derives
   ; parseM <- genPadsDataParseM name args pat padsData 
   ; parseS <- genPadsParseS name args pat
   ; let instances = mkPadsInstance name args (fmap patType pat)
   ; return (dataDecs ++ parseM ++ parseS ++ [instances] ) --  ++ printFL)
   }
 
-genPadsDecl (PadsDeclNew old name args pat branch derives) = do
-  { let dataDecs = mkNewRepMDDecl old name args branch derives
+genPadsDecl (PadsDeclNew name args pat branch derives) = do
+  { dataDecs <- mkNewRepMDDecl name args branch derives
   ; parseM <- genPadsNewParseM name args pat branch 
   ; parseS <- genPadsParseS name args pat
   ; let instances = mkPadsInstance name args (fmap patType pat)
   ; return (dataDecs ++ parseM ++ parseS ++ [instances] ) --  ++ printFL)
+  }
+
+genPadsDecl (PadsDeclObtain name args padsTy exp) = do
+  { --let mdDec = mkObtainMDDecl name args padsTy
+    parseM  <- genPadsObtainParseM name args padsTy exp
+--  ; parseS  <- genPadsParseS name args pat
+--  ; printFL <- -- genPadsPrintFL name args pat padsTy
+--               return []
+  ; return (parseM) -- mdDec ++ ++ parseS ++ printFL)
   }
 
 patType :: Pat -> Type
@@ -85,9 +94,9 @@ patType p = case p of
 -- GENERATE REP/MD TYPE DECLARATIONS
 -----------------------------------------------------------
 
-mkTyRepMDDecl :: Bool -> UString -> [UString] -> PadsTy -> [Dec]
-mkTyRepMDDecl old name args ty 
-  = (if old then [] else [repType]) ++ [mdType]
+mkTyRepMDDecl :: UString -> [UString] -> PadsTy -> [Dec]
+mkTyRepMDDecl name args ty 
+  = [repType, mdType]
   where
     repType = TySynD (mkRepName name) tyArgs (mkRepTy ty)
     mdType  = TySynD (mkMDName name) tyArgs (mkMDTy ty)
@@ -98,12 +107,14 @@ mkTyRepMDDecl old name args ty
 -- GENERATE REP/MD DATA DECLARATIONS
 -----------------------------------------------------------
 
-mkDataRepMDDecl :: Bool -> UString -> [LString] -> PadsData -> [QString] -> [Dec]
-mkDataRepMDDecl old name args branches ds
-  = (if old then [] else [dataDecl]) ++ [mdDecl, imdDecl]
+mkDataRepMDDecl :: UString -> [LString] -> PadsData -> [QString] -> Q [Dec]
+mkDataRepMDDecl name args branches ds = do
+  { bs <- mapM mkMDUnion bs
+  ; let imdDecl  = DataD [] (mkIMDName name) tyArgs bs (derive [])
+  ; return [dataDecl, mdDecl, imdDecl]
+  }
   where
     dataDecl = DataD [] (mkRepName name) tyArgs (map mkRepUnion bs) (derive ds)
-    imdDecl  = DataD [] (mkIMDName name) tyArgs (map mkMDUnion bs) (derive [])
     mdDecl   = TySynD   (mkMDName name)  tyArgs (mkTupleT [ConT ''Base_md, imdApp])
     tyArgs   = map (PlainTV . mkName) args
     imdApp   = foldl AppT (ConT (mkIMDName name)) (map (VarT . mkName) args)
@@ -113,19 +124,20 @@ mkDataRepMDDecl old name args branches ds
 
 mkRepUnion :: BranchInfo -> Con
 mkRepUnion (BConstr c args expM) = NormalC (mkConstrName c) reps
-  where   
-    reps = [(strict,mkRepTy ty) | (strict,ty) <- args, hasRep ty]
+  where reps = [(strict,mkRepTy ty) | (strict,ty) <- args, hasRep ty]
 mkRepUnion (BRecord c fields expM) = RecC (mkConstrName c) lreps
-  where   
-    lreps = [(mkName l,strict,mkRepTy ty) | (Just l,(strict,ty),_) <- fields, hasRep ty]
+  where lreps = [(mkName l,strict,mkRepTy ty) | (Just l,(strict,ty),_) <- fields, hasRep ty]
 
-mkMDUnion :: BranchInfo -> Con
-mkMDUnion (BConstr c args expM) = NormalC (mkConstrIMDName c) mds
+mkMDUnion :: BranchInfo -> Q Con
+mkMDUnion (BConstr c args expM) = return $ NormalC (mkConstrIMDName c) mds
   where   
-    mds = [(NotStrict,mkMDTy ty) | (_,ty) <- args, hasRep ty]
-mkMDUnion (BRecord c fields expM) = RecC (mkConstrIMDName c) lmds
-  where   
-    lmds = [(mkFieldMDName l,NotStrict,mkMDTy ty) | (Just l,(_,ty),_) <- fields, hasRep ty]
+    mds = [(NotStrict,mkMDTy ty) | (_,ty) <- args] --MD , hasRep ty]
+mkMDUnion (BRecord c fields expM) = do
+  { lmds <- sequence [ do { fn <- genLabMDName "m" lM; return (fn,NotStrict,mkMDTy ty)}
+                     | (lM,(_,ty),_) <- fields] 
+  ; return$ RecC (mkConstrIMDName c) lmds
+  }
+--MD    lmds <- return [(mkFieldMDName l,NotStrict,mkMDTy ty) | (Just l,(_,ty),_) <- fields, hasRep ty]
 
 derive :: [QString] -> [Name]
 derive ds =  map (mkName . qName) ds
@@ -136,16 +148,31 @@ derive ds =  map (mkName . qName) ds
 -- GENERATE REP/MD NEWTYPE DECLARATIONS
 -----------------------------------------------------------
 
-mkNewRepMDDecl :: Bool -> UString -> [LString] -> BranchInfo -> [QString] -> [Dec]
-mkNewRepMDDecl old name args branch ds
-  = (if old then [] else [dataDecl]) ++ [mdDecl, imdDecl]
+mkNewRepMDDecl :: UString -> [LString] -> BranchInfo -> [QString] -> Q [Dec]
+mkNewRepMDDecl name args branch ds = do
+  { bs <- mkMDUnion branch
+  ; let imdDecl  = NewtypeD [] (mkIMDName name) tyArgs bs (derive [])
+  ; return [dataDecl, mdDecl, imdDecl]
+  }
   where
     dataDecl = NewtypeD [] (mkRepName name) tyArgs (mkRepUnion branch) (derive ds)
-    imdDecl  = NewtypeD [] (mkIMDName name) tyArgs (mkMDUnion branch) (derive [])
     mdDecl   = TySynD   (mkMDName name)  tyArgs (mkTupleT [ConT ''Base_md, imdApp])
     tyArgs   = map (PlainTV . mkName) args
     imdApp   = foldl AppT (ConT (mkIMDName name)) (map (VarT . mkName) args)
 
+
+-----------------------------------------------------------
+-- GENERATE MD TYPE FROM OBTAIN DECLARATIONS -- Design decision not to do this
+-----------------------------------------------------------
+{-
+
+mkObtainMDDecl :: UString -> [UString] -> PadsTy -> [Dec]
+mkObtainMDDecl name args ty
+  = [mdType]
+  where
+    mdType  = TySynD (mkMDName name) tyArgs (mkMDTy ty)
+    tyArgs  = map (PlainTV . mkName) args
+-}
 
 -----------------------------------------------------------
 -- GENERATE REPRESENTATION TYPE OF A TYPE EXPRESSION
@@ -182,7 +209,7 @@ mkMDTy ty = case ty of
   PConstrain pat pty exp  -> mkMDTy pty 
   PTransform src dest exp -> mkMDTy dest 
   PList ty sep term       -> mkTupleT [ConT ''Base_md, ListT `AppT` mkMDTy ty]
-  PApp tys expM           -> foldl1 AppT [mkMDTy ty | ty <- tys, hasRep ty]
+  PApp tys expM           -> foldl1 AppT [mkMDTy ty | ty <- tys] --MD , hasRep ty]
   PTuple tys              -> mkMDTuple tys
   PExpression _           -> ConT ''Base_md
   PTycon c                -> ConT (mkMDQName c)
@@ -194,7 +221,7 @@ mkMDTuple tys = case mds of
     [m]    -> mkTupleT [ConT ''Base_md, m] 
     (m:ms) -> mkTupleT [ConT ''Base_md, mkTupleT mds]
   where
-    mds = [mkMDTy ty | ty <- tys, hasRep ty]
+    mds = [mkMDTy ty | ty <- tys] --MD , hasRep ty]
 
 
 -----------------------------------------------------------------
@@ -243,6 +270,12 @@ genPadsNewParseM name args patM branch = do
   { (dec,exp) <- genParseBranchInfo branch
   ; let body = LetE [dec] exp
   ; return [mkParserFunction name args patM body]
+  }
+
+genPadsObtainParseM :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
+genPadsObtainParseM name args padsTy exp = do
+  { body  <- genParseTy (PTransform padsTy (PTycon [name]) exp)
+  ; return [mkParserFunction name args Nothing body]
   }
 
 mkParserFunction :: UString -> [LString] -> Maybe Pat -> Exp -> Dec
@@ -333,7 +366,7 @@ buildF_md vars_fmd vars_frep
   = FunD (mkName "f_md") [Clause (map VarP vars_fmd) (NormalB body) []]
   where
     mdHeaders = [ VarE 'get_md_header `AppE` VarE xi | xi <- vars_fmd ]
-    body = TupE [mkMergeBaseMDs mdHeaders, TupE (map VarE vars_frep)]
+    body = TupE [mkMergeBaseMDs mdHeaders, TupE (map VarE vars_fmd)] --vars_frep)]
 
 mkMergeBaseMDs :: [Exp] -> Exp
 mkMergeBaseMDs [e] = e
@@ -402,7 +435,7 @@ buildConstr_md fnMD conMD tys
     vars_fmd   = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
     mdHeaders  = [ VarE 'get_md_header `AppE` VarE xi | xi <- vars_fmd ]
     body       = TupE [mkMergeBaseMDs mdHeaders, applyE (conMD : map VarE vars_conmd)]
-    vars_conmd = [v | (v,t) <- zip vars_fmd tys, hasRep t]
+    vars_conmd = vars_fmd --MD [v | (v,t) <- zip vars_fmd tys, hasRep t]
 
 
 ----------------------------------------------------------
@@ -414,18 +447,18 @@ genParseRecord c fields pred = do
   { c_md <- newName (strToLower c)
   ; let con_md = buildConstr_md c_md (ConE (mkConstrIMDName c))
                        [ty | (_,(_,ty),_) <- fields]
-  ; labMDs  <- sequence [genLabMDName l | (l,(_,_),_) <- fields] 
+  ; labMDs  <- sequence [genLabMDName "x" l | (l,(_,_),_) <- fields] 
   ; let fnMDLabs  = applyE $ map VarE (c_md : labMDs)
   ; doStmts <- sequence [genParseField f xn | (f,xn) <- zip fields labMDs]
+  ; let labs = [mkName lab | (Just lab,(_,ty),_) <- fields, hasRep ty]
+  ; let conLabs = applyE (ConE (mkConstrName c) : map VarE labs)
   ; returnStmt <- [| return ($(return conLabs),$(return fnMDLabs)) |]
   ; return (con_md, DoE (doStmts ++ [NoBindS returnStmt]))
   }
   where
-    labs    = [mkName lab | (Just lab,(_,ty),_) <- fields, hasRep ty]
-    conLabs = applyE (ConE (mkConstrName c) : map VarE labs)
 
-genLabMDName (Just lab) = return (mkFieldMDName lab)
-genLabMDName Nothing    = newName "x"
+genLabMDName s (Just lab) = return (mkFieldMDName lab)
+genLabMDName s Nothing    = newName s
 
 genParseField :: FieldInfo -> Name -> Q Stmt
 genParseField (labM, (strict, ty), expM) xn = do
@@ -532,7 +565,8 @@ genPrintTuple tys Nothing = do
 
 genNamesforTuple :: String -> [PadsTy] -> Q [Maybe Name]
 genNamesforTuple str tys =
-  sequence [if hasRep ty then fmap Just (newName str) else return Nothing | ty <- tys]
+  sequence [fmap Just (newName str) | ty <- tys]
+    --MD [if hasRep ty then fmap Just (newName str) else return Nothing | ty <- tys]
 
 genPrintTupleInner t (Just r) (Just m) = genPrintTy t (Just (TupE [VarE r,VarE m])) 
 genPrintTupleInner t Nothing Nothing   = genPrintTy t Nothing

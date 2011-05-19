@@ -40,32 +40,33 @@ instance Data b => PadsMD (Base_md,b) where
   replace_md_header (h1,b) h2 = (h2,b)
 
 
+cleanBasePD = Base_md {numErrors = 0, errInfo = Nothing }
+
+
+mergeBaseMDs :: [Base_md] -> Base_md
+mergeBaseMDs mds = foldl addInfo cleanBasePD mds
+  where
+    addInfo (Base_md {numErrors=num1,errInfo=i1}) 
+            (Base_md {numErrors=num2,errInfo=i2})
+      = Base_md {numErrors=num1 + num2, errInfo= E.maybeMergeErrInfo i1 i2 }
+
+
+mkErrBasePDfromLoc msg loc 
+  = Base_md {numErrors = 1, 
+      errInfo = Just (E.ErrInfo{msg=msg,position= Just (S.locToPos loc)}) }  
+
+mkErrBasePD msg pos
+  = Base_md {numErrors = 1, 
+      errInfo = Just (E.ErrInfo{msg=msg,position= pos}) }
 
 
 instance Pretty Base_md where
   ppr = pprBaseMD
 
-pprBaseMD Base_md {numErrors=num, errInfo = info} = text "Errors:" <+> PP.ppr num <+> 
-                                                    case info of Nothing -> empty
-                                                                 Just e -> PP.ppr e
+pprBaseMD Base_md {numErrors=num, errInfo = info} 
+  = text "Errors:" <+> PP.ppr num <+> 
+    case info of
+      Nothing -> empty
+      Just e -> PP.ppr e
 
-
-
-
-cleanBasePD = Base_md {numErrors = 0, errInfo = Nothing }
-mkErrBasePDfromLoc msg loc = Base_md {numErrors = 1, 
-                               errInfo = Just (E.ErrInfo{msg=msg,position= Just (S.locToPos loc)}) }  
-
-mkErrBasePD msg pos = Base_md {numErrors = 1, 
-                               errInfo = Just (E.ErrInfo{msg=msg,position= pos}) }
-
-shallowBaseMDs mds = case mds of 
-                     [] -> cleanBasePD
-                     otherwise ->  Data.List.foldl1 (\(Base_md {numErrors=num1,errInfo=i1}) (Base_md {numErrors=num2,errInfo=i2}) ->
-                                                          (Base_md {numErrors=num1 + num2, errInfo= Nothing })) mds
-
-mergeBaseMDs :: [Base_md] -> Base_md
-mergeBaseMDs []  = cleanBasePD
-mergeBaseMDs mds = foldl1 (\(Base_md {numErrors=num1,errInfo=i1}) (Base_md {numErrors=num2,errInfo=i2}) ->
-                                                          (Base_md {numErrors=num1 + num2, errInfo= E.maybeMergeErrInfo i1 i2 })) mds
 

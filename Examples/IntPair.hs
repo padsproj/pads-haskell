@@ -12,7 +12,14 @@ import Language.Pads.RegExp
 import Language.Pads.LazyList
 import qualified Language.Pads.BaseTypes as BT
 
+
+import Language.Pads.PadsParser
+
+
 import Data.Data
+import Data.Int 
+import qualified Data.ByteString as B  
+import Data.Word
 
 --test = parseStringInput trip_parseM "354;;23|53|43(652%%35)4;hefd"
 
@@ -28,7 +35,7 @@ data MyVoid = Myvoid Void
 
 
 
-type Trip = (Int, ";;", Lst CharPair, Foo Int , EOR) 
+data Trip = Trip (Int, ";;", Lst CharPair, Foo Int , EOR) 
 
 newtype Lst a = Lst ([a | '|'] length 3)
   deriving Read
@@ -52,12 +59,8 @@ data May a = Jus a
            | Noth ()
 
 
-data Exxy a = Exxy {exxy :: Int, aa :: a}
-
-
-
+data Exxy a = Exxy {exxy :: Int, Char, aa :: a}
 |]
-
 
 
 

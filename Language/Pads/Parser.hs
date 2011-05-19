@@ -64,33 +64,40 @@ padsDecls = option [] (many1 topDecl)
 
 topDecl :: Parser PadsDecl
 topDecl 
-  =  typeDecl <|> dataDecl <|> newDecl
+  =  typeDecl <|> dataDecl <|> newDecl <|> obtainDecl
  <?> "Pads declaration keyword"
 
 typeDecl :: Parser PadsDecl
 typeDecl 
-  = do { old <- ((reserved "type" >> return False)
-            <|> try (reserved "old" >> reserved "type" >> return True))
+  = do { reserved "type"
        ; (id,env,pat) <- declLHS
        ; rhs <- ptype env
-       ; return (PadsDeclType old id env pat rhs)
+       ; return (PadsDeclType id env pat rhs)
        } <?> "Pads type declaration"
 
 dataDecl :: Parser PadsDecl
 dataDecl 
-  = do { old <- (reserved "data" >> return False)
-            <|> (reserved "old" >> reserved "data" >> return True)
+  = do { reserved "data"
        ; (id,env,pat) <- declLHS
        ; rhs <- dataRHS env; drvs <- option [] derives
-       ; return (PadsDeclData old id env pat rhs drvs)
+       ; return (PadsDeclData id env pat rhs drvs)
        } <?> "Pads data declaration"
 
 newDecl :: Parser PadsDecl
 newDecl 
   = do { reserved "newtype"; (id,env,pat) <- declLHS
        ; rhs <- newRHS env; drvs <- option [] derives
-       ; return (PadsDeclNew False id env pat rhs drvs)
+       ; return (PadsDeclNew id env pat rhs drvs)
        } <?> "Pads newtype declaration"
+
+obtainDecl :: Parser PadsDecl
+obtainDecl
+  = do { reserved "obtain"; id <- upperId
+       ; env <- option [] (try $ many var)
+       ; reservedOp "from"; rhs <- ptype env
+       ; reserved "using"; exp <- expression 
+       ; return (PadsDeclObtain id env rhs exp)
+       } <?> "Pads transform type"
 
 declLHS
   = do { id <- upperId; env <- option [] (try $ many var)
@@ -223,25 +230,24 @@ branch env
        } <?> "Pads switch branch"
 
 constrs :: Env -> Parser [BranchInfo]
-constrs env = do
-  { clauses <- constr env `sepBy1` reservedOp "|"
-  ; if and (map noArg clauses) then return (map addLiteral clauses)
-  else return clauses       -- Provides literals on enumeration types
-  }
-  where
-    noArg (BConstr _ [] Nothing) = True
-    noArg _                      = False
-    addLiteral (BConstr c [] Nothing) = BConstr c [mkId c] Nothing
-    mkId id = (NotStrict, PExpression (LitE (StringL id)))
+constrs env = constr env `sepBy1` reservedOp "|"
 
 constr :: Env -> Parser BranchInfo
-constr env
+constr env =  constructor env
+--         <|> constructorOp env
+
+constructor :: Env -> Parser BranchInfo
+constructor env
   = do { id  <- upperId;
        ; do { args <- record env; predM <- optionMaybe predic
             ; return (BRecord id args predM)}
-     <|> do { args <- option [] (constrArgs env)
+     <|> do { args <- option (mkId id) (constrArgs env)
             ; predM <- optionMaybe predic
             ; return (BConstr id args predM)}}                 
+  where
+    mkId id = [(NotStrict, PExpression (LitE (StringL id)))]
+              -- Provides the expansion e.g.: Tue -> Tue "Tue"
+              
 
 constrArgs :: Env -> Parser [ConstrArg]
 constrArgs env
