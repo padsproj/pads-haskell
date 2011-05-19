@@ -600,7 +600,7 @@ test_switchOther = mkTestCase "switchOther" expect_switchOther result_switchOthe
 
 
 result_stringln = stringLn_parseS "hello\ngoodbye"
-expect_stringln = ("hello",0,"goodbye")
+expect_stringln = ("hello",0,"\ngoodbye")
 test_stringln = mkTestCase "stringln" expect_stringln result_stringln
 
 [pads| data MyBody (which::Int) = 
@@ -727,4 +727,12 @@ vals2_expects = (Vals2 {vv2=(12,3),uu2=True,ww2='x'},0,"")
 vals2_test = mkTestCase "values" vals2_expects vals2_result
 
 
-
+{-
+[pads| data Vals3 = Vals3 { vv3 :: (Int,",",Int),
+                            uu3 = value <| [] |> :: [a],
+                            ww3 :: Char} |]
+vals3_input  = "12,3x"
+vals3_result = vals3_parseS vals3_input
+vals3_expects = (Vals3 {vv3=(12,3),uu3=[],ww3='x'},0,"")
+vals3_test = mkTestCase "values" vals3_expects vals3_result
+-}

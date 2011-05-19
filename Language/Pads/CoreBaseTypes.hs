@@ -255,6 +255,7 @@ stringME_parseM re =
       Nothing  -> returnError (stringME_def re) (E.RegexMatchFail (show re))
 
 stringME_def (RE re) = "" -- should invert the re
+stringME_def (REd re d) = d
 
 stringME_printFL :: RE -> (StringME, Base_md) -> FList
 stringME_printFL re (str, bmd) = addString str       
@@ -268,13 +269,15 @@ type StringSE_md = Base_md
 
 stringSE_parseM :: RE -> PadsParser (StringSE, Base_md)
 stringSE_parseM re =
-  handleEOF (stringSE_def re) "StringSE" $ do
+  checkEOF (stringSE_def re) "StringSE" $ 
+  checkEOF (stringSE_def re) "StringSE" $ do
     match <- regexStopP re
     case match of 
       Just str -> returnClean str
       Nothing  -> returnError (stringSE_def re) (E.RegexMatchFail (show re))
 
 stringSE_def (RE re) = "" -- should invert the re
+stringSE_def (REd re d) = d
 
 stringSE_printFL :: RE -> (StringSE, Base_md) -> FList
 stringSE_printFL s (str, bmd) = addString str
@@ -473,6 +476,18 @@ handleEOR val str p
   = do { isEor <- isEORP 
        ; if isEor then
            returnError val (E.FoundWhenExpecting "EOR" str)
+         else p}
+
+checkEOF val str p 
+  = do { isEof <- isEOFP 
+       ; if isEof then
+           returnClean val
+         else p}
+
+checkEOR val str p 
+  = do { isEor <- isEORP 
+       ; if isEor then
+           returnClean val
          else p}
 
 ----------------------------------

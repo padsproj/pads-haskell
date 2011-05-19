@@ -38,7 +38,7 @@ import System.ByteOrder
 
 [pads|
 type Line a   = (a, EOR)
-type StringLn = [Char] terminator EOR
+type StringLn = [Char] terminator (Try EOR)
 type StringLnP (p :: String -> Bool) = constrain s :: StringLn where <| p s |> 
 
 data PMaybe a = PJust a
@@ -67,6 +67,7 @@ blTob (b,md) = (B.singleton (if b then 1 else 0), md)
 
 -- type Int8 : 8-bit, signed integers
 [pads| obtain Int8 from Bytes 1 using <|(bToi8,i8Tob)|> |]
+bToi8 :: Pos -> (Bytes, Base_md) -> (Int8, Base_md)
 bToi8 p (bytes,md) = (fromIntegral (bytes `B.index` 0), md)
 i8Tob (i,md) = (B.singleton (fromIntegral i), md)
 

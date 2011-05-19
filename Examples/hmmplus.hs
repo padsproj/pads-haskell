@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, 
              MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
-             DeriveDataTypeable, ScopedTypeVariables #-}
+             DeriveDataTypeable, ScopedTypeVariables, NamedFieldPuns #-}
 
 module Smurf.HmmPlus where
 import Language.Pads.Padsc
@@ -8,15 +8,15 @@ import Language.Pads.GenPretty
 import Control.Monad
 import System.IO.Unsafe (unsafePerformIO)
 
-ws = REd "[\t ]+|$" "foo"
+ws = REd "[\t ]+|$" " "
 
 amino = "ACDEFGHIKLMNPQRSTVWY"
 nucleotide = "ACTG"
 
 [pads|
-  data SmurfFile = SmurfFile { header::SmurfHeader, hmm::HMM <| getAlphabet header |> }
+  data SmurfFile = SmurfFile { header::SmurfHeader, hmm::HMM <| (getAlphabet header, getNumNodes header) |> }
   
-  type SmurfHeader = [HeaderLine] terminator Try (LitRE 'HMM ')
+  type SmurfHeader = [Line HeaderLine] terminator Try (LitRE 'HMM ')
   
   data HeaderLine = HeaderLine { tag::Tag, ws, payload::Payload tag }
   
@@ -39,10 +39,10 @@ nucleotide = "ACTG"
     | NSEQ -> SequenceNumber Int
     | EFFN -> EffectiveSeq Double
     | CKSUM -> Checksum Int
-    | GA -> PfamGathering (Double, ws, Double, EOR)
-    | TC -> PfamTrusted (Double, ws, Double, EOR)
-    | NC -> PfamNoise (Double, ws, Double, EOR)
-    | STATS -> Stats {"LOCAL", ws, scoredist::ScoreDistribution, ws, values::[Double | ws] terminator EOR }
+    | GA -> PfamGathering (Double, ws, Double)
+    | TC -> PfamTrusted (Double, ws, Double)
+    | NC -> PfamNoise (Double, ws, Double)
+    | STATS -> Stats {"LOCAL", ws, scoredist::ScoreDistribution, ws, values::[Double | ws] terminator (Try EOR) }
     | BETA -> Beta StrandPair
     | Other tag -> BadTag StringLn
     | otherwise -> OtherTag StringLn
@@ -62,57 +62,84 @@ nucleotide = "ACTG"
   }
     
   
-  data HMM (alphabet::String) = HMM {
+  data HMM (alphabet::String, numNodes::Int) = HMM {
     "HMM", ws, hmmAlphabet::[Letter alphabet | ws] length <| length alphabet |>, ws, EOR,
     ws, transitionHeader::TransitionDescription, EOR,
     composition::Maybe (ws, "COMPO", ws, EmissionProbabilities alphabet, ws, EOR),
     insertZeroEmissions::InsertEmissions alphabet,
-    stateZeroTransitions::StateTransitions <| length transitionHeader |>,
-    nodes::[HmmNode <| (alphabet, length transitionHeader ) |>] terminator "//" }
+    stateZeroTransitions::StateTransitions,
+    nodes::[HmmNode <| alphabet |>] terminator "//" where <| numNodes == length nodes |> }
 --    rest::[StringLn | EOR] terminator EOF }
               
   type Letter (alphabet::String) = constrain c::Char where <| c `elem` alphabet |>
   
   type EmissionProbabilities (alphabet::String) = [ Double | ws ] length <| length alphabet |> 
   
-  type TransitionProbabilities (numStates::Int) = [ LogProbability | ws ] length numStates
+--  type TransitionProbabilities (numStates::Int) = [ LogProbability | ws ] length numStates
+  
+  data TransitionProbabilities = TransitionProbabilities {
+      mm :: MatchToMatch, ws,
+      mi :: MatchToInsertion, ws,
+      md :: MatchToDeletion, ws,
+      im :: InsertionToMatch, ws,
+      ii :: InsertionToInsertion, ws,
+      dm :: DeletionToMatch, ws,
+      dd :: DeletionToDeletion
+  }
   
   type TransitionDescription = [ StringSE ws | ws] terminator (Try EOR)
   
   type InsertEmissions (alphabet::String) = (ws, EmissionProbabilities alphabet, ws, EOR)
   
-  type StateTransitions (numStates::Int) = (ws, TransitionProbabilities numStates, ws, EOR)
+  type StateTransitions = (ws, TransitionProbabilities, ws, EOR)
   
-  data HmmNode (alphabet::String, numStates::Int) = HmmNode {
+  data HmmNode (alphabet::String) = HmmNode {
                 ws, nodeNum::Int, ws, matchEmissions::EmissionProbabilities alphabet, ws, annotations::EmissionAnnotationSet, EOR,
                 insertionEmissions::InsertEmissions alphabet,
-                transitions::StateTransitions numStates
+                transitions::StateTransitions
   }
+  
   
   type EmissionAnnotationSet = (EmissionAnnotation, ws, EmissionAnnotation, ws, EmissionAnnotation)
   
   data EmissionAnnotation = MAPA Int
                           | Unused '-'
                           | RForCS Char
-                      
-                      
-              
+
   data LogProbability = NonZero Double
                       | LogZero '*'
+                      
+-- do we want these to be types or newtypes? newtype enforces type checking
+-- but might prove cumbersome in the algorithm.
+-- consider just making these type aliases.                      
+  newtype MatchToMatch = MatchToMatch LogProbability
+  newtype MatchToInsertion = MatchToInsertion LogProbability
+  newtype MatchToDeletion = MatchToDeletion LogProbability
+  newtype InsertionToMatch = InsertionToMatch LogProbability
+  newtype InsertionToInsertion = InsertionToInsertion LogProbability
+  newtype DeletionToMatch = DeletionToMatch LogProbability
+  newtype DeletionToDeletion = DeletionToDeletion LogProbability
 
 |]
 
 getAlphabet :: SmurfHeader -> String
-getAlphabet header = amino -- replace this with actual code to search the HeaderLine list
+getAlphabet ((HeaderLine {tag, payload}):xs) = case tag of
+                    ALPH -> case payload of
+                              Alphabet "amino" -> amino
+                              Alphabet "nucleotide" -> nucleotide
+                              otherwise -> error "Invalid alphabet"
+                    otherwise -> getAlphabet xs
 
+getNumNodes :: SmurfHeader -> Int
+-- getNumNodes header = 343 -- replace this  
+getNumNodes ((HeaderLine {tag, payload}):xs) = case tag of
+                    LENG -> case payload of
+                              ModelLength i -> i
+                              otherwise -> error "Invalid model length"
+                    otherwise -> getNumNodes xs
+                  
 
 result = do
         { (SmurfFile header hmm, md) <- parseFile "Examples/data/test.hmm+"
         ; return (header, hmm, md)
-        }
-
-
-result2= do
-        { (header, md) <- parseFileWith  smurfHeader_parseM "Examples/data/hmmSmall"
-        ; return (header, md)
         }
