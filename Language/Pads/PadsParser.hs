@@ -28,9 +28,9 @@ parseStringInput pp cs = case pp #  (S.padsSourceFromString cs) of
                            ((r,rest),b) -> (r, S.padsSourceToString rest)  
 
 
-parseByteStringInput :: PadsParser a -> S.RawStream -> a
+parseByteStringInput :: PadsParser a -> S.RawStream -> (a, S.RawStream)
 parseByteStringInput pp cs = case pp #  (S.padsSourceFromByteString cs) of
-                           ((r,rest),b) -> r
+                           ((r,rest),b) -> (r, S.padsSourceToByteString rest)
 
 parseFileInput :: PadsParser a -> FilePath -> IO a 
 parseFileInput pp file =  do

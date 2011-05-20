@@ -270,7 +270,7 @@ type StringSE_md = Base_md
 stringSE_parseM :: RE -> PadsParser (StringSE, Base_md)
 stringSE_parseM re =
   checkEOF (stringSE_def re) "StringSE" $ 
-  checkEOF (stringSE_def re) "StringSE" $ do
+  checkEOR (stringSE_def re) "StringSE" $ do
     match <- regexStopP re
     case match of 
       Just str -> returnClean str
@@ -283,6 +283,22 @@ stringSE_printFL :: RE -> (StringSE, Base_md) -> FList
 stringSE_printFL s (str, bmd) = addString str
 
 
+-----------------------------------------------------------------
+
+type StringP = String
+type StringP_md = Base_md
+
+stringP_parseM :: (Char -> Bool) -> PadsParser (StringP, Base_md)
+stringP_parseM p =
+  handleEOF (stringP_def p) "StringP" $ 
+  handleEOR (stringP_def p) "StringP" $ do
+    str <- satisfy p
+    returnClean str
+
+stringP_def _ = ""
+
+stringP_printFL :: (Char -> Bool) -> (StringP, Base_md) -> FList
+stringP_printFL p (str, bmd) = addString str
 
 -----------------------------------------------------------------
 
@@ -298,15 +314,18 @@ stringESC_parseM (escape, stops) =
          returnClean ""
       else if c1 == escape then do
          { takeHeadP
-         ; c2 <- takeHeadP
-         ; if (c2 == escape) || (c2 `elem` stops) then do
-            { (rest, rest_md) <- stringESC_parseM (escape, stops) 
-            ;  return (c2:rest, rest_md)
+         ; handleEOF [c1] "StringESC" $
+           handleEOR [c1] "StringESC" $ do
+            { c2 <- takeHeadP
+            ; if (c2 == escape) || (c2 `elem` stops) then do
+                   { (rest, rest_md) <- stringESC_parseM (escape, stops) 
+                   ;  return (c2:rest, rest_md)
+                   }
+              else do 
+                   { (rest, rest_md) <- stringESC_parseM (escape, stops) 
+                   ; return (c1:c2:rest, rest_md)
+                   }
             }
-           else do 
-             { (rest, rest_md) <- stringESC_parseM (escape, stops) 
-             ; return (c1:c2:rest, rest_md)
-             }
          } else do 
             { c1 <- takeHeadP
             ; (rest, rest_md) <- stringESC_parseM (escape, stops) 
@@ -314,27 +333,15 @@ stringESC_parseM (escape, stops) =
             }
     }
 
+
+
 stringESC_printFL :: (Char, [Char]) -> (StringESC, Base_md) -> FList
 stringESC_printFL (escape, stops) (str, bmd) = 
   let replace c = if c `elem` stops then escape : [c] else [c]
       newStr =  concat (map replace str)
   in addString newStr
 
-
-
-
 -----------------------------------------------------------------
-
-
-
-
-
-
-
-
-
-
-
 
 
 class LitParse a where

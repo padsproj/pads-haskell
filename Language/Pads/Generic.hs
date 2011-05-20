@@ -38,6 +38,9 @@ class (Data rep, PadsMD md) => Pads rep md | rep -> md  where
 parseS   :: Pads rep md => String -> ((rep, md), String) 
 parseS cs = parseStringInput parsePP cs 
 
+parseBS   :: Pads rep md => B.ByteString -> ((rep, md), B.ByteString) 
+parseBS cs = parseByteStringInput parsePP cs 
+
 parseFile :: Pads rep md => FilePath -> IO (rep, md)
 parseFile file = parseFileWith parsePP file
 
@@ -60,6 +63,11 @@ class (Data rep, PadsMD md) => Pads1 arg rep md | rep->md, rep->arg where
 
 parseS1 :: Pads1 arg rep md => arg -> String -> ((rep, md), String) 
 parseS1 arg cs = parseStringInput (parsePP1 arg) cs
+
+parseBS1 :: Pads1 arg rep md => arg -> B.ByteString -> ((rep, md), B.ByteString) 
+parseBS1 arg cs = parseByteStringInput (parsePP1 arg) cs
+
+
 
 parseFile1 :: Pads1 arg rep md => arg-> FilePath -> IO (rep, md)
 parseFile1 arg file = parseFileWith (parsePP1 arg) file

@@ -6,6 +6,7 @@ module Examples.First where
 import Language.Pads.Padsc
 import Language.Pads.Testing
 import System.IO.Unsafe (unsafePerformIO)
+import Data.Char as Char
 
 --import qualified Text.Regex.ByteString as BRE
 
@@ -103,15 +104,12 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "Discipline" linesFW_test
                 , TestLabel "Values" vals_test
                 , TestLabel "Values" vals2_test
+                , TestLabel "Double" doubles_test
+                , TestLabel "StringSE" stringSEs_test
+                , TestLabel "StringFWs" stringFWs_test
+                , TestLabel "StringESCs" stringESCs_test
+                , TestLabel "StringPs" stringPs_test
                 ]
-
-{-
-getTotalErrors :: PadsMD md => md -> Int
-getTotalErrors md = numErrors $ get_md_header md
-mdToError ((rep,md), residual) = (rep, getTotalErrors md, residual)
-mkTestCase s expected seen = TestCase(assertEqual s expected  (mdToError seen))
-mkFileTestCase s expected seen = TestCase(assertEqual s expected (mdFileToError seen))
--}
 
 [pads| type MyChar = Char |]
 myChar_result = myChar_parseS "ab"
@@ -728,11 +726,44 @@ vals2_test = mkTestCase "values" vals2_expects vals2_result
 
 
 {-
-[pads| data Vals3 = Vals3 { vv3 :: (Int,",",Int),
-                            uu3 = value <| [] |> :: [a],
-                            ww3 :: Char} |]
+[pads| data Vals3 a = Vals3 { vv3 :: (Int,",",Int),
+                              uu3 = value <| [] |> :: [a],
+                              ww3 :: Char} |]
 vals3_input  = "12,3x"
 vals3_result = vals3_parseS vals3_input
 vals3_expects = (Vals3 {vv3=(12,3),uu3=[],ww3='x'},0,"")
 vals3_test = mkTestCase "values" vals3_expects vals3_result
 -}
+
+[pads| type Doubles = [Double | EOR] terminator EOF |]
+doubles_input = "12.34\n1\n-12.0\n1.3e4\n1.2e-2"
+doubles_result = doubles_parseS doubles_input
+doubles_expects = ([12.34,1.0,-12.0,13000.0,1.2e-2],0,"")
+doubles_test = mkTestCase "doubles" doubles_expects doubles_result
+
+[pads| type StringSEs = [StringSE <|RE "$"|> | EOR] terminator EOF |]
+
+stringSEs_input = "12.34\n1\n-12.0\n1.3e4\n1.2e-2"
+stringSEs_result = stringSEs_parseS stringSEs_input
+stringSEs_expects = (["12.34","1","-12.0","1.3e4","1.2e-2"],0,"")
+stringSEs_test = mkTestCase "stringSEs" stringSEs_expects stringSEs_result
+
+[pads| type StringFWs = [StringFW 3| EOR] terminator EOF |]
+stringFWs_input = "abc\nabcd\nab\nabc"
+stringFWs_result = stringFWs_parseS stringFWs_input
+stringFWs_expects = (["abc","abc","XXX","abc"],2,"")
+stringFWs_test = mkTestCase "stringFWs" stringFWs_expects stringFWs_result
+
+
+[pads| type StringESCs = [(StringESC <| ('!', ";,") |>, '[;,]') | EOR] terminator EOF |]
+stringESCs_input = "abc\na;\nb,\na!;bc,\na!,cd\nhe!"
+stringESCs_result = stringESCs_parseS stringESCs_input
+stringESCs_expects = (["abc","a","b","a;bc","a,cd","he!"],4, "")
+stringESCs_test = mkTestCase "stringESCs" stringESCs_expects stringESCs_result
+
+[pads| type StringPs = [StringP Char.isDigit | EOR] terminator EOF |]
+stringPs_input = "123\na\n123a"
+stringPs_result = stringPs_parseS stringPs_input
+stringPs_expects = (["123","","123"],2, "")
+stringPs_test = mkTestCase "stringPs" stringPs_expects stringPs_result
+

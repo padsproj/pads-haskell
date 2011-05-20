@@ -185,7 +185,10 @@ breakUsingDisc bs rd = case rd of
 
 {- CONVERTING SOURCES TO STRINGS -}
 padsSourceToString :: Source -> String
-padsSourceToString = (map word8ToChr) . B.unpack . rest . unputCurrentLine
+padsSourceToString = (map word8ToChr) . B.unpack . padsSourceToByteString
+
+padsSourceToByteString :: Source -> B.ByteString
+padsSourceToByteString = rest . unputCurrentLine
 
 drainSource :: Source -> (String, Source)
 drainSource s = (padsSourceToString s, emptySource)
@@ -206,9 +209,18 @@ head = word8ToChr . headOrZero . current
 
 headOrZero s = if B.null s then chrToWord8 '\0' else B.head s
 
+peekHeadM :: Source -> (Maybe Char, Source)
+peekHeadM (s @ Source{current,loc, ..}) = 
+  if B.null current then (Nothing, s) else (Just (Language.Pads.Source.head s), s)
+
 takeHead :: Source -> (Char, Source)
 takeHead (s @ Source{current,loc, ..}) = 
          (word8ToChr $ B.head current, s{current = B.tail current, loc = incOffset loc})
+
+takeHeadM :: Source -> (Maybe Char, Source)
+takeHeadM (s @ Source{current,loc, ..}) = 
+  if B.null current then (Nothing, s) 
+  else (Just $ word8ToChr $ B.head current, s{current = B.tail current, loc = incOffset loc})
 
 
 takeHeadStr :: String -> Source -> (Bool, Source)

@@ -145,4 +145,4 @@ result = do
         }
 
 test = do (header, hmm, (topmd,restmd)) <- result
-          return (header, hmm, topmd)
+          return topmd

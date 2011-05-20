@@ -1,17 +1,19 @@
-K adding disciplines for fixed-width and no records and cobol
-K adding binary base types
-   how to tell endienness of host machine?
-    Library System.ByteOrder has value byteOrder
-
-K review remaining source code files
-K cleanup  pads-cabal file
+K refactor base types into modules, Prelude
 K getting vcard example to run
 K lifting String -> (Foo, String) functions to pads parsers
-K define base types for Haskell URL and IP address types
+K define base types for Haskell 
+   URL, IP address types
+   ASCII versions of Int8, Int16, Int32, and Int64, and Integer
+   Binary versions of Int64 and Word64
+K review remaining source code files
+K create list of supported base types
 
--- non-exhaustive patterns in function StringSE match
--- user-supplied default values
-- simplified data structure syntax for user-developed tools
+
+Ideas:
+-- user-supplied default values for structured types?
+-- simplified data structure syntax for user-developed tools
+-- allow users to capture positions in value fields
+-- Allow users to define their own literals by making an instance of LitParse function
 
 {-mylit = Trans (foo, bar)foo :: B.ByteString -> (Maybe a, B.ByteString)bar :: a -> B.ByteString-}
 

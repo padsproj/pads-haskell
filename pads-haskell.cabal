@@ -59,9 +59,11 @@ Library
                        Language.Pads.Syntax,    Language.Pads.Parser,
                        Language.Pads.Generic,   Language.Pads.RegExp
                        Language.Pads.Pretty,    Language.Pads.Source, 
-                       Language.Pads.TH,        Language.Pads.Testing
-
-
+                       Language.Pads.TH,        Language.Pads.Testing,
+                       Language.Pads.Library.BinaryUtitlities,
+                       Language.Pads.Library.Native, 
+                       Language.Pads.Library.BigEndian,
+                       Language.Pads.Library.LittleEndian,
 
 
   -- Packages needed in order to build this package.

@@ -1,11 +1,11 @@
 {-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, ScopedTypeVariables #-}
 module Examples.Binary where
 import Language.Pads.Padsc
+import Language.Pads.Library.LittleEndian as LE
+import qualified Language.Pads.Library.BigEndian as BE
+import qualified Language.Pads.Library.Native as Native
 import Language.Pads.Testing
 import System.IO.Unsafe (unsafePerformIO)
-import Data.Word
-import Data.Int
-
 
 test = runTestTT tests
 
@@ -15,7 +15,7 @@ tests = TestList[TestLabel "Calls" call_test
 
 
 [pads| data Call = Call 
-            { onpa  :: Int32, obase :: Int32
+            { onpa  :: Int32, obase :: LE.Int32
             , dpna  :: Int32, dbase :: Int32
             , con   :: Int32
             , dur   :: Int32 }
@@ -36,25 +36,27 @@ callNoRec_result = unsafePerformIO $ parseFileWith callsNoRecInstall_parseM call
 callNoRec_test = mkFileTestCase "CallNoRec" call_expect callNoRec_result
 
 binary_input_file = "Examples/data/binary"
-word32sbh_result :: (Word32, Base_md) = unsafePerformIO $ parseFileWith word32sbh_parseM binary_input_file
+word32sbh_result :: (Word32, Base_md) = unsafePerformIO $ parseFileWith BE.word32_parseM binary_input_file
 word32sbh_expect = (2864434397,0 )
 
-word32sbl_result :: (Word32, Base_md) = unsafePerformIO $ parseFileWith word32sbl_parseM binary_input_file
+word32sbl_result :: (Word32, Base_md) = unsafePerformIO $ parseFileWith LE.word32_parseM binary_input_file
 word32sbl_expect = (3721182122,0)
 
-
-word32_result :: (Word32, Base_md) = unsafePerformIO $ parseFileWith word32_parseM binary_input_file
+{- on a little endian machine -}
+word32_result :: (Word32, Base_md) = unsafePerformIO $ parseFileWith Native.word32_parseM binary_input_file
 word32_expect = (3721182122,0)
 
 
-int32sbh_result :: (Int32, Base_md) = unsafePerformIO $ parseFileWith int32sbh_parseM binary_input_file
+int32sbh_result :: (Int32, Base_md) = unsafePerformIO $ parseFileWith BE.int32_parseM binary_input_file
 int32sbh_expect = (-1430532899,0)
 
-int32sbl_result :: (Int32, Base_md) = unsafePerformIO $ parseFileWith int32sbl_parseM binary_input_file
+int32sbl_result :: (Int32, Base_md) = unsafePerformIO $ parseFileWith LE.int32_parseM binary_input_file
 int32sbl_expect = (-573785174,0 )
 
-int32_result :: (Int32, Base_md) = unsafePerformIO $ parseFileWith int32_parseM binary_input_file
+{- on a little endian machine -}
+int32_result :: (Int32, Base_md) = unsafePerformIO $ parseFileWith Native.int32_parseM binary_input_file
 int32_expect = (-573785174,0 )
+
 
 [pads| data TestRec = TestRec 
              { w8  :: Word8
