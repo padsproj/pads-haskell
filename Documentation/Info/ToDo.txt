@@ -1,0 +1,39 @@
+K adding disciplines for fixed-width and no records and cobol
+K adding binary base types
+   how to tell endienness of host machine?
+    Library System.ByteOrder has value byteOrder
+
+K review remaining source code files
+K cleanup  pads-cabal file
+K getting vcard example to run
+K lifting String -> (Foo, String) functions to pads parsers
+K define base types for Haskell URL and IP address types
+
+-- non-exhaustive patterns in function StringSE match
+-- user-supplied default values
+- simplified data structure syntax for user-developed tools
+
+{-mylit = Trans (foo, bar)foo :: B.ByteString -> (Maybe a, B.ByteString)bar :: a -> B.ByteString-}
+
+J printing
+J generating default values
+J change internal constructor names to avoid clashes
+J parsing expressions
+J improve syntax errors on bad pads parse
+
+. paper outline
+    level of integration of haskell language principles
+    benefits from using haskell
+	forced us to take seriously parameterized datatypes
+	  then lots of things are definable in pads
+    erasure -> haskell type declarations
+    vcard example
+    pun for characters for regular expressions
+    adding type checking during code generation for TH
+    show how to get existing haskell types in pads descriptions
+
+
+****************
+D finish getting first examples to work
+D reviewing galois comments
+D adding partition declarations to source language
