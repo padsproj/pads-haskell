@@ -143,3 +143,6 @@ result = do
         { (SmurfFile header hmm, md) <- parseFile "Examples/data/test.hmm+"
         ; return (header, hmm, md)
         }
+
+test = do (header, hmm, (topmd,restmd)) <- result
+          return (header, hmm, topmd)
