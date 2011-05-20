@@ -1,0 +1,106 @@
+%-----------------------------------------------------------------------------
+%
+%               Template for sigplanconf LaTeX Class
+%
+% Name:         sigplanconf-template.tex
+%
+% Purpose:      A template for sigplanconf.cls, which is a LaTeX 2e class
+%               file for SIGPLAN conference proceedings.
+%
+% Author:       Paul C. Anagnostopoulos
+%               Windfall Software
+%               978 371-2316
+%               paul@windfall.com
+%
+% Created:      15 February 2005
+%
+%-----------------------------------------------------------------------------
+
+
+\documentclass[preprint]{sigplanconf}
+
+\usepackage{amsmath} \usepackage{amssymb} \usepackage{graphicx}\newcommand{\cL}{{\cal L}}
+
+% The following \documentclass options may be useful:
+%
+% 10pt          To set in 10-point type instead of 9-point.
+% 11pt          To set in 11-point type instead of 9-point.
+% authoryear    To obtain author/year citation style instead of numeric.
+
+
+%\newcommand{proofappendix}[1]{#1}
+%\newcommand{proofappendix}[1]{}
+
+
+\begin{document}
+
+\conferenceinfo{Haskell'11,} {September 2011}
+\CopyrightYear{2011}
+\copyrightdata{978-1-4503-0252-4/10/09}
+
+
+
+\titlebanner{DRAFT}        % These are ignored unless
+\preprintfooter{Pads-Haskell -- DRAFT}   % 'preprint' option specified.
+
+\title{Concurrent Orchestration in Haskell}
+
+\authorinfo{Katheleen Fisher \and John Launchbury}
+           {Tufts University, Galois, Inc.}
+           {katheleen.fisher at gmail.com, john at galois.com}
+
+\maketitle
+
+\begin{abstract}
+Pads Haskell is great. You should use it.
+\end{abstract}
+
+\category{CR-number}{subcategory}{third-level}
+
+\keywords Haskell, Data
+
+\section{Introduction}
+
+
+
+
+
+
+\acks
+
+Nobody helped us in this endeavor, otherwise we would offer them our sincere thanks. 
+
+% We recommend abbrvnat bibliography style.
+
+\bibliographystyle{abbrvnat}
+
+% The bibliography should be embedded for final submission.
+
+\begin{thebibliography}{}
+\softraggedright
+
+ 
+\bibitem[D08]{monadlib}
+  I. Diatchki.
+  \emph{MonadLib}
+  http://www.purely-functional.net/monadLib
+
+\bibitem[EH97]{frp}
+  C. Elliott and P. Hudak, 
+  \emph{Functional Reactive Animation.}
+  ACM Conference on International Conference on Functional Programming (ICFP), 1997.
+
+   
+\end{thebibliography}
+
+
+%------------------------------------------------------------------------
+%------------------------------------------------------------------------
+
+
+% \appendix
+
+
+
+
+\end{document}
