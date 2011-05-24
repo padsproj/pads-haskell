@@ -19,7 +19,6 @@ Ideas:
 
 J printing
 J generating default values
-J change internal constructor names to avoid clashes
 J parsing expressions
 J improve syntax errors on bad pads parse
 
@@ -39,3 +38,4 @@ J improve syntax errors on bad pads parse
 D finish getting first examples to work
 D reviewing galois comments
 D adding partition declarations to source language
+D change internal constructor names to avoid clashes
