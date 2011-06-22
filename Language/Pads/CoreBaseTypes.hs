@@ -177,6 +177,15 @@ text_parseM = do
   document <- getAllBinP
   returnClean (Text document)
 
+instance Pretty Text where
+  ppr (Text str) = text "ASCII"
+
+
+instance Pads Text Base_md where
+  parsePP = text_parseM
+  printFL = text_printFL
+
+
 text_printFL :: (Text, Base_md) -> FList
 text_printFL (Text str, bmd) = addBString str
 
