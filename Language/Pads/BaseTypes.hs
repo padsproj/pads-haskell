@@ -36,6 +36,8 @@ import qualified Data.ByteString as B
 type Line a   = (a, EOR)
 type StringLn = [Char] terminator (Try EOR)
 type StringLnP (p :: String -> Bool) = constrain s :: StringLn where <| p s |> 
+type StringESCLn (p :: (Char, [Char])) = StringPESC <|(True, p)|> 
+type StringESC   (p :: (Char, [Char])) = StringPESC <|(False, p)|> 
 
 data PMaybe a = PJust a
               | PNothing Void

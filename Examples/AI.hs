@@ -75,7 +75,7 @@ printAI n = putStrLn(pretty 100 (ppr (ai_file_take n)))
 
 result n  = do 
      { (AI rep, md) <- parseFile ai_file
-     ; return (Prelude.take n ai_rep)
+     ; return (Prelude.take n rep)
      } 
 
 

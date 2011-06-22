@@ -168,16 +168,17 @@ digit_printFL (i, bmd) = fshow i
 
 -----------------------------------------------------------------
 
-type Text = String
+newtype Text = Text S.RawStream
+  deriving (Eq, Show, Data, Typeable, Ord)
 type Text_md = Base_md
 
 text_parseM :: PadsParser (Text, Base_md)
 text_parseM = do
-  document <- getAllP
-  returnClean document
+  document <- getAllBinP
+  returnClean (Text document)
 
 text_printFL :: (Text, Base_md) -> FList
-text_printFL (str, bmd) = addString str
+text_printFL (Text str, bmd) = addBString str
 
 
 -----------------------------------------------------------------
@@ -302,41 +303,43 @@ stringP_printFL p (str, bmd) = addString str
 
 -----------------------------------------------------------------
 
-type StringESC = String
-type StringESC_md = Base_md
+type StringPESC = String
+type StringPESC_md = Base_md
 
-stringESC_parseM :: (Char, [Char]) -> PadsParser(StringESC, Base_md)
-stringESC_parseM (escape, stops) = 
-  handleEOF "" "StringESC" $
-  handleEOR "" "StringESC" $ do 
+stringPESC_parseM :: (Bool, (Char, [Char])) -> PadsParser(StringPESC, Base_md)
+stringPESC_parseM arg @ (endIfEOR, (escape, stops)) = 
+ let (doEOF, doEOR) = if endIfEOR then (checkEOF, checkEOR) else (handleEOF, handleEOR)
+ in
+  doEOF "" "StringPESC" $
+  doEOR "" "StringPESC" $ do 
     { c1 <- peekHeadP
     ; if c1 `elem` stops then 
          returnClean ""
       else if c1 == escape then do
          { takeHeadP
-         ; handleEOF [c1] "StringESC" $
-           handleEOR [c1] "StringESC" $ do
+         ; doEOF [c1] "StringPESC" $
+           doEOR [c1] "StringPESC" $ do
             { c2 <- takeHeadP
             ; if (c2 == escape) || (c2 `elem` stops) then do
-                   { (rest, rest_md) <- stringESC_parseM (escape, stops) 
+                   { (rest, rest_md) <- stringPESC_parseM arg
                    ;  return (c2:rest, rest_md)
                    }
               else do 
-                   { (rest, rest_md) <- stringESC_parseM (escape, stops) 
+                   { (rest, rest_md) <- stringPESC_parseM arg
                    ; return (c1:c2:rest, rest_md)
                    }
             }
          } else do 
             { c1 <- takeHeadP
-            ; (rest, rest_md) <- stringESC_parseM (escape, stops) 
+            ; (rest, rest_md) <- stringPESC_parseM arg
             ; return (c1:rest, rest_md)
             }
     }
 
 
 
-stringESC_printFL :: (Char, [Char]) -> (StringESC, Base_md) -> FList
-stringESC_printFL (escape, stops) (str, bmd) = 
+stringPESC_printFL :: (Bool, (Char, [Char])) -> (StringPESC, Base_md) -> FList
+stringPESC_printFL (_, (escape, stops)) (str, bmd) = 
   let replace c = if c `elem` stops then escape : [c] else [c]
       newStr =  concat (map replace str)
   in addString newStr

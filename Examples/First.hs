@@ -7,6 +7,8 @@ import Language.Pads.Padsc
 import Language.Pads.Testing
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Char as Char
+import qualified Data.ByteString as B
+import Data.Word
 
 --import qualified Text.Regex.ByteString as BRE
 
@@ -94,7 +96,7 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "Compound" test_myData
                 , TestLabel "Compound" test_hp_data
                 , TestLabel "Doc"  test_hp_data_file_parse
-                , TestLabel "Doc"  myDoc_test
+--                , TestLabel "Doc"  myDoc_test
                 , TestLabel "Literal"  litRec_test
                 , TestLabel "Literal"  whiteSpace_test
                 , TestLabel "Literal"  whiteSpace2_test
@@ -647,10 +649,12 @@ test_hp_data_file_parse = mkFileTestCase "HP file" expect_hp_data_file_parse res
 
 
 
+strToBS = B.pack . (map chrToWord8)
+
 [pads| newtype MyDoc = MyDoc Text |]
 myDoc_input_file = "Examples/data/test_file"
 myDoc_result :: (MyDoc, MyDoc_md) = unsafePerformIO $ parseFile myDoc_input_file
-myDoc_expects = (MyDoc "8,Hermione\n3,Ron\n5,Harry\n",0)
+myDoc_expects = (MyDoc (Text (strToBS "8,Hermione\n3,Ron\n5,Harry\n")),0)
 myDoc_test = mkFileTestCase "myDoc" myDoc_expects myDoc_result
 
 

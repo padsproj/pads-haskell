@@ -20,29 +20,30 @@ import System.Locale (defaultTimeLocale)
 
 import Language.Pads.Padsc
 
-
 -- Lines are delimited with carriage return/line-feed (control-M, newline)  \r\n
 -- Nested Vcards are separated by \n rather than \r\n
 
 [pads|
 -- KSF: Added to describe sequence of VCards
-type VCards = [VCard | EOR] terminator EOF
+newtype VCards = VCards (partition [Line VCard] terminator EOF using windows)
 
 -- KSF: moved IndividualNames and Common Name into VCardPropety because these attributes are not 
 --      guaranteed to be in a particular order.
-data VCard = VCard  ("BEGIN:", vcardRE, EOR, [Entry|EOR] terminator "END:", vcardRE)
+data VCard = VCard  ("BEGIN:", vcardRE, EOR, [Line Entry] terminator "END:", vcardRE)
 
 data Entry = Entry { prefix   :: Maybe ("item", Int, '.'),
                      tag      :: Tag, 
-                     sep      :: StringME semicommaRE, 
+                     sep      :: StringME colonsemiRE, 
                      property :: VCardProperty tag }
 
-data Tag = VERSION | N | FN | NICKNAME | PHOTO | BDAY | ADR | LABEL
+data Tag = VERSION | FN | NICKNAME | BDAY | ADR | LABEL
          | TEL | EMAIL | MAILER | TZ |GEO | TITLE | ROLE | LOGO | AGENT
          | ORG | CATEGORIES | NOTE | PRODID | REV | SORTSTRING "SORT-STRING"
          | SOUND | UID | URL | CLASS | KEY
          | EXTENSION ("X-", VCardString)
          | ITEM "item"
+         | PHOTO 
+         | N  
 
 
 data VCardProperty (tag :: Tag) = case tag of 
@@ -60,7 +61,7 @@ data VCardProperty (tag :: Tag) = case tag of
     -- | A list of nicknames belonging to the VCard entity. E.g.,
     --
     -- > Nickname ["Mike", "Mikey"]
-    | NICKNAME -> Nickname NameRs
+    | NICKNAME -> Nickname NameSs
 
     -- | A photo of the VCard entity. E.g.,
     --
@@ -151,11 +152,11 @@ data VCardProperty (tag :: Tag) = case tag of
     -- unit names. E.g.,
     --
     -- > Organization ["Spearhead Development, L.L.C.", "Executive"]
-    | ORG -> Organization ([VCardString | ';'] terminator EOR)
+    | ORG -> Organization ([VCardString | ';'] terminator LitRE ';$|$')
     -- | General categories to describe the vCard entity. E.g.,
     --
     -- > Categories ["Internet", "Web Services", "Programmers"]
-    | CATEGORIES -> Categories ([VCardString | ','] terminator EOR)
+    | CATEGORIES -> Categories ([VCardString | ','] terminator Try EOR)
     -- | A general note about the vCard entity. E.g.,
     --
     -- > Note "Email is the absolute best contact method."
@@ -199,12 +200,14 @@ data VCardProperty (tag :: Tag) = case tag of
     -- | A website associated with the vCard entity. E.g.,
     --
     -- > URL "http://spearheaddev.com/"
-    | URL -> Url VCardString
+    | URL -> Url { urlType :: TypeL URLType
+                 , urlAddr :: VCardString
+                 }
     -- | Describes the general intention of the vCard owner as to how
     -- accessible the included information should be. E.g.,
     --
     -- > Class ClassConfidential
-    | CLASS -> Class
+    | CLASS -> Class Class
     -- | Specifies a public key or authentication certificate associated with
     -- the vCard entity. E.g.,
     --
@@ -212,7 +215,8 @@ data VCardProperty (tag :: Tag) = case tag of
     | KEY -> Key { keyType   :: Maybe (TypeS, ';') -- ^ Registered IANA format
                  , keyData   :: VCardData
                  }
-    | EXTENSION s -> VCardString    
+    | EXTENSION s -> Extension VCardString    
+    | otherwise -> Other StringLn
 
 -- | A breakdown of the vCard entity's name, corresponding, in sequence, to
 -- Family Name, Given Name, Additional Names, Honorific Prefixes, and Honorific
@@ -253,13 +257,19 @@ data TelType    = TelHome "HOME"
                 | TelCar "CAR"
                 | TelISDN "ISDN"
                 | TelPCS "PCS"
+                | TelMain "MAIN"
                 | TelPreferred (StringME 'PREF|pref')
 
+-- | Represents the various types or properties of a url.
+data URLType =   URLPreferred (StringME 'PREF|pref')
+               | URLWork "WORK"
+               | URLHome "HOME"
 
 -- | Represents the various types or properties of an email address.
 data EmailType = EmailInternet "INTERNET"
                | EmailX400  "X400"
                | EmailPreferred (StringME 'PREF|pref')
+               | EmailWork "WORK"
 
 -- | Represents the data associated with a vCard's Agent. This could be a URI
 -- to such a vCard or the embedded contents of the vCard itself.
@@ -269,9 +279,10 @@ data AgentData = AgentURI ("VALUE=uri:", VCardString)
 -- | Represents the various types of data that can be included in a vCard.
 data VCardData = VURI    ("VALUE=uri:", VCardString) 
                | VBinary ("ENCODING=b", Maybe(';', TypeS), ':', WrappedEncoding )
-               | VBase64 ("BASE64:", WrappedEncoding)
+               | VBase64 ("BASE64:", EOR, WrappedEncoding)
 
-type WrappedEncoding = [Line (StringLnP startsWithSpace)]
+--type WrappedEncoding = [Line (StringLnP startsWithSpace)]
+type WrappedEncoding = VCardString
 
 
 -- | Classifies the vCard's intended access level.
@@ -284,20 +295,21 @@ data Class = ClassPublic "PUBLIC"
 -- If parser sees first component of tuple, it stops.
 -- Second component is prefix to escape first component, so //, does not stop.
 -- Pretty printer prefixes stopping components with escape sequence.
-type VCardString = StringESC <| ('\\', ",:;") |>
+type VCardString = StringESCLn <| ('\\', ",:;") |>
 
-type NameSs = [VCardString | ','] terminator ';'
-type NameRs = [VCardString | ','] terminator EOR
+type NameSs = [VCardString | ','] terminator ';|$'
 
 
-type TypeS = (typeRE, '=', [VCardString|','] terminator Try (LitRE '[:;]'))
-type TypeL a = [(typeRE, '=', [a|','] terminator Try (Lit ";")) | ';'] terminator ':'
+type TypeS = (typeRE, '=', CommaL VCardString)
+type TypeL  a = [(typeRE, '=', CommaL a) | ';'] terminator ':'
+type CommaL a = [a|','] terminator Try (LitRE '[:;]')
 
 |]
 type CommonName = String
 
 
-semicommaRE = RE "[;,]"
+colonsemiRE = RE "[:;]"
+commasemiRE = RE "[,;]"
 vcardRE = REd "VCARD|vCard" "VCARD"
 typeRE = REd "TYPE|type" "TYPE"
 
@@ -309,28 +321,22 @@ startsWithSpace s = case s of
    '\v':s' -> True
    otherwise -> False
 
--- $doc
---
--- This package implements the RFC 2426 vCard 3.0 spec
--- (<http://www.ietf.org/rfc/rfc2426.txt>)
---
--- Its usage is fairly simple and intuitive. For example, below is how one
--- would produce a VCard for Frank Dawson, one of the RFC 2426 authors:
---
--- > VCard  "Frank Dawson"
--- >        (IndividualNames ["Dawson"] ["Frank"] [] [] [])
--- >        [ Organization ["Lotus Development Corporation"]
--- >        , Address [AddrWork, AddrPostal, AddrParcel] "" ""
--- >                    "6544 Battleford Drive"
--- >                    "Raleigh" "NC" "27613-3502" "U.S.A"
--- >        , Telephone [TelVoice, TelMessage, TelWork] "+1-919-676-9515"
--- >        , Telephone [TelFax, TelWork] "+1-919-676-9564"
--- >        , Email [EmailInternet, EmailPreferred] "Frank_Dawson@Lotus.com"
--- >        , Email [EmailInternet] "fdawson@earthlink.net"
--- >        , URL "http://home.earthlink.net/~fdawson"
--- >        ]
---
--- Although this package is fairly well documented, even with general
--- explanations about the various VCard properties, RFC 2426 should be
--- consulted for the final say on the meaning or application of any of the
--- VCard properties.
+vcard_file_small  = "Examples/data/VcardSmall.vcf"
+vcard_file_large  = "Examples/data/VcardSmall.vcf"
+vcard_file = vcard_file_large
+
+result n  = do 
+     { (VCards rep, md) <- parseFile vcard_file
+     ; return (Prelude.take n rep, fst md)
+     } 
+
+test = do 
+     { (VCards rep, md) <- parseFile vcard_file
+     ; return (fst md)
+     } 
+
+entry_input = "N:Brush;A.J.;;;\r\n"
+entry_result = entry_parseS entry_input
+
+entry_input2 = "X-ABUID:3CC68169-6DC9-4457-94B3-B1B3C69E832A\\:ABPerson"
+entry_result2 = entry_parseS entry_input2
