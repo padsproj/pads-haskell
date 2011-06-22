@@ -19,7 +19,8 @@
 
 \documentclass[preprint]{sigplanconf}
 
-\usepackage{amsmath} \usepackage{amssymb} \usepackage{graphicx}\newcommand{\cL}{{\cal L}}
+\usepackage{amsmath} \usepackage{amssymb} \usepackage{graphicx}
+\newcommand{\cL}{{\cal L}}
 
 % The following \documentclass options may be useful:
 %
@@ -60,8 +61,19 @@ Pads Haskell is great. You should use it.
 \keywords Haskell, Data
 
 \section{Introduction}
+Parsing, and parsing tools, have a long history. Yet particularly within the programming language community, parser tools have tended to focus on token based solutions. This is natural, as these are most appropriate for parsing programming languages. However, for lots of data, this style of parsing is inappropriate, and a different set of tools is required.
 
+Over the last few years, PADS (parsing ad-hoc data sets) has been developed. It's applications include...
 
+There has been a healthy set of academic papers desribing Pads. <briefly summarise>
+
+This paper is another in a series. It specifically describes Pads-Haskell, a {\it semi embedding} of the Pads domain-specific language into Haskell. In the process, we made a number of significant design decisions that were required to blend Pads with the rich type discipline of Haskell.
+
+The contributions of this paper are as follows.
+\begin{itemize}
+\item  We describe the design and use of Pads-Haskell as a parser framework for ad-hoc data descriptions.
+\item  We discuss the concept of {\it semi-embedded} domain-specific languages, as a development of a continuum between stand-alone DSLs and embedded DSLs.
+\end{itemize}
 
 
 
