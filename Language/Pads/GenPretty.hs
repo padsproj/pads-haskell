@@ -243,3 +243,10 @@ mkField (field_name, _, ty) = do
 
 nameToStrLit name = LitE (StringL (nameBase name))
 
+instance Pretty a => Pretty (PMaybe a) where
+  ppr PNothing = text ""
+  ppr (PJust a) = ppr a
+
+instance Pretty a => Pretty (PMaybe_imd a) where
+  ppr (PNothing_imd _) = text ""
+  ppr (PJust_imd a) = ppr a
