@@ -46,11 +46,11 @@ none = NoPartition
 {- SOURCE LOCATIONS -}
 data Loc = Loc { lineNumber :: Int64,
                  byteOffset :: Int64 }
-     deriving (Typeable, Data,Eq, Ord)
+     deriving (Typeable, Data,Eq, Ord, Show)
 
 data Pos = Pos { begin      :: Loc,
                  end        :: Maybe Loc}
-  deriving (Typeable, Data, Eq, Ord)
+  deriving (Typeable, Data, Eq, Ord, Show)
 
 zeroLoc   = Loc {lineNumber = 0,  byteOffset = 0}
 

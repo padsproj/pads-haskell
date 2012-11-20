@@ -28,7 +28,7 @@ data ErrMsg =
  | PredicateFailure
  | ExtraStuffBeforeTy String String
  | FileError String String
-   deriving (Typeable, Data, Eq, Ord)
+   deriving (Typeable, Data, Eq, Ord, Show)
 
 {- XXX-KSF: fix pretty printing to use pretty printing combinators rather than string ++ -}
 instance Pretty ErrMsg where
@@ -47,7 +47,7 @@ instance Pretty ErrMsg where
 
 data ErrInfo = ErrInfo { msg      :: ErrMsg,
                          position :: Maybe S.Pos }
-   deriving (Typeable, Data, Eq, Ord)
+   deriving (Typeable, Data, Eq, Ord, Show)
 
 instance Pretty ErrInfo where
   ppr (ErrInfo {msg,position}) = PP.ppr msg <+> 

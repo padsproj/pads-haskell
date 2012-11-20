@@ -17,7 +17,7 @@ import qualified Language.Pads.Source as S
 import Language.Pads.Errors
 import Language.Pads.MetaData
 import Language.Pads.RegExp
-import Char
+import Data.Char
 
 import Control.Monad
 

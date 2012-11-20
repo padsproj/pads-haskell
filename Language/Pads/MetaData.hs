@@ -23,7 +23,7 @@ data Base_md = Base_md { numErrors :: Int
                        , errInfo   :: Maybe E.ErrInfo
                         -- Need to add location information, etc.
                        }
-   deriving (Typeable, Data, Eq, Ord)
+   deriving (Typeable, Data, Eq, Ord, Show)
 
 
 {- Meta data type class -}

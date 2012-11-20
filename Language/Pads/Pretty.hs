@@ -11,7 +11,7 @@
 -}
 
 module Language.Pads.Pretty where
-import Char (isPrint, ord)
+import Data.Char (isPrint, ord)
 import qualified Data.Map as M
 import qualified Language.Haskell.TH as TH
 
@@ -169,19 +169,3 @@ string_ppr = ppr
 
 namedlist_ppr :: String -> [Doc] -> Doc
 namedlist_ppr name pprls = group $ hang 2 (text name <+/> (list_ppr pprls))
-
-
-
-
-
-
-instance (Pretty a, Pretty b, Pretty c, Pretty d, Pretty e) => Pretty (a, b, c, d, e) where
-    ppr (a, b, c, d, e) = parens $ commasep [ppr a, ppr b, ppr c, ppr d, ppr e]
-
-instance (Pretty a, Pretty b, Pretty c, Pretty d, Pretty e, Pretty f) => Pretty (a, b, c, d, e, f) where
-    ppr (a, b, c, d, e, f) = parens $ commasep [ppr a, ppr b, ppr c, ppr d, ppr e, ppr f]
-
-instance (Pretty a, Pretty b, Pretty c, Pretty d, Pretty e, Pretty f, Pretty g) => Pretty (a, b, c, d, e, f,g) where
-    ppr (a, b, c, d, e, f, g) = parens $ commasep [ppr a, ppr b, ppr c, ppr d, ppr e, ppr f, ppr g]
-
-

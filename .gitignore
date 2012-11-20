@@ -2,3 +2,8 @@ Documentation/Paper/Pads-Haskell.synctex.gz
 Documentation/Paper/Pads-Haskell.pdf
 Documentation/Paper/Pads-Haskell.log
 Documentation/Paper/Pads-Haskell.aux
+
+/cabal-dev/
+/dist/
+*.o
+*.swp

@@ -33,12 +33,12 @@ import Data.Data
 import qualified Data.Map as M
 import qualified Data.List as List
 import Data.Word
-import Char
+import Data.Char as Char
 import Data.Int
 
 import Text.PrettyPrint.Mainland as PP   
 
-import Monad
+import Control.Monad
 
 
 

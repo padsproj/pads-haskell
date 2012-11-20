@@ -70,7 +70,6 @@ Library
   build-depends:    base >= 4,
                     syb,
                     containers,
-                    haskell98,
                     template-haskell,
                     Glob,
                     regex-posix,
@@ -83,7 +82,7 @@ Library
                     byteorder,
                     old-locale,
                     time
-  
+
   -- Modules not exported by this package.
   Other-modules:       Language.Pads.CodeGen,
                        Language.Pads.CoreBaseTypes, 
