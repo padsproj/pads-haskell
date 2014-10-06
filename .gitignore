@@ -7,3 +7,5 @@ Documentation/Paper/Pads-Haskell.aux
 /dist/
 *.o
 *.swp
+.cabal-sandbox
+cabal-sandbox-config
