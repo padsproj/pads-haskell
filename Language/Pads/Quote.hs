@@ -34,7 +34,7 @@ module Language.Pads.Quote
     where
 
 import Prelude hiding (exp, init)
-import Foreign (unsafePerformIO)
+import System.IO.Unsafe (unsafePerformIO)
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter(..))
