@@ -20,6 +20,7 @@ import Language.Pads.RegExp
 import Data.Char
 
 import Control.Monad
+import Control.Applicative (Applicative(..))
 
 
 
@@ -50,12 +51,20 @@ instance Functor PadsParser where
   fmap f p = PadsParser $ \bs -> let ((x,bs'),b) = p # bs in
                                    ((f x, bs'),b)
 
+instance Applicative PadsParser where
+    pure  = return
+    (<*>) = ap
+
+
+
 -- if any results on the way are bad, then the whole thing will be bad
 instance Monad PadsParser where
   return r = PadsParser $ \bs -> ((r,bs), True)
   p >>= f  = PadsParser $ \bs -> let ((v,bs'),b)   = p # bs
                                      ((w,bs''),b') = f v # bs'
                                  in ((w,bs''), b && b')
+
+
 
 
 

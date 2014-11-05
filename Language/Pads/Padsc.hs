@@ -1,7 +1,3 @@
-{-# LANGUAGE TypeSynonymInstances, GeneralizedNewtypeDeriving, QuasiQuotes, TemplateHaskell, DeriveDataTypeable, 
-             ScopedTypeVariables, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances,
-             UndecidableInstances, NamedFieldPuns, RecordWildCards, StandaloneDeriving   #-}
-
 {-
 ** *********************************************************************
 *                                                                      *
@@ -10,8 +6,6 @@
 *                                                                      *
 ************************************************************************
 -}
-
-
 
 module Language.Pads.Padsc (
      {- FIX: Languages.Pads.Source exports "take", which clashes with 
@@ -32,7 +26,6 @@ module Language.Pads.Padsc (
   ) 
   where
 
-
 import Language.Pads.Source 
 import Language.Pads.RegExp
 import Language.Pads.Errors  hiding (msg)
@@ -48,10 +41,6 @@ import Language.Pads.LazyList
 import Data.Data
 import Text.PrettyPrint.Mainland hiding (line,  dot)
 
-
-
-{- Fix these should be reexported -}
--- parseAllS = Language.Pads.PadsParser.parseAllS
 numErrors = Language.Pads.MetaData.numErrors
 
 

@@ -1,5 +1,4 @@
-{-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
-    FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 
 
 {-
@@ -11,6 +10,9 @@
 ************************************************************************
 -}
 
+{-
+  Code to manage different binary representations of bytes and integers.
+-}
 
 module Language.Pads.Library.BinaryUtilities where
 

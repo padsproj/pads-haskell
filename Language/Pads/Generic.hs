@@ -1,4 +1,8 @@
-{-# LANGUAGE MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, FlexibleContexts, Rank2Types, FlexibleInstances #-}
+{-# LANGUAGE   FunctionalDependencies
+             , ScopedTypeVariables
+             , Rank2Types
+             , FlexibleInstances 
+   #-}
 
 {-
 ** *********************************************************************
@@ -9,24 +13,29 @@
 ************************************************************************
 -}
 
+{-
+  Declaration of the Pads type class and corresponding generic functions for 
+  parsing various forms of input and for generating default vaules.
+-}
+
 
 module Language.Pads.Generic where
 
-import Language.Pads.MetaData
-import Language.Pads.PadsParser
+import Language.Pads.MetaData (PadsMD, replace_md_header, mkErrBasePD)
+import Language.Pads.PadsParser (PadsParser, parseStringInput, parseFileInput,parseByteStringInput)
 import qualified Language.Pads.Errors as E
 import qualified Language.Pads.Source as S
-import Language.Pads.LazyList
+import Language.Pads.LazyList (FList)
+
 import qualified Data.ByteString as B
 import qualified Control.Exception as CE
-import Data.Data
-import Data.Generics.Aliases (extB, ext1B)
-import Data.Map
-import Data.Set
 
-import System.Posix.Types
-import Foreign.C.Types
-import System.CPUTime
+import Data.Data  -- Support for generics
+import Data.Generics.Aliases (extB, ext1B)
+import Data.Map (Map, empty, fromList, toList)
+import Data.Set (Set, fromList, toList)
+
+import System.Posix.Types (COff, EpochTime, FileMode)
 
 
 class (Data rep, PadsMD md) => Pads rep md | rep -> md  where
@@ -102,6 +111,7 @@ getConstr ty =
         CharRep     -> mkCharConstr ty '\NUL'
         NoRep       -> error "PADSC: Unexpected NoRep in PADS type"
 
+
 gdef :: Data a => a
 gdef = def_help 
   where
@@ -110,7 +120,7 @@ gdef = def_help
              constr = getConstr ty
          in fromConstrB gdef constr 
 
-ext2 :: (Data a, Typeable2 t)
+ext2 :: (Data a, Typeable t)
      => c a
      -> (forall d1 d2. (Data d1, Data d2) => c (t d1 d2))
      -> c a
@@ -118,7 +128,7 @@ ext2 def ext = maybe def id (dataCast2 ext)
 
 newtype B x = B {unB :: x}
 
-ext2B :: (Data a, Typeable2 t)
+ext2B :: (Data a, Typeable t)
       => a
       -> (forall b1 b2. (Data b1, Data b2) => t b1 b2)
       -> a
@@ -154,7 +164,6 @@ myempty = general
   list    = []
   map :: Data.Map.Map k v
   map = Data.Map.empty
-
 
 
 class BuildContainer2 c item where

@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
-    FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
+{-# LANGUAGE QuasiQuotes #-}
+
 
 {-
 ** *********************************************************************
@@ -10,6 +10,10 @@
 ************************************************************************
 -}
 
+{-
+  Library support for parsing bytes and integers in the host machine
+  native format.
+-}
 
 module Language.Pads.Library.Native where
 

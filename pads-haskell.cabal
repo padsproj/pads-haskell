@@ -7,13 +7,21 @@ Name:                pads-haskell
 -- The package version. See the Haskell package versioning policy
 -- (http://www.haskell.org/haskellwiki/Package_versioning_policy) for
 -- standards guiding when and how versions should be incremented.
-Version:             0.2.1
+Version:             1.1
 
 -- A short (one-line) description of the package.
 Synopsis:            PADS data description language for Haskell
 
 -- A longer description of the package.
--- Description:         
+Description:     Massive amounts of useful data are stored and processed in
+  ad hoc formats for which common tools like parsers,
+  printers, query engines and format converters are not readily 
+  available.  Pads/Haskell is a domain-specific language that 
+  facilitates the generation of data processing tools for ad hoc
+  formats. Pads/Haskell includes features such as
+  dependent, polymorphic and recursive datatypes, which allow
+  programmers to describe the syntax and semantics of ad hoc data in a
+  concise,  easy-to-read notation.
 
 -- URL for the project homepage or repository.
 Homepage:            http://www.padsproj.org
@@ -34,6 +42,7 @@ Maintainer:          kathleen.fisher@gmail.com
 -- A copyright notice.
 -- Copyright:           
 
+
 Category:            Language
 
 Build-type:          Simple
@@ -47,6 +56,11 @@ Extra-source-files:  Examples/First.hs, Examples/AI.hs, Examples/Binary.hs,
                      Examples/data/binary, 
                      Examples/data/a2b.c, Examples/data/calls10.a, Examples/data/calls10.b,
                      Examples/data/genBin.c, Examples/data/binTest.a, Examples/data/binTest.b
+                     Documentation/Info/Pads-Index.txt
+                     Documentation/Info/PackagesUsedInPads.txt
+                     Documentation/Info/Pads-grammar.tex
+                     Documentation/Info/Pads-grammar.pdf
+
 
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.2
@@ -67,21 +81,21 @@ Library
 
 
   -- Packages needed in order to build this package.
-  build-depends:    base >= 4,
-                    syb,
-                    containers,
-                    template-haskell,
-                    Glob,
-                    regex-posix,
-                    bytestring,
-                    haskell-src,
+  build-depends:    base >= 4.7 && < 5,
+                    syb >= 0.4,
+                    containers >0.5.5.1,
+                    template-haskell >=2.9,
+                    Glob >= 0.7.5,
+                    regex-posix >= 0.95.2,
+                    bytestring >= 0.10.4,
+                    haskell-src >=1.0.1.6,
                     haskell-src-meta >= 0.4,
                     parsec >= 3.1.0,
                     mainland-pretty >= 0.1.0.2,
-                    HUnit,
-                    byteorder,
-                    old-locale,
-                    time
+                    HUnit >= 1.2.5.2,
+                    byteorder >= 1.0.4,
+                    old-locale >= 1.0.0.6,
+                    time >= 1.4.2
 
   -- Modules not exported by this package.
   Other-modules:       Language.Pads.CodeGen,

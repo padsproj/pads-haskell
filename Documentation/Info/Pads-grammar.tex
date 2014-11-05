@@ -1,0 +1,121 @@
+\documentclass{article}
+\title{ PADS/Haskell Grammar}
+\usepackage{fullpage}
+\usepackage{syntax}
+\author{Kathleen Fisher}
+\date{October 5, 2014}
+
+\setlength{\grammarindent}{6em}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\begin{grammar}
+<decls> ::= <decl>*
+
+<dec>        ::= <typeDecl> | <dataDecl> | <newDecl> | <obtainDecl>
+
+<typeDecl>   ::= "type" <padsID> <haskell-pat>? "=" <ptype>
+
+<dataDecl>   ::= "data" <padsID> <haskell-pat>? "=" <dataRHS> <derives>?
+
+<newDecl>    ::= "newtype" <padsID> <haskell-pat>? "=" <newRHS> <derives>?
+
+<obtainDecl> ::= "obtain" <padsID> "from" <ptype> "using" <expression>
+
+<padsID>     ::= <upper><lower>*
+
+<ptype>      ::= <constrain> | <obtain> | <partition> | <listTy> | <value> | <btype>
+
+<constrain>  ::= "constrain" <haskell-pat> "::" <ptype> <predic>
+
+<obtain>     ::= "obtain" <ptype> "from" <ptype> "using" <expression>
+
+<partition>  ::= "partition" <ptype> "using" <expression>
+
+<listTy>     ::= "[" <listInside> "]" <listEnd>
+
+<listInside> ::= <ptype> ("|" <ptype>)?
+
+<listEnd>    ::= "terminator" <ptype> | "length" <expression>
+
+<value>      ::= "value" <expression> "::" <ptype>
+
+<btype>      ::= <etype> <atype>* <expression>?
+
+<etype>      ::= <atype> | <expression>
+
+<atype>      ::= <tuple> | "[" <listInside> "]" | <qualUpper> | <tyvar>
+
+<tuple>      ::= "(" (<ptype> ("," <ptype>)*)? ")"
+
+<dataRHS>    ::= <switchTy> | <constrs>
+ 
+<switchTy>   ::= "case" <expression> "of" <branch> ("|" <branch>)*
+
+<branch>     ::= <haskell-pat> "->" <constr>
+
+<constrs>    ::= <constr> ("|" <constr>)*
+
+<constr>     ::= <upper> <record> <predic>? | <upper> <constrArgs>? <predic>?
+
+<constrArgs> ::= ("!"? <etype>)+
+
+<record>     ::= "{" <field> ("," <field>)* "}"
+
+<field>       ::= <lower> "::" <ftype> <predic>? 
+             \alt  <lower> "=" "value" <expression> "::" <ftype> <predic>?
+             \alt  <ftype> <predic>?
+
+<ftype>      ::= "!" <atype> | <ptype>
+
+<newRHS>     ::= <upper> <record1> <predic>? | <upper> <atype> <predic>?
+
+<record1>    ::= "{" (<ftype> ",")* <field1> ("," <ftype>)* "}"
+
+<field1>      ::= <lower> "::" <ptype> <predic>?
+
+<literal>    ::= <charLit> | <reLit> | <stringLit> | <intLit> | <qualLower> | <qualUpper>
+
+<predic> ::= "where" <expression>
+
+<expression> ::= <h-exp> | <literal>
+
+<h-exp>      ::= "<|" <haskell-exp> "|>"
+
+<derives> ::= "deriving" <qualUpper> | "deriving" "(" <qualUppers> ")"
+
+<tyvar> ::= <lower>
+
+<qualUpper> ::= <upper> | <qualUpper> "." <upper>
+
+<qualLower> ::= <lower> | <qualUpper> "." <lower>
+
+<qualUppers> ::= <qualUpper> | <qualUpper> "," <qualUppers>
+
+<haskell-pat> ::= Parsed according to Language.Haskell.Meta.parsePat
+
+<haskell-exp> ::= Parsed according to Language.Haskell.Meta.pareExp
+
+<upper> ::= <identifier> with capitalized first character
+
+<lower> ::= <identifier> with lowercase first character
+
+<reLit> ::= Anything contained within single quotes (')
+
+<charLit> ::=  As defined in Text.Parsec.Token
+
+<stringLit>  ::= As defined in Text.Parsec.Token
+
+<intLit> ::= As defined in Text.Parsec.Token
+
+<identifier> ::= As defined in Text.Parsec.Token
+
+<whiteSpace> :: As defined in Text.Parsec.Token
+\end{grammar}
+
+\end{document}
+
+

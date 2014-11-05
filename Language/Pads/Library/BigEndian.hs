@@ -1,6 +1,4 @@
-{-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
-    FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
-
+{-# LANGUAGE QuasiQuotes #-}
 
 {-
 ** *********************************************************************
@@ -9,6 +7,11 @@
 *              John Launchbury <john.launchbury@gmail.com>             *
 *                                                                      *
 ************************************************************************
+-}
+
+{-
+  Library support for parsing bytes and integers in big endian
+  format.
 -}
 
 

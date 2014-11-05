@@ -8,6 +8,9 @@
 ************************************************************************
 -}
 
+{-
+  Type class for Pads meta-data and generic operations on meta-data.
+-}
 
 module Language.Pads.MetaData where
 

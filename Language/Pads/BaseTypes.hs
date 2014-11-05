@@ -1,5 +1,10 @@
-{-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
-    FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
+{-# LANGUAGE  QuasiQuotes
+            , DeriveDataTypeable
+            , ScopedTypeVariables
+            , MultiParamTypeClasses
+            , FlexibleInstances
+            , UndecidableInstances 
+   #-}
 
 
 {-
@@ -22,13 +27,17 @@ import Language.Pads.CoreBaseTypes
 import Language.Pads.Quote
 import Language.Pads.RegExp
 import Language.Pads.LazyList
+
+{- Libraries to support specific base types -}
 import Data.Time
 import System.Locale
-import Text.PrettyPrint.Mainland
 
+
+import Text.PrettyPrint.Mainland (Pretty, ppr, text)
+
+import Data.Data (Typeable, Data)
 import qualified Data.Char as C
 import qualified Data.List as L
-import Data.Data
 import qualified Data.ByteString as B  
 
 

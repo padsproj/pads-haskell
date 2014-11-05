@@ -9,14 +9,10 @@
 ************************************************************************
 -}
 
-
-
 module Language.Pads.Syntax where
 
-import Data.Generics
-import Language.Haskell.TH
-
-
+import Language.Haskell.TH (Pat, Exp, Strict)
+import Data.Generics (Data, Typeable)
 
 data PadsDecl = PadsDeclType   String [String] (Maybe Pat) PadsTy
               | PadsDeclData   String [String] (Maybe Pat) PadsData [QString]

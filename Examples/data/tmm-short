@@ -1,0 +1,23 @@
+HMMER3/a [3.0a2 | March 2009]
+NAME  8\all
+LENG  343
+ALPH  amino
+MEAN  -179.46686375467687
+RMSD  88.102255840401853
+RF    no
+CS    no
+MAP   yes
+DATE  Mon Aug 17 21:15:55 2009
+NSEQ  5
+EFFN  1.506653
+CKSUM 2775591013
+STATS LOCAL     VLAMBDA 0.700264
+STATS LOCAL         VMU -11.432074
+STATS LOCAL        FTAU -5.263512
+BETA  6 11 5 24 -1 oiiio
+BETA  12 16 2 28 -1 ii
+BETA  31 40 4 30 -1 ooii
+BETA  39 51 6 32 -1 oiiooo
+BETA  46 49 2 25 -1 oo
+BETA  55 61 2 25 -1 io
+HMM          A        C        D        E        F        G        H        I        K        L        M        N        P        Q        R        S        T        V        W        Y   

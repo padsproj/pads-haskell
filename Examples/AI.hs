@@ -1,12 +1,18 @@
-{-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, NamedFieldPuns, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveDataTypeable
+           , MultiParamTypeClasses
+           , TypeSynonymInstances
+           , TemplateHaskell
+           , QuasiQuotes 
+           , FlexibleInstances #-}
+
+-- :set -ddump-splices
+
 module Examples.AI where
 import Language.Pads.Padsc 
 import Language.Pads.GenPretty       
-import Control.Monad
 
 import System.IO.Unsafe (unsafePerformIO)
 
--- add ability for users to define default values.
 
 [pads|
   newtype AI    = AI ([Line Entry] terminator EOF)
@@ -27,7 +33,7 @@ import System.IO.Unsafe (unsafePerformIO)
 
   data ID = Missing '-' | Id (StringC ' ')
 
--- :set -ddump-splices
+
 
   type TimeStamp = ('[', Date, ']')   
   type Date = DateFC <|("%d/%h/%Y:%H:%M:%S %z", ']')|>

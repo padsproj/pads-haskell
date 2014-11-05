@@ -2,8 +2,21 @@ Documentation/Paper/Pads-Haskell.synctex.gz
 Documentation/Paper/Pads-Haskell.pdf
 Documentation/Paper/Pads-Haskell.log
 Documentation/Paper/Pads-Haskell.aux
+Documentation/Info/Pads-grammar.pdf
 
+Examples/data/genBin
+Examples/data/VCard-infinite.vcf Examples/data/VCards.vcf
+Examples/data/vCards.vcf
+Examples/data/VcardSmall.vcf
+
+
+cabal.sandbox.config
+.cabal-sandbox/*
 /cabal-dev/
 /dist/
 *.o
 *.swp
+*.aux
+*.log
+*~
+*.dvi

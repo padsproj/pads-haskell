@@ -1,4 +1,7 @@
-{-# LANGUAGE NamedFieldPuns, RecordWildCards, DeriveDataTypeable #-}
+{-# LANGUAGE NamedFieldPuns
+           , RecordWildCards
+           , DeriveDataTypeable 
+           #-}
 
 {-
 ** *********************************************************************
@@ -9,12 +12,16 @@
 ************************************************************************
 -}
 
+{-
+   Code for manipulating input sources that will be parsed using Pads-generated tools.
+-}
+
 module Language.Pads.Source where
 
-import qualified Data.ByteString as B   -- abstraction for input data
+import qualified Data.ByteString as B              -- abstraction for input data
+import Text.PrettyPrint.Mainland as PP 
 import qualified Text.Regex.Posix as TRP
 import Language.Pads.RegExp                        -- user-specified regular expressions
-import Text.PrettyPrint.Mainland as PP 
 
 import Data.Int
 import Data.Data

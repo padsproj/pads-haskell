@@ -1,6 +1,5 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables, 
-             MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances, 
-             FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses, TypeSynonymInstances, FlexibleInstances, DeriveDataTypeable #-}
+
 
 {-
 ** *********************************************************************
@@ -10,9 +9,6 @@
 *                                                                      *
 ************************************************************************
 -}
-
-
-
 
 module Language.Pads.CoreBaseTypes where
 
@@ -38,7 +34,7 @@ import Data.Int
 
 import Text.PrettyPrint.Mainland as PP   
 
-import Control.Monad
+import Control.Monad (when)
 
 
 

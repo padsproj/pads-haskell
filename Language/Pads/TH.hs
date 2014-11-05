@@ -11,13 +11,18 @@
 ************************************************************************
 -}
 
+{-
+   This file contains helper functions for generating Template Haskell
+   representations of Haskell code to implement Pads descriptions.
+-}
+
 
 module Language.Pads.TH where
 
 import Language.Haskell.TH as TH
 import Language.Haskell.TH.Syntax
-import Control.Monad
-import Data.Char
+import Control.Monad (replicateM)
+import Data.Char (toUpper, toLower)
 
 typeAnnotate :: Maybe TH.Pat -> Maybe (TH.Pat, TH.Type)
 typeAnnotate Nothing = Nothing

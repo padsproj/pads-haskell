@@ -5,6 +5,7 @@
 module Examples.First where
 import Language.Pads.Padsc
 import Language.Pads.Testing
+
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Char as Char
 import qualified Data.ByteString as B
@@ -112,6 +113,8 @@ tests = TestList[ TestLabel "MyChar"  myChar_test
                 , TestLabel "StringESCs" stringESCs_test
                 , TestLabel "StringPs" stringPs_test
                 ]
+
+[pads|  |]
 
 [pads| type MyChar = Char |]
 myChar_result = myChar_parseS "ab"

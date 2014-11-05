@@ -1,6 +1,3 @@
-{-# LANGUAGE NamedFieldPuns,RecordWildCards #-}
-
-
 {-
 ** *********************************************************************
 *                                                                      *
@@ -10,15 +7,18 @@
 ************************************************************************
 -}
 
+{-
+  This module genertes code to pretty print pads descriptions.
+-}
+
 module Language.Pads.Pretty where
+import Language.Pads.Syntax
+
+import qualified Language.Haskell.TH as TH
+import Text.PrettyPrint.Mainland as PP
+
 import Data.Char (isPrint, ord)
 import qualified Data.Map as M
-import qualified Language.Haskell.TH as TH
-
-import Text.PrettyPrint.Mainland as PP
-import Language.Pads.Syntax
-import qualified Language.Pads.Parser as P
-import Language.Pads.RegExp
 
 
 instance Pretty PadsDecl where

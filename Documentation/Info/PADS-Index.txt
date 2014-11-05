@@ -1,0 +1,104 @@
+PACKAGE-RELATED FILES
+pads-haskell.cabal
+This file describes the pads-haskell package so that the pads/haskell library can be installed along with its dependencies using the tool cabal, which is part of the Haskell platform and is available on the homework.eecs.tufts.edu cluster.  Instructions on using cabal to install packages are available from
+  http://www.haskell.org/haskellwiki/Cabal-Install
+When installing packages, you do not normally need to look at the contents of this file.
+
+Instructions on creating a project.cabal file using the command cabal init are available from
+  http://www.haskell.org/cabal/users-guide/developing-packages.html
+You will need to create such a file for your project.
+
+Setup.hs
+This file is needed for the cabal packaging process.  It is also created automatically as part of the cabal init process for creating a Haskell package.
+
+
+EXAMPLES
+Examples/AI.hs
+Contains a simple Pads description of a web sever log.  Invoke using result n where n is the number of records from sample data file you would like to parse.
+
+Examples/First.hs
+Contains a regression of 89 simple pads examples.  Invoke using function test.
+
+Examples/Binary.hs
+Contains a regression of 3 pads examples using binary data.
+
+
+PADS LANGUAGE FILES
+Language/Pads
+Directory containing all files in the implementation of the PADS/Haskell EDSL.
+
+Language/Pads/Padsc.hs
+Top-level file that exports all the functionality of the PADS language.  Haskell files that want to use Pads just need to import Language.Pads.Padsc.
+
+Language/Pads/Testing.hs
+Code to describe and run unit tests.
+
+
+COMPILER FILES
+Language/Pads/Quote.hs
+Code to implement the Pads quasi-quoter.
+
+Language/Pads/Syntax.hs
+Parse tree data structure for representing Pads programs.
+
+Language/Pads/Parser.hs
+Parser for Pads syntax.  The code in this file maps the input given in a quasi-quotation block into a Pads parse tree represented in the data structures defined in Language.Pads.Syntax.
+
+Language/Pads/CodeGen.hs
+Code to convert Pads parse tree data structures into corresponding Haskell code.  The corresponding Haskell code is represented in the Template Haskell data structures from Language.Haskell.TH embedded in the Q Quasi-Quotation monad.
+
+Language/Pads/RegExp.hs
+Defines a dataype for representing regular expressions in Pads descriptions.
+
+Language/Pads/TH.hs
+Helper functions for building Template Haskell data structures relevant for PADS.
+
+Language/Pads/GenPretty.hs
+Code for pretty printing Pads Parse Tree data structures.  Used mainly for debugging purposes.
+
+
+RUNTIME SYSTEM FILES
+Language/Pads/PadsParser.hs
+Code for parsing source files according to Pads descriptions.
+
+Language/Pads/Source.hs
+Code for manipulating input sources that will be parsed using Pads-generated tools.
+
+Language/Pads/LazyLists.hs
+Code for lazy-append lists.
+
+Language/Pads/Library/Native.hs
+Library support for parsing bytes and integers in the host machine native format.
+
+Language/Pads/Library/BigEndian.hs
+Library support for parsing bytes and integers in big endian format.
+
+Language/Pads/Library/LittleEndian.hs
+Library support for parsing bytes and integers in little endian format.
+
+Language/Pads/Library/BinaryUtilities.hs
+Code to manage different binary representations of bytes and integers.
+
+Language/Pads/Generic.hs
+Declaration of the Pads type class and corresponding generic functions
+for parsing various forms of input and for generating default values.
+
+
+Language/Pads/MetaData.hs
+Declaration of the Pads type class for meta data and for generic operations on meta-data.
+
+Language/Pads/CoreBaseTypes.hs
+Code to implement Pads base types that can’t be implemented as expressions in the Pads language.
+
+Language/Pads/BaseTypes.hs
+Code to implement Pads base types that can be implemented as expressions in the Pads language.
+
+Language/Pads/Error.hs
+Error messages that can be reported during parsing using a Pads description.
+
+GENERATED TOOLS
+Language/Pads/GenPretty.hs
+Code for generating pretty-printers for data in the Pads in-memory representation.
+
+
+

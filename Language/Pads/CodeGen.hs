@@ -1,5 +1,4 @@
-{-# LANGUAGE TemplateHaskell, NamedFieldPuns, ScopedTypeVariables,
-             RecordWildCards, UndecidableInstances #-}
+{-# LANGUAGE TemplateHaskell  #-}
 
 {-
 ** *********************************************************************
@@ -23,18 +22,12 @@ import qualified Language.Pads.Source as S
 import Language.Pads.LazyList
 
 import Language.Haskell.TH 
-import Language.Haskell.Syntax
+import Language.Haskell.TH.Syntax(Name(..), NameFlavour(..), showName)
 
-import Data.Data
-import Data.Char
-import qualified Data.Map as M
-import qualified Data.List as List
 import qualified Data.Maybe as Maybe
-import Control.Monad
+
 
 type BString = S.RawStream
-
-
 
 
 make_pads_declarations :: [PadsDecl] -> Q [Dec]
@@ -88,6 +81,8 @@ patType p = case p of
                 StringL s -> VarT ''String
   TupP ps  -> mkTupleT (map patType ps)
   SigP p t -> t
+  ParensP p -> patType p
+  _ -> error(show p)
 
 
 -----------------------------------------------------------
@@ -463,7 +458,10 @@ genParseRecord c fields pred = do
   where
 
 genLabMDName s (Just lab) = return (mkFieldMDName lab)
-genLabMDName s Nothing    = newName s
+genLabMDName s Nothing    = do {
+   ; name <- newName s
+   ; newName (showName name)
+   }
 
 genParseField :: FieldInfo -> Name -> Q Stmt
 genParseField (labM, (strict, ty), expM) xn = do
@@ -731,143 +729,6 @@ type LString = String
 
 
 
-
-
-
-
-
-------------------------------------
--- Old Stuff 
-------------------------------------
-
-
-
-
-
-{-
-
-genPadsPrintFL :: String -> Name ->    Name ->  Name -> PadsTy -> Maybe (Pat, Type) -> Q [Dec]
-genPadsPrintFL    p_name    print_name rep_name pd_name padsTy mpat_info = do 
-   core_bodyE <- printE rep_name pd_name padsTy
-   let core_ty = arrowTy (AppT (AppT (TupleT 2) (ConT rep_name)) (ConT pd_name)) (ConT (mkName "FList"))
-   let (bodyE,ty) = case mpat_info of
-                     Nothing -> (core_bodyE, core_ty)
-                     Just (pat,pat_ty) -> ( LamE [pat] core_bodyE,
-                                            arrowTy pat_ty core_ty)
-   let sigD = SigD print_name ty
-   let funD = ValD (VarP print_name) (NormalB bodyE) []
-   return [sigD, funD]
-
-printE :: Name -> Name -> PadsTy -> Q Exp
-printE repN mdN ty = do
-   repName     <- genRepName 
-   mdName      <- genMdName 
-   let (repE,repP) = genPE repName
-   let (mdE, mdP)  = genPE mdName
-   let frepP       = wrapRepP repN ty repP 
-   rhsE        <- printE' (ty, repE, mdE)
-   let printFun = LamE [TupP [frepP,mdP]] rhsE
-   return printFun
-
-
-wrapRepP :: Name -> PadsTy -> Pat -> Pat
-wrapRepP repN ty repP = ConP repN [repP]
-
-
-genPrintList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> Exp -> Exp -> Q Exp
-genPrintList ty sepOpt termCondOpt repE mdE = do 
-  (elemRepE, elemRepP) <- doGenPE "elemrep"
-  (elemMDE,  elemMDP)  <- doGenPE "elemmd"
-  parseElemE <- printE' (ty, elemRepE, elemMDE)
-  let parseElemFnE = LamE [TupP [elemRepP, elemMDP]] parseElemE
-  sepElemE <- case sepOpt of 
-                Nothing -> return (VarE 'printNothing)
-                Just ty -> printE' (ty, TupE [], TupE [])
-  termElemE <- case termCondOpt of
-                Nothing -> return (VarE 'printNothing)
-                Just (LengthTC _) -> return (VarE 'printNothing)
-                Just (TyTC (Ptry _)) -> return (VarE 'printNothing)
-                Just (TyTC (Ptuple [Ptry _])) -> return (VarE 'printNothing)
-                Just (TyTC termTy) -> printE' (termTy, TupE [], TupE [])
-  return (AppE (AppE (AppE (AppE (VarE 'printList) (TupE [repE, mdE])) parseElemFnE) sepElemE) termElemE)
-
-
-printUnion :: Name -> [FieldInfo] -> Exp -> Exp -> Q Exp
-printUnion ty_name branches repE mdE = do
-  matches <- printBranches branches
-  let caseE = CaseE (TupE [repE,mdE]) matches
-  return caseE
-
-printBranches :: [FieldInfo] -> Q [Match]
-printBranches branches = mapM printBranch branches
-
-printBranch :: (Maybe String, PadsTy, Maybe Exp) -> Q Match
-printBranch (Just str, branchTy, pred) = do
-  (repE, repP) <- doGenPE "rep"
-  (mdE,  mdP)  <- doGenPE "md"
-  bodyE <- printE' (branchTy, repE, mdE)
-  let caseBodyB = NormalB bodyE
-  let repPatArg = case branchTy of {Plit _ -> [] ; _ -> [repP]}
-  let repPat = ConP (getBranchNameU str) repPatArg
-  let mdPat =  TupP[WildP, ConP (getBranchMDNameU str) [mdP]]
-  let casePat = TupP [repPat, mdPat]
-  let match = Match casePat caseBodyB []
-  return match
-
-
-printTypeDef :: (PadsTy, Exp, Exp) -> Q Exp
-printTypeDef (pty, repE, mdE) = printE' (pty, repE, AppE (VarE 'snd) mdE)
-
-printTrans :: (PadsTy, PadsTy, Exp, Exp, Exp) -> Q Exp
-printTrans (tySrc, tyDst, transE, repE, mdE) = do 
-  (tmpRepE, tmpRepP) <- doGenPE "rep"
-  (tmpMdE,  tmpMdP) <- doGenPE "md"
-  let toDiskE = AppE (VarE 'snd) transE
-  let    cvtE = AppE toDiskE (TupE [repE, mdE])
-  printBodyE <- printE' (tySrc, tmpRepE, tmpMdE)
-  let letPat = ValD (TupP [tmpRepP, tmpMdP]) (NormalB cvtE) []
-  return (LetE [letPat] printBodyE)
-
-
-printApp :: (PadsTy, Exp, Exp, Exp) -> Q Exp
-printApp (ty, argE, repE, mdE) = case ty of
-  Pname p_name   -> return (AppE (AppE  (VarE (getPrintFLName p_name))  argE) (TupE [repE, mdE]))
-
-
-printRecord :: Name -> [FieldInfo] -> Exp -> Exp -> Q Exp
-printRecord recName fields repE mdE = do 
-  let (repEs, repPs) = getPEforFields getBranchNameL fields
-  let (mdEs,  mdPs)  = getPEforFields getBranchMDNameL fields
-  let ptys = map (\(n,ty,p) -> ty) fields
-  let ty_rep_mds = zip3 ptys repEs mdEs
-  expE <- mapM printE' ty_rep_mds
-  let printItemsE = ListE expE
-  let caseBody = NormalB (AppE (VarE 'concatFL) printItemsE)
-  let mdPat  = TupP[WildP, RecP (mkInnerMDName recName) mdPs]
-  let repPat = RecP recName repPs
-  let casePat = TupP [repPat, mdPat]
-  let match = Match casePat caseBody []
-  let caseE = CaseE (TupE [repE,mdE]) [match]
-  return caseE
-
-getPEforField :: (String -> Name) -> (Maybe String, PadsTy, Maybe Exp) -> (Exp, Maybe FieldPat)
-getPEforField mkFieldNm (nameOpt, pty, optPred) = case nameOpt of
-  Nothing -> (TupE [], Nothing) 
-  Just str -> let (varE, varP) = genPE (mkFieldNm str)
-              in (varE, Just (mkFieldNm str, varP))
-
-getPEforFields :: (String -> Name) -> [(Maybe String, PadsTy, Maybe Exp)] ->  ([Exp], [FieldPat])
-getPEforFields mkFieldNm fields = 
-  let eps =  map (getPEforField mkFieldNm) fields
-      (es, pOpts) = List.unzip eps
-      ps = Maybe.catMaybes pOpts
-  in (es, ps)
-
-
-
-
-
--}
 
 
 

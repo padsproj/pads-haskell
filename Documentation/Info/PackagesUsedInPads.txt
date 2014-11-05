@@ -1,0 +1,37 @@
+Key packages used in the implementation of Pads/Haskell
+
+template-haskell
+ http://hackage.haskell.org/package/template-haskell-2.9.0.0
+ Language.Haskell.TH
+ “This package provides modules containing facilities for manipulating Haskell source code using template Haskell”  
+ This package provides support for Quasi-Quotation.  To generate Haskell code, we define a quasi-quoter that represents the desired Haskell code in the data structures defined in this package.  
+
+haskell-src
+  https://hackage.haskell.org/package/haskell-src
+ Language.Haskell.{Syntax, Parser, …}
+ “The haskell-src package provides support for manipulating Haskell source code. The package provides a lexer, parser and pretty-printer, and a definition of a Haskell abstract syntax tree (AST). Common uses of this package are to parse or generate Haskell 98 code”
+ Pads uses this library to parse embedded uses of Haskell in Pads descriptions into the data structures described in this package.
+
+
+haskell-src-meta
+  https://hackage.haskell.org/package/haskell-src-meta
+  Language.Haskell.Meta
+  “The translation from haskell-src-exts abstract syntax to template-haskell abstract syntax isn't 100% complete yet.”
+  This package provides routines to convert between the Template Haskell and Haskell Source representations for Haskell source code.  Pads calls Haskell Source parser to convert Haskell expressions and patterns nested in Pads Code into the Haskell Source data structure for Haskell code.  Pads then calls the haskell-src-meta translation routines to convert those data structures into Template Haskell data structures that the quasi-quoter can use.
+
+parsec
+  https://hackage.haskell.org/package/parsec
+  Text.Parsec
+   “Parsec is designed from scratch as an industrial-strength parser library. It is simple, safe, well documented (on the package homepage), has extensive libraries and good error messages, and is also fast. It is defined as a monad transformer that can be stacked on arbitrary monads, and it is also parametric in the input stream type.”
+  Pads uses this library to define the parser for Pads syntax.
+
+
+mainland-pretty
+  http://hackage.haskell.org/package/mainland-pretty-0.2.7
+  Text.PrettyPrint.Mainland
+  “Pretty printing designed for printing source code based on Wadler's paper A Prettier Printer. The main advantage of this library is its ability to automatically track the source locations associated with pretty printed values and output appropriate #line pragmas and its ability to produce output in the form of lazy text using a builder.”
+
+HUnit
+  http://hackage.haskell.org/package/HUnit
+  Test.HUnit
+  “HUnit is a unit testing framework for Haskell, inspired by the JUnit tool for Java, see: http://www.junit.org”
