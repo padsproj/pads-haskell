@@ -20,3 +20,6 @@ cabal.sandbox.config
 *.log
 *~
 *.dvi
+.cabal-sandbox
+cabal-sandbox-config
+
