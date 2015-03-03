@@ -520,7 +520,10 @@ bytes_parseM n =
     bytes <- takeBytesP n
     if B.length bytes == n 
       then returnClean bytes
-      else returnError (def1 n) (E.Insufficient (B.length bytes) n)
+      else returnError (bytes_default n) (E.Insufficient (B.length bytes) n)
+
+bytes_default :: Int -> Bytes
+bytes_default n = B.pack (replicate n (fromInt 0))
 
 bytes_printFL :: Int -> (Bytes, Bytes_md) -> FList
 bytes_printFL i (bs, bmd) = addBString bs
