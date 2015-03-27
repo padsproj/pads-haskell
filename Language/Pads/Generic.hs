@@ -22,7 +22,8 @@
 module Language.Pads.Generic where
 
 import Language.Pads.MetaData (PadsMD, replace_md_header, mkErrBasePD)
-import Language.Pads.PadsParser (PadsParser, parseStringInput, parseFileInput,parseByteStringInput)
+import Language.Pads.PadsParser (PadsParser, parseStringInput, parseFileInput,parseByteStringInput,
+                                 parseStringInputWithDisc, parseFileInputWithDisc,parseByteStringInputWithDisc)
 import qualified Language.Pads.Errors as E
 import qualified Language.Pads.Source as S
 import Language.Pads.LazyList (FList)
@@ -47,11 +48,20 @@ class (Data rep, PadsMD md) => Pads rep md | rep -> md  where
 parseS   :: Pads rep md => String -> ((rep, md), String) 
 parseS cs = parseStringInput parsePP cs 
 
+parseSWithDisc   :: Pads rep md => S.RecordDiscipline -> String -> ((rep, md), String) 
+parseSWithDisc d cs = parseStringInputWithDisc d parsePP cs 
+
 parseBS   :: Pads rep md => B.ByteString -> ((rep, md), B.ByteString) 
 parseBS cs = parseByteStringInput parsePP cs 
 
+parseBSWithDisc   :: Pads rep md => S.RecordDiscipline -> B.ByteString -> ((rep, md), B.ByteString) 
+parseBSWithDisc d cs = parseByteStringInputWithDisc d parsePP cs 
+
 parseFile :: Pads rep md => FilePath -> IO (rep, md)
 parseFile file = parseFileWith parsePP file
+
+parseFileWithDisc :: Pads rep md => S.RecordDiscipline -> FilePath -> IO (rep, md)
+parseFileWithDisc d file = parseFileWithD d parsePP file
 
 printS :: Pads rep md => (rep,md) -> String
 printS = S.byteStringToStr . printBS
@@ -78,8 +88,11 @@ parseBS1 arg cs = parseByteStringInput (parsePP1 arg) cs
 
 
 
-parseFile1 :: Pads1 arg rep md => arg-> FilePath -> IO (rep, md)
+parseFile1 :: Pads1 arg rep md => arg -> FilePath -> IO (rep, md)
 parseFile1 arg file = parseFileWith (parsePP1 arg) file
+
+parseFile1WithDisc :: Pads1 arg rep md => S.RecordDiscipline -> arg -> FilePath -> IO (rep, md)
+parseFile1WithDisc d arg file = parseFileWithD d (parsePP1 arg) file
 
 printS1 :: Pads1 arg rep md => arg -> (rep,md) -> String
 printS1 arg (rep,md) = S.byteStringToStr (printBS1 arg (rep,md))
@@ -94,6 +107,14 @@ printFile1 arg filepath r = B.writeFile filepath (printBS1 arg r)
 parseFileWith  :: (Data rep, PadsMD md) => PadsParser (rep,md) -> FilePath -> IO (rep,md)
 parseFileWith p file = do
    result <- CE.try (parseFileInput p file)
+   case result of
+     Left (e::CE.SomeException) -> return (gdef, replace_md_header gdef
+                                                 (mkErrBasePD (E.FileError (show e) file) Nothing))
+     Right r -> return r
+
+parseFileWithD  :: (Data rep, PadsMD md) => S.RecordDiscipline -> PadsParser (rep,md) -> FilePath -> IO (rep,md)
+parseFileWithD d p file = do
+   result <- CE.try (parseFileInputWithDisc d p file)
    case result of
      Left (e::CE.SomeException) -> return (gdef, replace_md_header gdef
                                                  (mkErrBasePD (E.FileError (show e) file) Nothing))

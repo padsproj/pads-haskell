@@ -93,18 +93,31 @@ emptySource = Source {current = B.empty, rest = B.empty, loc = zeroLoc, eorAtEOF
 padsSourceFromString :: String -> Source
 padsSourceFromString str = padsSourceFromByteString (strToByteString str)
 
+padsSourceFromStringWithDisc :: RecordDiscipline -> String -> Source
+padsSourceFromStringWithDisc d str = padsSourceFromByteStringWithDisc d (strToByteString str)
+
 padsSourceFromFile :: FilePath -> IO Source
 padsSourceFromFile file = do
   { bs <- B.readFile file
   ; return (padsSourceFromByteString bs)
   }
 
+
+padsSourceFromFileWithDisc :: RecordDiscipline -> FilePath -> IO Source
+padsSourceFromFileWithDisc d file = do
+  { bs <- B.readFile file
+  ; return (padsSourceFromByteStringWithDisc d bs)
+  }
+
 padsSourceFromByteString :: B.ByteString -> Source
-padsSourceFromByteString bs = 
+padsSourceFromByteString = padsSourceFromByteStringWithDisc newline 
+
+padsSourceFromByteStringWithDisc :: RecordDiscipline -> B.ByteString -> Source
+padsSourceFromByteStringWithDisc d bs = 
     let rawSource = Source{ current  = B.empty
                           , rest     = bs
                           , loc      = zeroLoc  
-                          , disc     = newline 
+                          , disc     = d
                           , eorAtEOF = False  
                           }
     in getNextLine rawSource
