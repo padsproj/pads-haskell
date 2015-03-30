@@ -1,5 +1,4 @@
-{-# LANGUAGE TemplateHaskell
- #-}
+{-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, NamedFieldPuns, ScopedTypeVariables #-}
 
 {-
 ** *********************************************************************
@@ -8,11 +7,6 @@
 *              John Launchbury <john.launchbury@gmail.com>             *
 *                                                                      *
 ************************************************************************
--}
-
-{-
-  This module contains code for generating pretty printers for
-  data in a PADS in-memory represenation
 -}
 
 module Language.Pads.GenPretty where
@@ -27,11 +21,12 @@ import Text.PrettyPrint.Mainland
 
 import qualified Data.List as L
 import qualified Data.Set as S
+import Control.Monad
 
-import Data.Time
+import System.Posix.Types
 import Data.Word
 import Data.Int
-import System.Posix.Types
+import Data.Time
 
 
 pprE argE = AppE (VarE 'ppr) argE
@@ -90,10 +85,10 @@ getNamedTys' answers worklist =
            ; let new_worklist = worklist' `S.union` new_nested
            ; getNamedTys' answers' new_worklist
            }
-        TyConI (TySynD _ _ _ ) -> do {reportError ("getTyNames: unimplemented TySynD case " ++ (nameBase ty_name)); return answers'} 
-        TyConI (ForeignD _) -> do {reportError ("getTyNames: unimplemented ForeignD case " ++ (nameBase ty_name)); return answers'} 
+        TyConI (TySynD _ _ _ ) -> do {report True ("getTyNames: unimplemented TySynD case " ++ (nameBase ty_name)); return answers'} 
+        TyConI (ForeignD _) -> do {report True ("getTyNames: unimplemented ForeignD case " ++ (nameBase ty_name)); return answers'} 
         PrimTyConI _ _ _ -> return answers
-        otherwise -> do {reportError ("getTyNames: pattern didn't match for " ++ (nameBase ty_name)); return answers'} 
+        otherwise -> do {report True ("getTyNames: pattern didn't match for " ++ (nameBase ty_name)); return answers'} 
    }
 
 baseTypeNames = S.fromList [ ''Int, ''Char, ''Digit, ''Text, ''String, ''StringFW, ''StringME 
@@ -188,8 +183,8 @@ mkPrettyInstance' worklist done decls =
                      { let nestedTyNames = getTyNames ty
 --                     ; report True ("tysyn for"++(nameBase ty_name)) 
                      ; return (nestedTyNames, [])} 
-                   TyConI dec -> do {reportError ("otherwise; tyconI case "++(nameBase ty_name)) ; return (S.empty, [])} 
-                   otherwise -> do {reportError ("pattern didn't match for "++(nameBase ty_name)) ; return (S.empty, [])} 
+                   TyConI dec -> do {report True ("otherwise; tyconI case "++(nameBase ty_name)) ; return (S.empty, [])} 
+                   otherwise -> do {report True ("pattern didn't match for "++(nameBase ty_name)) ; return (S.empty, [])} 
          let newWorklist = worklist `S.union` nestedTyNames
          let newDecls = decls'++decls
          mkPrettyInstance' newWorklist newDone newDecls

@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wall #-}
-
+{-# OPTIONS -fglasgow-exts #-}
 
 {-
 ** *********************************************************************
@@ -11,18 +11,14 @@
 ************************************************************************
 -}
 
-{-
-   This file contains helper functions for generating Template Haskell
-   representations of Haskell code to implement Pads descriptions.
--}
-
 
 module Language.Pads.TH where
 
 import Language.Haskell.TH as TH
 import Language.Haskell.TH.Syntax
-import Control.Monad (replicateM)
-import Data.Char (toUpper, toLower)
+import Control.Monad
+import Data.Char
+import GHC.Exts
 
 typeAnnotate :: Maybe TH.Pat -> Maybe (TH.Pat, TH.Type)
 typeAnnotate Nothing = Nothing
@@ -117,6 +113,7 @@ patToTy pat = case pat of
   RecP name _fieldPats -> ConT name
   ListP pats  -> mkListT (map patToTy pats)
   SigP _ ty   -> ty
+  ParensP pat -> patToTy pat
   _           -> error ("patToTy: unexpected pat: " ++ show pat)
 
 litToTy :: TH.Lit -> TH.Type
@@ -156,3 +153,12 @@ fieldPatToExp (n,p) = (n, patToExp p)
 boolToExpE :: Bool -> Exp
 boolToExpE True = ConE 'True
 boolToExpE False = ConE 'False
+
+-- generate globally scoped unique variables as suggested in https://ghc.haskell.org/trac/ghc/ticket/5398
+mangleName :: Name -> Name
+mangleName name@(Name occ fl) = case fl of
+	NameU u -> Name (mangle_occ occ u) fl
+	_       -> name
+  where
+	mangle_occ :: OccName -> Int# -> OccName
+	mangle_occ occ uniq = mkOccName (occString occ ++ "-" ++ show (I# uniq))

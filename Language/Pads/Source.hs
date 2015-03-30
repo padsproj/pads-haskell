@@ -1,7 +1,4 @@
-{-# LANGUAGE NamedFieldPuns
-           , RecordWildCards
-           , DeriveDataTypeable 
-           #-}
+{-# LANGUAGE NamedFieldPuns, RecordWildCards, DeriveDataTypeable #-}
 
 {-
 ** *********************************************************************
@@ -12,21 +9,18 @@
 ************************************************************************
 -}
 
-{-
-   Code for manipulating input sources that will be parsed using Pads-generated tools.
--}
-
 module Language.Pads.Source where
 
-import qualified Data.ByteString as B              -- abstraction for input data
-import Text.PrettyPrint.Mainland as PP 
+import qualified Data.ByteString as B   -- abstraction for input data
 import qualified Text.Regex.Posix as TRP
 import Language.Pads.RegExp                        -- user-specified regular expressions
+import Text.PrettyPrint.Mainland as PP 
 
 import Data.Int
 import Data.Data
 import Data.Word
 import Data.Char
+import qualified Data.ByteString.Char8 as Char8
 
 type RawStream = B.ByteString   -- This is the type that should be used in other files!!!
 
@@ -102,7 +96,6 @@ padsSourceFromFile file = do
   ; return (padsSourceFromByteString bs)
   }
 
-
 padsSourceFromFileWithDisc :: RecordDiscipline -> FilePath -> IO Source
 padsSourceFromFileWithDisc d file = do
   { bs <- B.readFile file
@@ -110,7 +103,14 @@ padsSourceFromFileWithDisc d file = do
   }
 
 padsSourceFromByteString :: B.ByteString -> Source
-padsSourceFromByteString = padsSourceFromByteStringWithDisc newline 
+padsSourceFromByteString bs = 
+    let rawSource = Source{ current  = B.empty
+                          , rest     = bs
+                          , loc      = zeroLoc  
+                          , disc     = newline 
+                          , eorAtEOF = False  
+                          }
+    in getNextLine rawSource
 
 padsSourceFromByteStringWithDisc :: RecordDiscipline -> B.ByteString -> Source
 padsSourceFromByteStringWithDisc d bs = 
@@ -385,7 +385,8 @@ byteStringToStr :: B.ByteString -> String
 byteStringToStr = word8sToStr . B.unpack
 
 strToByteString :: String -> B.ByteString
-strToByteString = B.pack . strToWord8s
+--strToByteString = B.pack . strToWord8s
+strToByteString = Char8.pack
 
 
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE NamedFieldPuns,RecordWildCards #-}
 
-module Example.Regression where
+module Examples.Regression where
 
 
 import Text.PrettyPrint.Mainland as PP

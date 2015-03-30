@@ -9,21 +9,28 @@ module Language.Pads.Parser where
 ************************************************************************
 -}
 
+
 -- This is the parser for the PADS syntax in Haskell
+
+import Language.Pads.Syntax
+
 
 import Text.Parsec hiding (upper,lower)
 import qualified Text.Parsec.String as PS
-import qualified Text.Parsec.Prim   as PP
-import qualified Text.Parsec.Token  as PT
-import Text.ParserCombinators.Parsec.Language (haskellStyle, reservedOpNames, reservedNames)
-import Text.ParserCombinators.Parsec.Pos      (newPos)
+import Text.Parsec.Error
+import Text.Parsec.Prim as PP
+import qualified Text.Parsec.Token as PT
+import Text.Parsec.Language
+import Text.ParserCombinators.Parsec.Language 
+import Text.ParserCombinators.Parsec.Pos
+import Text.Parsec.Expr
+import Control.Monad
 
-import qualified Language.Haskell.Meta as LHM  -- Supports parsing Haskell forms
-import Language.Pads.Syntax  -- Defines syntx tree for PADS forms
-import Language.Haskell.TH   -- Defines data structures for Haskell Code
+import qualified Language.Haskell.Meta as LHM 
+import Language.Haskell.TH
 
-import Data.Char (isUpper, isLower)
-import Control.Monad (guard)
+import Data.Char
+import System.FilePath.Glob
 
 
 
@@ -33,21 +40,16 @@ type Env    = [String]
 -- The main entry point for the QuasiQuoter is parsePadsDecls.
 
 
--- To find documentation for many Haskell library functions, go to
---  http://www.haskell.org/hoogle/
--- and enter the name of the function.
 parsePadsDecls :: SourceName -> Line -> Column -> String -> Either ParseError [PadsDecl]
 parsePadsDecls fileName line column input 
   = PP.parse (do { setPosition (newPos fileName line column)
                  ; whiteSpace
-                 ; x <- decls
+                 ; x <- padsDecls
                  ; whiteSpace
                  ; eof <|> errorParse
                  ; return x
                  }) fileName input
 
-
--- This function consumes input until the eof marker.
 errorParse = do 
   { rest <- manyTill anyToken eof
   ; unexpected rest }
@@ -57,18 +59,18 @@ errorParse = do
 -- PADS DECLARATIONS
 -------------------------
 
-decls :: Parser [PadsDecl]
-decls = many decl
+padsDecls :: Parser [PadsDecl]
+padsDecls = option [] (many1 topDecl)
 
-decl :: Parser PadsDecl
-decl 
+topDecl :: Parser PadsDecl
+topDecl 
   =  typeDecl <|> dataDecl <|> newDecl <|> obtainDecl
  <?> "Pads declaration keyword"
 
 typeDecl :: Parser PadsDecl
 typeDecl 
   = do { reserved "type"
-       ; (id,env) <- padsID; pat <- patLHS
+       ; (id,env) <- declLHS; pat <- patLHS
        ; rhs <- ptype env
        ; return (PadsDeclType id env pat rhs)
        } <?> "Pads type declaration"
@@ -76,7 +78,7 @@ typeDecl
 dataDecl :: Parser PadsDecl
 dataDecl 
   = do { reserved "data"
-       ; (id,env) <- padsID; pat <- patLHS
+       ; (id,env) <- declLHS; pat <- patLHS
        ; rhs <- dataRHS env; drvs <- option [] derives
        ; return (PadsDeclData id env pat rhs drvs)
        } <?> "Pads data declaration"
@@ -84,7 +86,7 @@ dataDecl
 newDecl :: Parser PadsDecl
 newDecl 
   = do { reserved "newtype"
-       ; (id,env) <- padsID; pat <- patLHS
+       ; (id,env) <- declLHS; pat <- patLHS
        ; rhs <- newRHS env; drvs <- option [] derives
        ; return (PadsDeclNew id env pat rhs drvs)
        } <?> "Pads newtype declaration"
@@ -92,16 +94,16 @@ newDecl
 obtainDecl :: Parser PadsDecl
 obtainDecl
   = do { reserved "obtain"
-       ; (id,env) <- padsID
+       ; (id,env) <- declLHS
        ; reservedOp "from"; rhs <- ptype env
        ; reserved "using"; exp <- expression 
        ; return (PadsDeclObtain id env rhs exp)
        } <?> "Pads transform type"
 
-padsID 
+declLHS
   = do { id <- upper; env <- try $ many lower
        ; return (id,env)
-       } 
+       }
 
 patLHS
   = do { p <- try $ haskellParsePatTill "="
@@ -132,8 +134,7 @@ ptype env
 constrain :: Env -> Parser PadsTy
 constrain env
   = do { reserved "constrain"
-       ; pat <- haskellParsePatTill "::"
-       ; ty <- ptype env
+       ; pat <- haskellParsePatTill "::"; ty <- ptype env
        ; exp <- predic
        ; return (PConstrain pat ty exp)
        } <?> "Pads constrain type"
@@ -382,6 +383,20 @@ reLiteral = do { reservedOp reMark
                }
 reMark = "'"
 
+literalPat :: Parser Pat 
+literalPat =  fmap (LitP . CharL) (try charLiteral)
+       <|> reLiteralPat
+       <|> fmap (LitP . StringL) stringLiteral
+       <|> fmap (LitP . IntegerL) (try integer)
+       <|> fmap (VarP . mkName . qName) qualLower
+       <|> fmap (flip ConP [] . mkName . qName) qualUpper
+       <?> "Pads literal"
+
+reLiteralPat :: Parser Pat 
+reLiteralPat = do { reservedOp reMark
+               ; str <- manyTill anyChar (reservedOp reMark) 
+               ; return (ConP (mkName "RE") [LitP (StringL str)])
+               }
 
 qualUpper, qualLower :: Parser QString
 qualUpper = try (upper `sepBy1` reservedOp ".")

@@ -7,9 +7,6 @@
 ************************************************************************
 -}
 
-{-
-   Code to describe and run Pads-related unit tests.
--}
 
 module Language.Pads.Testing (
     module Test.HUnit ,

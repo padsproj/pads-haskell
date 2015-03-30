@@ -1,4 +1,5 @@
-{-# LANGUAGE NamedFieldPuns, RecordWildCards, FlexibleInstances, DeriveDataTypeable #-}
+{-# LANGUAGE Rank2Types, TypeFamilies, KindSignatures, NamedFieldPuns, RecordWildCards, FlexibleInstances, DeriveDataTypeable #-}
+{-# LANGUAGE ConstraintKinds, MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, FlexibleContexts #-}
 {-
 ** *********************************************************************
 *                                                                      *
@@ -8,9 +9,6 @@
 ************************************************************************
 -}
 
-{-
-  Type class for Pads meta-data and generic operations on meta-data.
--}
 
 module Language.Pads.MetaData where
 
@@ -18,7 +16,13 @@ import qualified Language.Pads.Errors as E
 import qualified Language.Pads.Source as S
 import Text.PrettyPrint.Mainland as PP
 
-import Data.Data
+import System.Posix.Types
+
+import Data.Generics
+import Data.Map (Map(..))
+import qualified Data.Map as Map
+import Data.Set (Set(..))
+import qualified Data.Set as Set
 import Data.List
 
 {- Base type library support -}
@@ -42,8 +46,8 @@ instance Data b => PadsMD (Base_md,b) where
   get_md_header (h,b) = h
   replace_md_header (h1,b) h2 = (h2,b)
 
-
 cleanBasePD = Base_md {numErrors = 0, errInfo = Nothing }
+errorBasePD path = Base_md {numErrors = 1, errInfo = Just (E.ErrInfo (E.FileError path path) Nothing) }
 
 
 mergeBaseMDs :: [Base_md] -> Base_md
@@ -69,7 +73,40 @@ instance Pretty Base_md where
 pprBaseMD Base_md {numErrors=num, errInfo = info} 
   = text "Errors:" <+> PP.ppr num <+> 
     case info of
-      Nothing -> empty
+      Nothing -> PP.empty
       Just e -> PP.ppr e
 
+type family Meta (rep :: *) :: *
 
+myempty :: forall a. Data a => a
+myempty = general 
+      `extB` char 
+      `extB` int
+      `extB` integer
+      `extB` float 
+      `extB` double 
+      `extB` coff
+      `extB` epochTime
+      `extB` fileMode
+      `ext2B` map
+      `ext1B` set
+      `ext1B` list where
+  -- Generic case
+  general :: Data a => a
+  general = fromConstrB myempty (indexConstr (dataTypeOf general) 1)
+  
+  -- Base cases
+  char    = '\NUL'
+  int     = 0      :: Int
+  integer = 0      :: Integer
+  float   = 0.0    :: Float
+  double  = 0.0    :: Double
+  coff    = 0      :: COff
+  epochTime = 0    :: EpochTime
+  fileMode = 0     :: FileMode
+  list :: Data b => [b]
+  list    = []
+  map :: (Data k,Data v) => Map k v
+  map = Map.empty
+  set :: Data k => Set k
+  set = Set.empty

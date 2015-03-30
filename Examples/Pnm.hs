@@ -1,5 +1,5 @@
 {-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, NamedFieldPuns, ScopedTypeVariables #-}
-module Pnm where
+module Examples.Pnm where
 import qualified Data.Char as Char
 import Language.Pads.Padsc 
 import Control.Monad

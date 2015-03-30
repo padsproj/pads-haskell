@@ -1,8 +1,4 @@
-{-# LANGUAGE   FunctionalDependencies
-             , ScopedTypeVariables
-             , Rank2Types
-             , FlexibleInstances 
-   #-}
+{-# LANGUAGE ConstraintKinds, MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, FlexibleContexts, Rank2Types, FlexibleInstances #-}
 
 {-
 ** *********************************************************************
@@ -13,49 +9,49 @@
 ************************************************************************
 -}
 
-{-
-  Declaration of the Pads type class and corresponding generic functions for 
-  parsing various forms of input and for generating default vaules.
--}
-
 
 module Language.Pads.Generic where
 
-import Language.Pads.MetaData (PadsMD, replace_md_header, mkErrBasePD)
-import Language.Pads.PadsParser (PadsParser, parseStringInput, parseFileInput,parseByteStringInput,
-                                 parseStringInputWithDisc, parseFileInputWithDisc,parseByteStringInputWithDisc)
+import Language.Pads.MetaData
+import Language.Pads.PadsParser
 import qualified Language.Pads.Errors as E
 import qualified Language.Pads.Source as S
-import Language.Pads.LazyList (FList)
-
+import Language.Pads.PadsPrinter
 import qualified Data.ByteString as B
 import qualified Control.Exception as CE
-
-import Data.Data  -- Support for generics
+import Data.Data
 import Data.Generics.Aliases (extB, ext1B)
-import Data.Map (Map, empty, fromList, toList)
-import Data.Set (Set, fromList, toList)
+import Data.Map (Map(..))
+import qualified Data.Map as Map
+import Data.Set (Set(..))
+import qualified Data.Set as Set
+import Language.Pads.Errors
 
-import System.Posix.Types (COff, EpochTime, FileMode)
+import System.Posix.Types
+import Foreign.C.Types
+import System.CPUTime
 
+type Pads rep md = Pads1 () rep md
 
-class (Data rep, PadsMD md) => Pads rep md | rep -> md  where
-  def :: rep
-  def = gdef
-  parsePP  :: PadsParser(rep,md)
-  printFL :: (rep,md) -> FList
+def :: Pads rep md => rep
+def = def1 ()
+defaultMd :: Pads rep md => rep -> md
+defaultMd = defaultMd1 ()
+parsePP :: Pads rep md => PadsParser (rep,md)
+parsePP = parsePP1 ()
+printFL :: Pads rep md => PadsPrinter (rep,md)
+printFL = printFL1 ()
+defaultRepMd :: Pads rep md => (rep,md)
+defaultRepMd = defaultRepMd1 ()
+
+parseRep :: Pads rep md => String -> rep
+parseRep cs = fst $ fst $ parseStringInput parsePP cs
 
 parseS   :: Pads rep md => String -> ((rep, md), String) 
 parseS cs = parseStringInput parsePP cs 
 
-parseSWithDisc   :: Pads rep md => S.RecordDiscipline -> String -> ((rep, md), String) 
-parseSWithDisc d cs = parseStringInputWithDisc d parsePP cs 
-
 parseBS   :: Pads rep md => B.ByteString -> ((rep, md), B.ByteString) 
 parseBS cs = parseByteStringInput parsePP cs 
-
-parseBSWithDisc   :: Pads rep md => S.RecordDiscipline -> B.ByteString -> ((rep, md), B.ByteString) 
-parseBSWithDisc d cs = parseByteStringInputWithDisc d parsePP cs 
 
 parseFile :: Pads rep md => FilePath -> IO (rep, md)
 parseFile file = parseFileWith parsePP file
@@ -63,22 +59,37 @@ parseFile file = parseFileWith parsePP file
 parseFileWithDisc :: Pads rep md => S.RecordDiscipline -> FilePath -> IO (rep, md)
 parseFileWithDisc d file = parseFileWithD d parsePP file
 
-printS :: Pads rep md => (rep,md) -> String
+printS :: Pads rep md => (rep,md) -> (String)
 printS = S.byteStringToStr . printBS
 
-printBS :: Pads rep md => (rep,md) -> B.ByteString
-printBS r = printFL r B.empty
+printRep :: Pads rep md => rep -> String
+printRep = printRep1 ()
+
+printBS :: Pads rep md => (rep,md) -> (B.ByteString)
+printBS r = let f = (printFL r) in f B.empty
 
 printFile :: Pads rep md => FilePath -> (rep,md) -> IO ()
-printFile filepath r = B.writeFile filepath (printBS r)
+printFile filepath r = do
+	let str = printBS r
+	B.writeFile filepath str
 
+printFileRep :: Pads rep md => FilePath -> rep -> IO ()
+printFileRep filepath r = printFile filepath (r,defaultMd r)
 
+class (Data rep, PadsMD md) => Pads1 arg rep md | rep -> md, rep -> arg where
+	def1 :: arg -> rep
+	def1 =  \_ -> gdef
+	defaultMd1 :: arg -> rep -> md
+	defaultMd1 _ _ = myempty
+	parsePP1  :: arg -> PadsParser (rep,md)
+	printFL1 :: arg -> PadsPrinter (rep,md)
+	defaultRepMd1 :: arg -> (rep,md)
+	defaultRepMd1 arg = (rep,md) where
+		rep = def1 arg
+		md = defaultMd1 arg rep
 
-class (Data rep, PadsMD md) => Pads1 arg rep md | rep->md, rep->arg where
-  def1 :: arg -> rep
-  def1 =  \_ -> gdef
-  parsePP1  :: arg -> PadsParser(rep,md)
-  printFL1 :: arg -> (rep,md) -> FList
+parseRep1 :: Pads1 arg rep md => arg -> String -> rep
+parseRep1 arg cs = fst $ fst $ parseStringInput (parsePP1 arg) cs
 
 parseS1 :: Pads1 arg rep md => arg -> String -> ((rep, md), String) 
 parseS1 arg cs = parseStringInput (parsePP1 arg) cs
@@ -87,22 +98,33 @@ parseBS1 :: Pads1 arg rep md => arg -> B.ByteString -> ((rep, md), B.ByteString)
 parseBS1 arg cs = parseByteStringInput (parsePP1 arg) cs
 
 
+parseString1 :: Pads1 arg rep md => arg-> String -> (rep, md)
+parseString1 arg str = parseStringWith (parsePP1 arg) str
 
-parseFile1 :: Pads1 arg rep md => arg -> FilePath -> IO (rep, md)
+parseFile1 :: Pads1 arg rep md => arg-> FilePath -> IO (rep, md)
 parseFile1 arg file = parseFileWith (parsePP1 arg) file
 
 parseFile1WithDisc :: Pads1 arg rep md => S.RecordDiscipline -> arg -> FilePath -> IO (rep, md)
 parseFile1WithDisc d arg file = parseFileWithD d (parsePP1 arg) file
 
-printS1 :: Pads1 arg rep md => arg -> (rep,md) -> String
+printS1 :: Pads1 arg rep md => arg -> (rep,md) -> (String)
 printS1 arg (rep,md) = S.byteStringToStr (printBS1 arg (rep,md))
 
-printBS1 :: Pads1 arg rep md => arg -> (rep,md) -> B.ByteString
-printBS1 arg r = printFL1 arg r B.empty
+printRep1 :: Pads1 arg rep md => arg -> rep -> String
+printRep1 arg rep = printS1 arg (rep,defaultMd1 arg rep)
 
+printBS1 :: Pads1 arg rep md => arg -> (rep,md) -> (B.ByteString)
+printBS1 arg r = let f = (printFL1 arg r) in f B.empty
 printFile1 :: Pads1 arg rep md => arg -> FilePath -> (rep,md) -> IO ()
-printFile1 arg filepath r = B.writeFile filepath (printBS1 arg r)
+printFile1 arg filepath r = do
+	let str = printBS1 arg r
+	B.writeFile filepath str
+	
+printFileRep1 :: Pads1 arg rep md => arg -> FilePath -> rep -> IO ()
+printFileRep1 arg filepath r = printFile1 arg filepath (r,defaultMd1 arg r)
 
+parseStringWith  :: (Data rep, PadsMD md) => PadsParser (rep,md) -> String -> (rep,md)
+parseStringWith p str = fst $ parseStringInput p str
 
 parseFileWith  :: (Data rep, PadsMD md) => PadsParser (rep,md) -> FilePath -> IO (rep,md)
 parseFileWith p file = do
@@ -120,8 +142,6 @@ parseFileWithD d p file = do
                                                  (mkErrBasePD (E.FileError (show e) file) Nothing))
      Right r -> return r
 
-
-
 {- Generic function for computing the default for any type supporting Data a interface -}
 getConstr :: DataType -> Constr
 getConstr ty = 
@@ -131,7 +151,6 @@ getConstr ty =
         FloatRep    -> mkRealConstr ty 0.0 
         CharRep     -> mkCharConstr ty '\NUL'
         NoRep       -> error "PADSC: Unexpected NoRep in PADS type"
-
 
 gdef :: Data a => a
 gdef = def_help 
@@ -156,50 +175,24 @@ ext2B :: (Data a, Typeable t)
 ext2B def ext = unB ((B def) `ext2` (B ext))
 
 
-myempty :: forall a. Data a => a
-myempty = general 
-      `extB` char 
-      `extB` int
-      `extB` integer
-      `extB` float 
-      `extB` double 
-      `extB` coff
-      `extB` epochTime
-      `extB` fileMode
-      `ext2B` map
-      `ext1B` list where
-  -- Generic case
-  general :: Data a => a
-  general = fromConstrB myempty (indexConstr (dataTypeOf general) 1)
-  
-  -- Base cases
-  char    = '\NUL'
-  int     = 0      :: Int
-  integer = 0      :: Integer
-  float   = 0.0    :: Float
-  double  = 0.0    :: Double
-  coff    = 0      :: COff
-  epochTime = 0    :: EpochTime
-  fileMode = 0     :: FileMode
-  list :: Data b => [b]
-  list    = []
-  map :: Data.Map.Map k v
-  map = Data.Map.empty
 
+class BuildContainer2 c key item where
+  buildContainer2 :: [(key,item)] -> c key item
+  toList2         :: c key item -> [(key,item)]
 
-class BuildContainer2 c item where
-  buildContainer2 :: [(FilePath,item)] -> c FilePath item
-  toList2         :: c FilePath item -> [(FilePath,item)]
+instance Ord key => BuildContainer2 Map key a  where
+  buildContainer2 = Map.fromList
+  toList2         = Map.toList
 
-instance BuildContainer2 Map a  where
-  buildContainer2 = Data.Map.fromList
-  toList2         = Data.Map.toList
+class BuildContainer1 c key item where
+  buildContainer1 :: [(key,item)] -> c (key, item)
+  toList1         :: c (key, item) ->  [(key,item)]
 
-class BuildContainer1 c item where
-  buildContainer1 :: [(FilePath,item)] -> c (FilePath, item)
-  toList1         :: c (FilePath, item) ->  [(FilePath,item)]
+instance (Ord a,Ord key) => BuildContainer1 Set key a  where
+  buildContainer1 = Set.fromList
+  toList1         = Set.toList
 
-instance Ord a => BuildContainer1 Set a  where
-  buildContainer1 = Data.Set.fromList
-  toList1         = Data.Set.toList
+instance BuildContainer1 [] key a  where
+  buildContainer1 = id
+  toList1         = id
 

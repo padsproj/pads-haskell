@@ -20,23 +20,14 @@ import Language.Pads.RegExp
 import Data.Char
 
 import Control.Monad
-import Control.Applicative (Applicative(..))
-
 
 parseStringInput :: PadsParser a -> String -> (a,String)
 parseStringInput pp cs = case pp #  (S.padsSourceFromString cs) of
                            ((r,rest),b) -> (r, S.padsSourceToString rest)  
 
-parseStringInputWithDisc :: S.RecordDiscipline -> PadsParser a -> String -> (a,String)
-parseStringInputWithDisc d pp cs = case pp #  (S.padsSourceFromStringWithDisc d cs) of
-                           ((r,rest),b) -> (r, S.padsSourceToString rest)  
 
 parseByteStringInput :: PadsParser a -> S.RawStream -> (a, S.RawStream)
 parseByteStringInput pp cs = case pp #  (S.padsSourceFromByteString cs) of
-                           ((r,rest),b) -> (r, S.padsSourceToByteString rest)
-
-parseByteStringInputWithDisc :: S.RecordDiscipline -> PadsParser a -> S.RawStream -> (a, S.RawStream)
-parseByteStringInputWithDisc d pp cs = case pp #  (S.padsSourceFromByteStringWithDisc d cs) of
                            ((r,rest),b) -> (r, S.padsSourceToByteString rest)
 
 parseFileInput :: PadsParser a -> FilePath -> IO a 
@@ -45,13 +36,11 @@ parseFileInput pp file =  do
   ; case pp # source of ((r,rest),b) -> return r
   }
 
-
 parseFileInputWithDisc :: S.RecordDiscipline -> PadsParser a -> FilePath -> IO a 
 parseFileInputWithDisc d pp file =  do
   { source <- S.padsSourceFromFileWithDisc d file
   ; case pp # source of ((r,rest),b) -> return r
   }
-
 
 ------------------------------------------------------------------
                         
@@ -64,20 +53,12 @@ instance Functor PadsParser where
   fmap f p = PadsParser $ \bs -> let ((x,bs'),b) = p # bs in
                                    ((f x, bs'),b)
 
-instance Applicative PadsParser where
-    pure  = return
-    (<*>) = ap
-
-
-
 -- if any results on the way are bad, then the whole thing will be bad
 instance Monad PadsParser where
   return r = PadsParser $ \bs -> ((r,bs), True)
   p >>= f  = PadsParser $ \bs -> let ((v,bs'),b)   = p # bs
                                      ((w,bs''),b') = f v # bs'
                                  in ((w,bs''), b && b')
-
-
 
 
 
@@ -393,7 +374,6 @@ digitListToInt :: Bool -> [Char] -> Int
 digitListToInt isNeg digits = if isNeg then negate raw else raw
   where
     raw = foldl (\a d ->10*a + digitToInt d) 0 digits
-
 
 -------------------------
 

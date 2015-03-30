@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveDataTypeable
+{-# LANGUAGE TypeFamilies, ScopedTypeVariables, DeriveDataTypeable
            , MultiParamTypeClasses
            , TypeSynonymInstances
            , TemplateHaskell

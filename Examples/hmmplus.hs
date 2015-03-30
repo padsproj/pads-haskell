@@ -1,8 +1,8 @@
-{-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, 
+{-# LANGUAGE TypeFamilies, TypeSynonymInstances, TemplateHaskell, QuasiQuotes, 
              MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
              DeriveDataTypeable, ScopedTypeVariables, NamedFieldPuns #-}
 
-module Smurf.HmmPlus where
+module Examples.HmmPlus where
 import Language.Pads.Padsc
 import Language.Pads.GenPretty
 import Control.Monad

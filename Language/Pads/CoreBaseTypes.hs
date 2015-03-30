@@ -1,5 +1,6 @@
-{-# LANGUAGE MultiParamTypeClasses, TypeSynonymInstances, FlexibleInstances, DeriveDataTypeable #-}
-
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables, 
+             MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances, 
+             FlexibleInstances #-}
 
 {-
 ** *********************************************************************
@@ -10,18 +11,23 @@
 ************************************************************************
 -}
 
+
+
+
 module Language.Pads.CoreBaseTypes where
 
 import Language.Pads.Generic
 import Language.Pads.MetaData
 import Language.Pads.PadsParser
 import Language.Pads.RegExp
+import Data.Maybe
 
 import qualified Language.Pads.Source as S
 import qualified Language.Pads.Errors as E
 import qualified Data.ByteString as B  
+import qualified Data.ByteString.Char8 as C
 
-import Language.Pads.LazyList 
+import Language.Pads.PadsPrinter 
 
 import Language.Haskell.TH as TH
 import Language.Haskell.TH.Syntax
@@ -34,7 +40,7 @@ import Data.Int
 
 import Text.PrettyPrint.Mainland as PP   
 
-import Control.Monad (when)
+import Control.Monad
 
 
 
@@ -51,11 +57,12 @@ char_parseM  =
     c <- takeHeadP
     returnClean c
 
-instance Pads Char Base_md where
-  parsePP = char_parseM
-  printFL = char_printFL
+type instance Meta Char = Base_md
+instance Pads1 () Char Base_md where
+  parsePP1 () = char_parseM
+  printFL1 () = char_printFL
 
-char_printFL :: (Char, Base_md) -> FList
+char_printFL :: PadsPrinter (Char, md)
 char_printFL (c,bmd) = addString [c] 
 
 
@@ -76,13 +83,86 @@ int_parseM =
       then returnClean (digitListToInt isNeg digits)
       else returnError def (E.FoundWhenExpecting (mkStr c) "Int")
 
-instance Pads Int Base_md where
-  parsePP = int_parseM
-  printFL = int_printFL
+type instance Meta Int = Base_md
+instance Pads1 () Int Base_md where
+  parsePP1 () = int_parseM
+  printFL1 () = int_printFL
 
-int_printFL :: (Int, Base_md) -> FList
+int_printFL :: PadsPrinter (Int, Base_md)
 int_printFL (i, bmd) = fshow i
 
+-----------------------------------------------------------------
+
+--type Integer
+type Integer_md = Base_md
+
+integer_parseM :: PadsParser (Integer,Base_md)
+integer_parseM =
+  handleEOF def "Integer" $
+  handleEOR def "Integer" $ do
+    c <- peekHeadP 
+    let isNeg = (c == '-')
+    when isNeg (takeHeadP >> return ())
+    digits <- satisfy Char.isDigit
+    if not (null digits)
+      then returnClean (toEnum $ digitListToInt isNeg digits)
+      else returnError def (E.FoundWhenExpecting (mkStr c) "Integer")
+
+type instance Meta Integer = Base_md
+instance Pads1 () Integer Base_md where
+  parsePP1 () = integer_parseM
+  printFL1 () = integer_printFL
+
+integer_printFL :: PadsPrinter (Integer, Base_md)
+integer_printFL (i, bmd) = fshow i
+
+-----------------------------------------------------------------
+
+--type Float
+type Float_md = Base_md
+
+float_parseM :: PadsParser (Float,Base_md)
+float_parseM =
+  handleEOF def "Float" $
+  handleEOR def "Float" $ do
+    -- Get leading sign
+    c <- peekHeadP 
+    let isNeg = (c == '-')
+    when isNeg (takeHeadP >> return ())
+    let sign = if isNeg then "-" else ""
+    -- Get digits before any dot
+    digits1 <- satisfy Char.isDigit
+    -- Get optional dot
+    d <- peekHeadP 
+    let hasDot = (d == '.')
+    when hasDot (takeHeadP >> return ())
+    let dec = if hasDot then "." else ""
+    -- Get digits after dot
+    digits2 <- satisfy Char.isDigit
+    -- Get optional exponent marker
+    e <- peekHeadP 
+    let hasExp = (e == 'e')
+    when hasExp (takeHeadP >> return ())
+    let exp = if hasExp then "e" else ""
+    -- Get optional exponent sign
+    es <- peekHeadP 
+    let hasESign = (es == '-')
+    when hasESign (takeHeadP >> return ())
+    let expSign = if hasESign then "-" else ""
+    -- Get digits in the exponent
+    digits3 <- satisfy Char.isDigit
+    -- As long as the double had digits
+    if not (null digits1)
+      then returnClean (read (sign ++digits1++dec++digits2++exp++expSign++digits3))
+      else returnError def (E.FoundWhenExpecting (mkStr c) "Float")
+
+type instance Meta Float = Base_md
+instance Pads1 () Float Base_md where
+  parsePP1 () = float_parseM
+  printFL1 () = float_printFL
+
+float_printFL :: PadsPrinter (Float, Base_md)
+float_printFL (d, bmd) = fshow d
 
 -----------------------------------------------------------------
 
@@ -124,22 +204,25 @@ double_parseM =
       then returnClean (read (sign ++digits1++dec++digits2++exp++expSign++digits3))
       else returnError def (E.FoundWhenExpecting (mkStr c) "Double")
 
-instance Pads Double Base_md where
-  parsePP = double_parseM
-  printFL = double_printFL
+type instance Meta Double = Base_md
+instance Pads1 () Double Base_md where
+  parsePP1 () = double_parseM
+  printFL1 () = double_printFL
 
-double_printFL :: (Double, Base_md) -> FList
+double_printFL :: PadsPrinter (Double, Base_md)
 double_printFL (d, bmd) = fshow d
 
 
 
 -----------------------------------------------------------------
 
+-- tries to parse @a@ without consuming the input string
 type Try a = a
 type Try_md a_md = (Base_md, a_md)
 
 try_parseM p = parseTry p
-try_printFL p = printFL p
+try_printFL :: PadsPrinter (a,a_md) -> PadsPrinter (Try a,Try_md a_md)
+try_printFL p _ = printNothing
 
 
 -----------------------------------------------------------------
@@ -156,10 +239,28 @@ digit_parseM  =
       then returnClean (digitToInt c)
       else returnError def (E.FoundWhenExpecting [c] "Digit")
 
-digit_printFL :: (Digit, Base_md) -> FList
+digit_printFL :: PadsPrinter (Digit, Base_md)
 digit_printFL (i, bmd) = fshow i
 
 
+-----------------------------------------------------------------
+
+--type String
+type String_md = Base_md
+
+string_parseM :: PadsParser (String, Base_md)
+string_parseM = do
+  document <- getAllBinP
+  returnClean $ C.unpack document
+
+type instance Meta String = Base_md
+instance Pads1 () String Base_md where
+  parsePP1 () = string_parseM
+  printFL1 () = string_printFL
+
+
+string_printFL :: PadsPrinter (String, Base_md)
+string_printFL (str, bmd) = addString str
 
 
 -----------------------------------------------------------------
@@ -176,13 +277,13 @@ text_parseM = do
 instance Pretty Text where
   ppr (Text str) = text "ASCII"
 
+type instance Meta Text = Base_md
+instance Pads1 () Text Base_md where
+  parsePP1 () = text_parseM
+  printFL1 () = text_printFL
 
-instance Pads Text Base_md where
-  parsePP = text_parseM
-  printFL = text_printFL
 
-
-text_printFL :: (Text, Base_md) -> FList
+text_printFL :: PadsPrinter (Text, Base_md)
 text_printFL (Text str, bmd) = addBString str
 
 
@@ -200,16 +301,18 @@ binary_parseM = do
 instance Pretty Binary where
   ppr (Binary str) = text "Binary"
 
-instance Pads Binary Base_md where
-  parsePP = binary_parseM
-  printFL = binary_printFL
+type instance Meta Binary = Base_md
+instance Pads1 () Binary Base_md where
+  parsePP1 () = binary_parseM
+  printFL1 () = binary_printFL
 
-binary_printFL :: (Binary, Base_md) -> FList
-binary_printFL (Binary bstr, bmd) =  addBString bstr
+binary_printFL :: PadsPrinter (Binary, Base_md)
+binary_printFL (Binary bstr, bmd) = addBString bstr
 
 
 -----------------------------------------------------------------
 
+-- string with end character
 type StringC = String
 type StringC_md = Base_md
 
@@ -222,12 +325,13 @@ stringC_parseM c =
 
 stringC_def c = ""
 
-stringC_printFL :: Char -> (StringC, Base_md) -> FList
+stringC_printFL :: Char -> PadsPrinter (StringC, Base_md) 
 stringC_printFL c (str, bmd) = addString str
 
 
 -----------------------------------------------------------------
 
+-- string of fixed length
 type StringFW = String
 type StringFW_md = Base_md
 
@@ -241,14 +345,53 @@ stringFW_parseM n =
       then returnClean str
       else returnError (stringFW_def n) (E.Insufficient (length str) n)
 
-stringFW_def n = take n (repeat 'X')
+stringFW_def n = replicate n 'X'
 
-stringFW_printFL :: Int -> (StringFW, Base_md) -> FList
+stringFW_printFL :: Int -> PadsPrinter (StringFW, Base_md)
 stringFW_printFL n (str, bmd)  = addString (take n str)
-
 
 -----------------------------------------------------------------
 
+-- string of variable length
+type StringVW = String
+type StringVW_md = Base_md
+
+stringVW_parseM :: Int -> PadsParser (StringVW, Base_md)
+stringVW_parseM 0 = returnClean ""
+stringVW_parseM n =
+  handleEOF (stringVW_def n) "StringVW" $
+  handleEOR (stringVW_def n) "StringVW" $ do
+    str <- takeP n 
+    returnClean str
+
+stringVW_def n = replicate n 'X'
+
+stringVW_printFL :: Int -> PadsPrinter (StringVW, Base_md)
+stringVW_printFL n (str, bmd)  = addString (take n str)
+
+---- string of variable length (end if EOR)
+--type StringVW = String
+--type StringVW_md = Base_md
+--
+--stringVW_parseM :: (Bool,Int) -> PadsParser (StringVW, Base_md)
+--stringVW_parseM (endIfEOR,0) = returnClean ""
+--stringVW_parseM (endIfEOR,n) = do
+--	let (doEOF, doEOR) = if endIfEOR then (checkEOF, checkEOR) else (handleEOF, handleEOR)
+--	doEOF "" "StringVW" $ doEOR "" "StringVW" $ do
+--		c1 <- takeHeadP
+--		(rest, rest_md) <- stringVW_parseM (endIfEOR,pred n)
+--		return (c1:rest, rest_md)
+--
+--stringVW_def (endIfEOR,n) = replicate n 'X'
+--
+--stringVW_printFL :: (Bool,Int) -> PadsPrinter (StringVW, Base_md)
+--stringVW_printFL (endIfEOR,n) (str, bmd)  = addString (take n str)
+
+-----------------------------------------------------------------
+
+-----------------------------------------------------------------
+
+-- string with matching expression
 type StringME = String
 type StringME_md = Base_md
 
@@ -263,10 +406,9 @@ stringME_parseM re =
 stringME_def (RE re) = "" -- should invert the re
 stringME_def (REd re d) = d
 
-stringME_printFL :: RE -> (StringME, Base_md) -> FList
+stringME_printFL :: RE -> PadsPrinter (StringME, Base_md)
 stringME_printFL re (str, bmd) = addString str       
            -- We're not likely to check that str matches re
-
 
 -----------------------------------------------------------------
 
@@ -285,12 +427,13 @@ stringSE_parseM re =
 stringSE_def (RE re) = "" -- should invert the re
 stringSE_def (REd re d) = d
 
-stringSE_printFL :: RE -> (StringSE, Base_md) -> FList
-stringSE_printFL s (str, bmd) = addString str
+stringSE_printFL :: RE -> PadsPrinter (StringSE, Base_md)
+stringSE_printFL re (str, bmd) = addString str
 
 
 -----------------------------------------------------------------
 
+-- string with a predicate
 type StringP = String
 type StringP_md = Base_md
 
@@ -303,11 +446,12 @@ stringP_parseM p =
 
 stringP_def _ = ""
 
-stringP_printFL :: (Char -> Bool) -> (StringP, Base_md) -> FList
+stringP_printFL :: (Char -> Bool) -> PadsPrinter (StringP, Base_md)
 stringP_printFL p (str, bmd) = addString str
 
 -----------------------------------------------------------------
 
+-- string predicate with escape condition
 type StringPESC = String
 type StringPESC_md = Base_md
 
@@ -343,11 +487,11 @@ stringPESC_parseM arg @ (endIfEOR, (escape, stops)) =
 
 
 
-stringPESC_printFL :: (Bool, (Char, [Char])) -> (StringPESC, Base_md) -> FList
-stringPESC_printFL (_, (escape, stops)) (str, bmd) = 
-  let replace c = if c `elem` stops then escape : [c] else [c]
-      newStr =  concat (map replace str)
-  in addString newStr
+stringPESC_printFL :: (Bool, (Char, [Char])) -> PadsPrinter (StringPESC, Base_md)
+stringPESC_printFL (_, (escape, stops)) (str, bmd) =
+	let replace c = if c `elem` stops then escape : [c] else [c]
+	    newStr =  concat (map replace str)
+	in addString newStr
 
 -----------------------------------------------------------------
 
@@ -366,12 +510,14 @@ strLit_parseM s =
       Just junk -> returnError () (E.ExtraBeforeLiteral s)
       Nothing   -> returnError () (E.MissingLiteral     s)
 
+strLit_printFL :: String -> FList
+strLit_printFL str = addString str
 
 instance LitParse Char where
   litParse = charLit_parseM
   litPrint = charLit_printFL
 
-charLit_parseM :: Char -> PadsParser ((), Base_md)
+charLit_parseM :: Char -> PadsParser ((),Base_md)
 charLit_parseM c =
   handleEOF () (mkStr c) $
   handleEOR () (mkStr c) $ do
@@ -382,6 +528,8 @@ charLit_parseM c =
                       then E.ExtraBeforeLiteral (mkStr c)
                       else E.MissingLiteral     (mkStr c)) 
 
+charLit_printFL :: Char -> FList
+charLit_printFL c = addString [c]
 
 instance LitParse String where
   litParse = strLit_parseM
@@ -399,41 +547,39 @@ reLit_parseM re = do
     then return ((), md) 
     else badReturn ((), md)
 
+reLit_printFL :: RE -> FList
+reLit_printFL (RE re) = addString "--REGEXP LITERAL-- "
+reLit_printFL (REd re def) = addString def
 
-
+type EOF = ()
 type EOF_md = Base_md
 
-eof_parseM :: PadsParser ((), Base_md)
+eof_parseM :: PadsParser (EOF, Base_md)
 eof_parseM = do
   isEof <- isEOFP
   if isEof then returnClean ()
            else returnError () (E.ExtraBeforeLiteral "Eof")
 
 
+type EOR = ()
 type EOR_md = Base_md
 
-eor_parseM :: PadsParser ((), Base_md)
+eor_parseM :: PadsParser (EOR, Base_md)
 eor_parseM = 
    handleEOF () "EOR" $ do
    isEor <- isEORP
    if isEor then doLineEnd
      else returnError () (E.LineError "Expecting EOR")
 
+eor_printFL :: (EOR,Base_md) -> FList
+eor_printFL = const eorLit_printFL
 
+eOR_printFL = eor_printFL
 
+eof_printFL :: (EOF,Base_md) -> FList
+eof_printFL = const eofLit_printFL
 
-
-
-
-reLit_printFL :: RE -> FList
-reLit_printFL (RE re)  = addString "--REGEXP LITERAL-- "
-reLit_printFL (REd re def) = addString def
-
-charLit_printFL :: Char ->  FList
-charLit_printFL c  = addString [c] 
-
-strLit_printFL :: String -> FList
-strLit_printFL str  = addString str
+eOF_printFL = eof_printFL
 
 eorLit_printFL :: FList
 eorLit_printFL = printEOR
@@ -450,11 +596,11 @@ type Void_md = Base_md
 void_parseM :: PadsParser (Void, Base_md)
 void_parseM = returnClean (Void ())
 
-instance Pads Void Base_md where
-  parsePP = void_parseM
-  printFL = void_printFL
+instance Pads1 () Void Base_md where
+  parsePP1 () = void_parseM
+  printFL1 () = void_printFL
 
-void_printFL :: a -> FList
+void_printFL :: PadsPrinter (Void,Base_md)
 void_printFL v = nil
 
 
@@ -520,14 +666,13 @@ bytes_parseM n =
     bytes <- takeBytesP n
     if B.length bytes == n 
       then returnClean bytes
-      else returnError (bytes_default n) (E.Insufficient (B.length bytes) n)
+      else returnError (def1 n) (E.Insufficient (B.length bytes) n)
 
-bytes_default :: Int -> Bytes
-bytes_default n = B.pack (replicate n (fromInt 0))
+bytes_printFL :: Int -> PadsPrinter (Bytes, Bytes_md)
+bytes_printFL n (bs, bmd) =
+	addBString bs
 
-bytes_printFL :: Int -> (Bytes, Bytes_md) -> FList
-bytes_printFL i (bs, bmd) = addBString bs
-
+type instance Meta Bytes = Bytes_md
 instance Pads1 Int Bytes Bytes_md where
   parsePP1 = bytes_parseM
   printFL1 = bytes_printFL
@@ -541,4 +686,3 @@ instance Pads1 Int Bytes Bytes_md where
 
 {- Helper functions -}
 mkStr c = "'" ++ [c] ++ "'"
-

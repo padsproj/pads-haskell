@@ -1,10 +1,5 @@
-{-# LANGUAGE  QuasiQuotes
-            , DeriveDataTypeable
-            , ScopedTypeVariables
-            , MultiParamTypeClasses
-            , FlexibleInstances
-            , UndecidableInstances 
-   #-}
+{-# LANGUAGE FlexibleContexts, TypeFamilies, TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
+    FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
 
 
 {-
@@ -26,22 +21,20 @@ import Language.Pads.MetaData
 import Language.Pads.CoreBaseTypes
 import Language.Pads.Quote
 import Language.Pads.RegExp
-import Language.Pads.LazyList
-
-{- Libraries to support specific base types -}
+import Language.Pads.PadsPrinter
 import Data.Time
 import System.Locale
+import Text.PrettyPrint.Mainland
 
-
-import Text.PrettyPrint.Mainland (Pretty, ppr, text)
-
-import Data.Data (Typeable, Data)
 import qualified Data.Char as C
 import qualified Data.List as L
+import Data.Data
 import qualified Data.ByteString as B  
 
 
 [pads|
+-- string that stops in a newline
+type StringEOR = [Char] terminator EOR
 type Line a   = (a, EOR)
 type StringLn = [Char] terminator (Try EOR)
 type StringLnP (p :: String -> Bool) = constrain s :: StringLn where <| p s |> 
@@ -51,13 +44,14 @@ type StringESC   (p :: (Char, [Char])) = StringPESC <|(False, p)|>
 data PMaybe a = PJust a
               | PNothing Void
 obtain Maybe a from PMaybe a using <|(pm2m,m2pm)|>
+
 |]
 
 pm2m :: Pos -> (PMaybe a, md) -> (Maybe a, md)
 pm2m p (PJust x, md) = (Just x, md)
 pm2m p (PNothing,md) = (Nothing,md)
 
-m2pm :: (Maybe a, Maybe_md a) -> (PMaybe a, PMaybe_md a)
+m2pm :: (Maybe a, Maybe_md a_md) -> (PMaybe a, PMaybe_md a_md)
 m2pm (Just x, md) = (PJust x, md)
 m2pm (Nothing,md) = (PNothing,md)
 
@@ -68,7 +62,7 @@ type LitRE (x::RE)     = (Void, x)
 |]
 
 [pads| obtain Bool from Bytes 1 using <|(bTobl,blTob)|> |]
-bTobl p (bytes,md) = (fromIntegral (bytes `B.index` 0)==1, md)
+bTobl p (bytes,md) = (fromIntegral (bytes `B.index` 0)==(1::Int), md)
 blTob (b,md) = (B.singleton (if b then 1 else 0), md)
 
 
