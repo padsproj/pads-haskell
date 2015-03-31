@@ -23,7 +23,7 @@ import Language.Pads.Quote
 import Language.Pads.RegExp
 import Language.Pads.PadsPrinter
 import Data.Time
-import System.Locale
+import System.Locale as Locale
 import Text.PrettyPrint.Mainland
 
 import qualified Data.Char as C
@@ -76,14 +76,14 @@ instance Pretty UTCTime where
 
 strToUTC :: String -> Pos -> (StringSE, Base_md) -> (UTCTime, Base_md)
 strToUTC fmt pos (input, input_bmd) = 
-  case parseTime defaultTimeLocale fmt input of 
+  case parseTime Locale.defaultTimeLocale fmt input of 
        Nothing -> (gdef, mergeBaseMDs [errPD, input_bmd])
        Just t  -> (t, input_bmd)
   where
     errPD = mkErrBasePD (TransformToDstFail "DateFSE" input " (conversion failed)") (Just pos)
 
 utcToStr :: String -> (UTCTime, Base_md) -> (StringSE, Base_md) 
-utcToStr fmt (utcTime, bmd) = (formatTime defaultTimeLocale fmt utcTime, bmd)
+utcToStr fmt (utcTime, bmd) = (formatTime Locale.defaultTimeLocale fmt utcTime, bmd)
 
 
 [pads| type TimeZoneSE (se :: RE) = obtain TimeZone from StringSE se using <| (strToTz, tzToStr) |> 
@@ -95,7 +95,7 @@ instance Pretty TimeZone where
 
 strToTz :: Pos -> (StringSE, Base_md) -> (TimeZone, Base_md)
 strToTz pos (input, input_bmd) = 
-  case parseTime defaultTimeLocale "%z" input of 
+  case parseTime Locale.defaultTimeLocale "%z" input of 
        Nothing -> (gdef,  mergeBaseMDs [mkErrBasePD (TransformToDstFail "TimeZoneSE" input " (conversion failed)") (Just pos), input_bmd])
        Just t  -> (t, input_bmd)
 
