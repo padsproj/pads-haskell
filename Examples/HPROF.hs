@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, NamedFieldPuns, ScopedTypeVariables #-}
-module Examples.Binary where
+{-# LANGUAGE TypeFamilies, TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, NamedFieldPuns, ScopedTypeVariables #-}
+module Examples.HPROF where
 import Language.Pads.Padsc
 import Language.Pads.Library.LittleEndian as LE
 import qualified Language.Pads.Library.BigEndian as BE
@@ -53,7 +53,7 @@ import System.IO.Unsafe (unsafePerformIO)
        data Body (tag :: Int, len :: Int) =
          case <| tag |> of
            1 -> One  -- ?? One and Two never declared...
-                { id :: ID
+                { oneid :: ID
                 , str :: [Char] length <| len - 4 |> } -- !! should be len - idsiz.  len - (idsiz hdr)
          | 2 -> Two 
                 { clsserial :: U4

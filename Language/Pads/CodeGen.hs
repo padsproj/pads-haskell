@@ -31,7 +31,6 @@ import qualified Data.Map as M
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import Control.Monad
-import Debug.Trace
 
 type BString = S.RawStream
 
@@ -349,7 +348,7 @@ genPadsParseS name args patM = do
   ; return [ FunD (mkTyParserSName name) [Clause parserArgs (NormalB body) []] ]
   }
   where
-    parserWithArgs = foldr1 AppE (VarE parserName : map patToExp parserArgs)
+    parserWithArgs = foldl1 AppE (VarE parserName : map patToExp parserArgs)
     parserName     = mkTyParserName name    
     parserArgs     = map (VarP . mkVarParserName) args ++ Maybe.maybeToList patM
 
@@ -624,7 +623,7 @@ genPrintList ty sepOpt termCondOpt = do
 genPrintTyApp :: [PadsTy] -> Maybe Exp -> Q Exp
 genPrintTyApp tys expM = do
 	prtys <- mapM (flip genPrintTy Nothing) tys
-	foldr1M (\e1 e2 -> return $ AppE e1 e2) (prtys ++ Maybe.maybeToList expM)
+	foldl1M (\e1 e2 -> return $ AppE e1 e2) (prtys ++ Maybe.maybeToList expM)
 
 {-
 intPair_printFL (r,m)

@@ -1,6 +1,6 @@
-{-# LANGUAGE TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, ScopedTypeVariables, TypeSynonymInstances #-}
+{-# LANGUAGE TypeFamilies, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses, FlexibleInstances, DeriveDataTypeable, ScopedTypeVariables, TypeSynonymInstances #-}
 
-module Text.VCard
+module Examples.VCardInfinite
     ( -- $doc
       VCard(..)
     , CommonName
