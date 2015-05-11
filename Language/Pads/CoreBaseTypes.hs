@@ -57,6 +57,7 @@ char_parseM  =
     c <- takeHeadP
     returnClean c
 
+type instance PadsArg Char = ()
 type instance Meta Char = Base_md
 instance Pads1 () Char Base_md where
   parsePP1 () = char_parseM
@@ -83,6 +84,7 @@ int_parseM =
       then returnClean (digitListToInt isNeg digits)
       else returnError def (E.FoundWhenExpecting (mkStr c) "Int")
 
+type instance PadsArg Int = ()
 type instance Meta Int = Base_md
 instance Pads1 () Int Base_md where
   parsePP1 () = int_parseM
@@ -108,6 +110,7 @@ integer_parseM =
       then returnClean (toEnum $ digitListToInt isNeg digits)
       else returnError def (E.FoundWhenExpecting (mkStr c) "Integer")
 
+type instance PadsArg Integer = ()
 type instance Meta Integer = Base_md
 instance Pads1 () Integer Base_md where
   parsePP1 () = integer_parseM
@@ -156,6 +159,7 @@ float_parseM =
       then returnClean (read (sign ++digits1++dec++digits2++exp++expSign++digits3))
       else returnError def (E.FoundWhenExpecting (mkStr c) "Float")
 
+type instance PadsArg Float = ()
 type instance Meta Float = Base_md
 instance Pads1 () Float Base_md where
   parsePP1 () = float_parseM
@@ -204,6 +208,7 @@ double_parseM =
       then returnClean (read (sign ++digits1++dec++digits2++exp++expSign++digits3))
       else returnError def (E.FoundWhenExpecting (mkStr c) "Double")
 
+type instance PadsArg Double = ()
 type instance Meta Double = Base_md
 instance Pads1 () Double Base_md where
   parsePP1 () = double_parseM
@@ -253,6 +258,7 @@ string_parseM = do
   document <- getAllBinP
   returnClean $ C.unpack document
 
+type instance PadsArg String = ()
 type instance Meta String = Base_md
 instance Pads1 () String Base_md where
   parsePP1 () = string_parseM
@@ -277,6 +283,7 @@ text_parseM = do
 instance Pretty Text where
   ppr (Text str) = text "ASCII"
 
+type instance PadsArg Text = ()
 type instance Meta Text = Base_md
 instance Pads1 () Text Base_md where
   parsePP1 () = text_parseM
@@ -301,6 +308,7 @@ binary_parseM = do
 instance Pretty Binary where
   ppr (Binary str) = text "Binary"
 
+type instance PadsArg Binary = ()
 type instance Meta Binary = Base_md
 instance Pads1 () Binary Base_md where
   parsePP1 () = binary_parseM
@@ -672,6 +680,7 @@ bytes_printFL :: Int -> PadsPrinter (Bytes, Bytes_md)
 bytes_printFL n (bs, bmd) =
 	addBString bs
 
+type instance PadsArg Bytes = Int
 type instance Meta Bytes = Bytes_md
 instance Pads1 Int Bytes Bytes_md where
   parsePP1 = bytes_parseM

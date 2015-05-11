@@ -242,8 +242,11 @@ mkPadsInstance str args mb@(Nothing)
 mkPadsInstance str args mb@(Just ety) 
   = buildInst mb str args (ConT ''Pads1 `AppT` ety)
 
-buildInst mb str args pads = [InstanceD ctx inst [parsePP_method, printFL_method],TySynInstD ''Meta $ TySynEqn [ty_name] meta_ty]
+buildInst mb str args pads = [InstanceD ctx inst [parsePP_method, printFL_method],TySynInstD ''Meta $ TySynEqn [ty_name] meta_ty,TySynInstD ''PadsArg $ TySynEqn [ty_name] arg_ty]
 	where
+	arg_ty = case mb of
+		Nothing -> TupleT 0
+		Just ety -> ety
 	mbarg = case mb of
 		Nothing -> [TupP []]
 		Just _ -> []

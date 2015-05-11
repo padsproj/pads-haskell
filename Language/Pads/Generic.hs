@@ -1,4 +1,4 @@
-{-# LANGUAGE ConstraintKinds, MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, FlexibleContexts, Rank2Types, FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies, ConstraintKinds, MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, FlexibleContexts, Rank2Types, FlexibleInstances #-}
 
 {-
 ** *********************************************************************
@@ -75,6 +75,8 @@ printFile filepath r = do
 
 printFileRep :: Pads rep md => FilePath -> rep -> IO ()
 printFileRep filepath r = printFile filepath (r,defaultMd r)
+
+type family PadsArg rep :: *
 
 class (Data rep, PadsMD md) => Pads1 arg rep md | rep -> md, rep -> arg where
 	def1 :: arg -> rep
