@@ -17,8 +17,8 @@ module Language.Pads.Library.LittleEndian where
 import Language.Pads.Padsc
 import Language.Pads.Library.BinaryUtilities
 
-import Data.Int
-import Data.Word
+import qualified Data.Int
+import qualified Data.Word
 import Data.ByteString as B
 
 -- SIGNED INTEGERS --

@@ -47,7 +47,7 @@ obtain Maybe a from PMaybe a using <|(pm2m,m2pm)|>
 
 |]
 
-pm2m :: Pos -> (PMaybe a, md) -> (Maybe a, md)
+pm2m :: Pos -> (PMaybe a, PMaybe_md a_md) -> (Maybe a, Maybe_md a_md)
 pm2m p (PJust x, md) = (Just x, md)
 pm2m p (PNothing,md) = (Nothing,md)
 
@@ -62,7 +62,9 @@ type LitRE (x::RE)     = (Void, x)
 |]
 
 [pads| obtain Bool from Bytes 1 using <|(bTobl,blTob)|> |]
+bTobl :: Pos -> (Bytes,Bytes_md) -> (Bool,Bool_md)
 bTobl p (bytes,md) = (fromIntegral (bytes `B.index` 0)==(1::Int), md)
+blTob :: (Bool,Bool_md) -> (Bytes,Bytes_md)
 blTob (b,md) = (B.singleton (if b then 1 else 0), md)
 
 
@@ -81,6 +83,8 @@ strToUTC fmt pos (input, input_bmd) =
        Just t  -> (t, input_bmd)
   where
     errPD = mkErrBasePD (TransformToDstFail "DateFSE" input " (conversion failed)") (Just pos)
+
+uTCTime_def = UTCTime (ModifiedJulianDay 0) (secondsToDiffTime 0)
 
 utcToStr :: String -> (UTCTime, Base_md) -> (StringSE, Base_md) 
 utcToStr fmt (utcTime, bmd) = (formatTime Locale.defaultTimeLocale fmt utcTime, bmd)
@@ -103,6 +107,7 @@ tzToStr ::  (TimeZone, Base_md) -> (StringSE, Base_md)
 tzToStr (tz, bmd) = (h ++ ":" ++ m, bmd)
            where (h,m) = splitAt 3 (show tz)
 
+timeZone_def = utc
 
 [pads| type Phex32FW (size :: Int) = obtain Int from StringFW size using <| (hexStr2Int,int2HexStr size) |> |]  
 

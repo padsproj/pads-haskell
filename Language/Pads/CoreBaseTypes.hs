@@ -57,11 +57,15 @@ char_parseM  =
     c <- takeHeadP
     returnClean c
 
+char_def :: Char
+char_def = 'X'
+
 type instance PadsArg Char = ()
 type instance Meta Char = Base_md
 instance Pads1 () Char Base_md where
   parsePP1 () = char_parseM
   printFL1 () = char_printFL
+  def1 () = char_def
 
 char_printFL :: PadsPrinter (Char, md)
 char_printFL (c,bmd) = addString [c] 
@@ -84,11 +88,15 @@ int_parseM =
       then returnClean (digitListToInt isNeg digits)
       else returnError def (E.FoundWhenExpecting (mkStr c) "Int")
 
+int_def :: Int
+int_def = 0
+
 type instance PadsArg Int = ()
 type instance Meta Int = Base_md
 instance Pads1 () Int Base_md where
   parsePP1 () = int_parseM
   printFL1 () = int_printFL
+  def1 () = int_def
 
 int_printFL :: PadsPrinter (Int, Base_md)
 int_printFL (i, bmd) = fshow i
@@ -110,11 +118,15 @@ integer_parseM =
       then returnClean (toEnum $ digitListToInt isNeg digits)
       else returnError def (E.FoundWhenExpecting (mkStr c) "Integer")
 
+integer_def :: Integer
+integer_def = 0
+
 type instance PadsArg Integer = ()
 type instance Meta Integer = Base_md
 instance Pads1 () Integer Base_md where
   parsePP1 () = integer_parseM
   printFL1 () = integer_printFL
+  def1 () = integer_def
 
 integer_printFL :: PadsPrinter (Integer, Base_md)
 integer_printFL (i, bmd) = fshow i
@@ -159,11 +171,15 @@ float_parseM =
       then returnClean (read (sign ++digits1++dec++digits2++exp++expSign++digits3))
       else returnError def (E.FoundWhenExpecting (mkStr c) "Float")
 
+float_def :: Float
+float_def = 0
+
 type instance PadsArg Float = ()
 type instance Meta Float = Base_md
 instance Pads1 () Float Base_md where
   parsePP1 () = float_parseM
   printFL1 () = float_printFL
+  def1 () = float_def
 
 float_printFL :: PadsPrinter (Float, Base_md)
 float_printFL (d, bmd) = fshow d
@@ -208,11 +224,15 @@ double_parseM =
       then returnClean (read (sign ++digits1++dec++digits2++exp++expSign++digits3))
       else returnError def (E.FoundWhenExpecting (mkStr c) "Double")
 
+double_def :: Double
+double_def = 0
+
 type instance PadsArg Double = ()
 type instance Meta Double = Base_md
 instance Pads1 () Double Base_md where
   parsePP1 () = double_parseM
   printFL1 () = double_printFL
+  def1 () = 0
 
 double_printFL :: PadsPrinter (Double, Base_md)
 double_printFL (d, bmd) = fshow d
@@ -229,6 +249,9 @@ try_parseM p = parseTry p
 try_printFL :: PadsPrinter (a,a_md) -> PadsPrinter (Try a,Try_md a_md)
 try_printFL p _ = printNothing
 
+try_def :: a -> Try a
+try_def d = d
+
 
 -----------------------------------------------------------------
 
@@ -244,6 +267,9 @@ digit_parseM  =
       then returnClean (digitToInt c)
       else returnError def (E.FoundWhenExpecting [c] "Digit")
 
+digit_def :: Digit
+digit_def = 0
+
 digit_printFL :: PadsPrinter (Digit, Base_md)
 digit_printFL (i, bmd) = fshow i
 
@@ -258,12 +284,14 @@ string_parseM = do
   document <- getAllBinP
   returnClean $ C.unpack document
 
+string_def = ""
+
 type instance PadsArg String = ()
 type instance Meta String = Base_md
 instance Pads1 () String Base_md where
   parsePP1 () = string_parseM
   printFL1 () = string_printFL
-
+  def1 () = string_def
 
 string_printFL :: PadsPrinter (String, Base_md)
 string_printFL (str, bmd) = addString str
@@ -283,12 +311,15 @@ text_parseM = do
 instance Pretty Text where
   ppr (Text str) = text "ASCII"
 
+text_def :: Text
+text_def = Text $ B.pack []
+
 type instance PadsArg Text = ()
 type instance Meta Text = Base_md
 instance Pads1 () Text Base_md where
   parsePP1 () = text_parseM
   printFL1 () = text_printFL
-
+  def1 () = text_def
 
 text_printFL :: PadsPrinter (Text, Base_md)
 text_printFL (Text str, bmd) = addBString str
@@ -308,11 +339,15 @@ binary_parseM = do
 instance Pretty Binary where
   ppr (Binary str) = text "Binary"
 
+binary_def :: Binary
+binary_def = Binary $ B.pack []
+
 type instance PadsArg Binary = ()
 type instance Meta Binary = Base_md
 instance Pads1 () Binary Base_md where
   parsePP1 () = binary_parseM
   printFL1 () = binary_printFL
+  def1 () = binary_def
 
 binary_printFL :: PadsPrinter (Binary, Base_md)
 binary_printFL (Binary bstr, bmd) = addBString bstr
@@ -353,6 +388,7 @@ stringFW_parseM n =
       then returnClean str
       else returnError (stringFW_def n) (E.Insufficient (length str) n)
 
+stringFW_def :: Int -> StringFW
 stringFW_def n = replicate n 'X'
 
 stringFW_printFL :: Int -> PadsPrinter (StringFW, Base_md)
@@ -372,6 +408,7 @@ stringVW_parseM n =
     str <- takeP n 
     returnClean str
 
+stringVW_def :: Int -> StringVW
 stringVW_def n = replicate n 'X'
 
 stringVW_printFL :: Int -> PadsPrinter (StringVW, Base_md)
@@ -493,13 +530,16 @@ stringPESC_parseM arg @ (endIfEOR, (escape, stops)) =
             }
     }
 
-
+stringPESC_def :: (Bool, (Char, [Char])) -> String
+stringPESC_def arg@(endIfEOR, (escape, stops)) = ""
 
 stringPESC_printFL :: (Bool, (Char, [Char])) -> PadsPrinter (StringPESC, Base_md)
 stringPESC_printFL (_, (escape, stops)) (str, bmd) =
 	let replace c = if c `elem` stops then escape : [c] else [c]
 	    newStr =  concat (map replace str)
 	in addString newStr
+
+
 
 -----------------------------------------------------------------
 
@@ -584,10 +624,16 @@ eor_printFL = const eorLit_printFL
 
 eOR_printFL = eor_printFL
 
+eOR_def :: EOR
+eOR_def = ()
+
 eof_printFL :: (EOF,Base_md) -> FList
 eof_printFL = const eofLit_printFL
 
 eOF_printFL = eof_printFL
+
+eOF_def :: EOF
+eOF_def = ()
 
 eorLit_printFL :: FList
 eorLit_printFL = printEOR
@@ -604,9 +650,14 @@ type Void_md = Base_md
 void_parseM :: PadsParser (Void, Base_md)
 void_parseM = returnClean (Void ())
 
+void_def :: Void
+void_def = Void ()
+
+type instance Meta Void = Base_md
 instance Pads1 () Void Base_md where
   parsePP1 () = void_parseM
   printFL1 () = void_printFL
+  def1 () = void_def
 
 void_printFL :: PadsPrinter (Void,Base_md)
 void_printFL v = nil
@@ -680,12 +731,15 @@ bytes_printFL :: Int -> PadsPrinter (Bytes, Bytes_md)
 bytes_printFL n (bs, bmd) =
 	addBString bs
 
+bytes_def :: Int -> Bytes
+bytes_def i = B.pack $ replicate i (0::Word8)
+
 type instance PadsArg Bytes = Int
 type instance Meta Bytes = Bytes_md
 instance Pads1 Int Bytes Bytes_md where
   parsePP1 = bytes_parseM
   printFL1 = bytes_printFL
-
+  def1 i = bytes_def i
 
 ---- All the others can be derived from this: moved to BaseTypes.hs
 

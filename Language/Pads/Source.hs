@@ -55,6 +55,8 @@ data Pos = Pos { begin      :: Loc,
 
 zeroLoc   = Loc {lineNumber = 0,  byteOffset = 0}
 
+zeroPos = locToPos zeroLoc
+
 incLineNumber :: Loc -> Loc
 incLineNumber Loc{lineNumber, ..} = Loc{ lineNumber = lineNumber+1
                                        , byteOffset = 0}

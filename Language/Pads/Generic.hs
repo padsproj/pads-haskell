@@ -78,7 +78,7 @@ printFileRep filepath r = printFile filepath (r,defaultMd r)
 
 type family PadsArg rep :: *
 
-class (Data rep, PadsMD md) => Pads1 arg rep md | rep -> md, rep -> arg where
+class (Data rep, PadsMD md, PadsMD (Meta rep)) => Pads1 arg rep md | rep -> md, rep -> arg where
 	def1 :: arg -> rep
 	def1 =  \_ -> gdef
 	defaultMd1 :: arg -> rep -> md
