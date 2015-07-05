@@ -217,7 +217,7 @@ drainSource s = (padsSourceToString s, emptySource)
 
 {- XXX: Change call site to use no record discipline; then this call should just became an instance of drainSource -}
 rawSource :: Source -> (B.ByteString, Source) 
-rawSource s = (B.concat [current s ,rest s], emptySource)
+rawSource s = (padsSourceToByteString s, emptySource)
 
 {- Return the rest of the current record as a string -}
 restRec :: Source -> String
