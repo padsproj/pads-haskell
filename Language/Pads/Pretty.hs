@@ -41,9 +41,9 @@ instance Pretty PadsData where
   ppr (PUnion branches) = ppr_branches branches
   ppr (PSwitch exp patBranches) = text "case" <+> ppr exp <+> text "of" <+> ppr_patBranches patBranches
 
-ppr_patBranches patBranches = encloseSep empty empty (text " |") (map ppr_patBranch patBranches)
+ppr_patBranches patBranches = enclosesep empty empty (text " |") (map ppr_patBranch patBranches)
 ppr_patBranch (pat, branchInfo) = ppr pat <+> text "->" <+> ppr branchInfo
-ppr_branches branches = encloseSep empty empty (text " |") (map ppr branches)
+ppr_branches branches = enclosesep empty empty (text " |") (map ppr branches)
 
 instance Pretty BranchInfo where
   ppr (BRecord con fields predOpt)     = text con <+> braces (commasep (map ppr_fieldInfo fields)) <> (ppr_optPred predOpt)
