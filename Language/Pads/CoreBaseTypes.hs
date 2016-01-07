@@ -421,11 +421,11 @@ stringVW_printFL n (str, bmd)  = addString (take n str)
 --stringVW_parseM :: (Bool,Int) -> PadsParser (StringVW, Base_md)
 --stringVW_parseM (endIfEOR,0) = returnClean ""
 --stringVW_parseM (endIfEOR,n) = do
---	let (doEOF, doEOR) = if endIfEOR then (checkEOF, checkEOR) else (handleEOF, handleEOR)
---	doEOF "" "StringVW" $ doEOR "" "StringVW" $ do
---		c1 <- takeHeadP
---		(rest, rest_md) <- stringVW_parseM (endIfEOR,pred n)
---		return (c1:rest, rest_md)
+--  let (doEOF, doEOR) = if endIfEOR then (checkEOF, checkEOR) else (handleEOF, handleEOR)
+--  doEOF "" "StringVW" $ doEOR "" "StringVW" $ do
+--    c1 <- takeHeadP
+--    (rest, rest_md) <- stringVW_parseM (endIfEOR,pred n)
+--    return (c1:rest, rest_md)
 --
 --stringVW_def (endIfEOR,n) = replicate n 'X'
 --
@@ -535,9 +535,9 @@ stringPESC_def arg@(endIfEOR, (escape, stops)) = ""
 
 stringPESC_printFL :: (Bool, (Char, [Char])) -> PadsPrinter (StringPESC, Base_md)
 stringPESC_printFL (_, (escape, stops)) (str, bmd) =
-	let replace c = if c `elem` stops then escape : [c] else [c]
-	    newStr =  concat (map replace str)
-	in addString newStr
+  let replace c = if c `elem` stops then escape : [c] else [c]
+      newStr =  concat (map replace str)
+  in addString newStr
 
 
 
@@ -729,7 +729,7 @@ bytes_parseM n =
 
 bytes_printFL :: Int -> PadsPrinter (Bytes, Bytes_md)
 bytes_printFL n (bs, bmd) =
-	addBString bs
+  addBString bs
 
 bytes_def :: Int -> Bytes
 bytes_def i = B.pack $ replicate i (0::Word8)

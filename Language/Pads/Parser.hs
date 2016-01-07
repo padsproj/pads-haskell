@@ -114,7 +114,7 @@ patLHS
 derives 
   = reserved "deriving" >> 
     (do { q <- qualUpper; return [q] }
-	<|> parens (commaSep1 qualUpper))
+    <|> parens (commaSep1 qualUpper))
 
 
 -------------------------
@@ -284,9 +284,10 @@ field env
         ; return (Just id, (strict, PValue exp ty), predM)
         })
  <|> do { ty <- ftype env
-        ; let recordid = case ty of
-			(strict,PConstrain (VarP name) _ _) -> Just $ nameBase name
-			otherwise -> Nothing
+        ; let recordid =  (case ty of
+                            (strict,PConstrain (VarP name) _ _) -> Just $ nameBase name
+                            otherwise -> Nothing
+                          )
         ; predM <- optionMaybe predic
         ; return (recordid, ty, predM)
         }
