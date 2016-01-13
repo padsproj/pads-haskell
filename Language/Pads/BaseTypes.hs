@@ -78,7 +78,7 @@ instance Pretty UTCTime where
 
 strToUTC :: String -> Pos -> (StringSE, Base_md) -> (UTCTime, Base_md)
 strToUTC fmt pos (input, input_bmd) = 
-  case parseTime Locale.defaultTimeLocale fmt input of 
+  case parseTime Data.Time.defaultTimeLocale fmt input of 
        Nothing -> (gdef, mergeBaseMDs [errPD, input_bmd])
        Just t  -> (t, input_bmd)
   where
@@ -87,7 +87,7 @@ strToUTC fmt pos (input, input_bmd) =
 uTCTime_def = UTCTime (ModifiedJulianDay 0) (secondsToDiffTime 0)
 
 utcToStr :: String -> (UTCTime, Base_md) -> (StringSE, Base_md) 
-utcToStr fmt (utcTime, bmd) = (formatTime Locale.defaultTimeLocale fmt utcTime, bmd)
+utcToStr fmt (utcTime, bmd) = (formatTime Data.Time.defaultTimeLocale fmt utcTime, bmd)
 
 
 [pads| type TimeZoneSE (se :: RE) = obtain TimeZone from StringSE se using <| (strToTz, tzToStr) |> 
@@ -99,7 +99,7 @@ instance Pretty TimeZone where
 
 strToTz :: Pos -> (StringSE, Base_md) -> (TimeZone, Base_md)
 strToTz pos (input, input_bmd) = 
-  case parseTime Locale.defaultTimeLocale "%z" input of 
+  case parseTime Data.Time.defaultTimeLocale "%z" input of 
        Nothing -> (gdef,  mergeBaseMDs [mkErrBasePD (TransformToDstFail "TimeZoneSE" input " (conversion failed)") (Just pos), input_bmd])
        Just t  -> (t, input_bmd)
 

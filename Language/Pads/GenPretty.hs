@@ -85,10 +85,10 @@ getNamedTys' answers worklist =
            ; let new_worklist = worklist' `S.union` new_nested
            ; getNamedTys' answers' new_worklist
            }
-        TyConI (TySynD _ _ _ ) -> do {report True ("getTyNames: unimplemented TySynD case " ++ (nameBase ty_name)); return answers'} 
-        TyConI (ForeignD _) -> do {report True ("getTyNames: unimplemented ForeignD case " ++ (nameBase ty_name)); return answers'} 
+        TyConI (TySynD _ _ _ ) -> do {reportError ("getTyNames: unimplemented TySynD case " ++ (nameBase ty_name)); return answers'} 
+        TyConI (ForeignD _) -> do {reportError ("getTyNames: unimplemented ForeignD case " ++ (nameBase ty_name)); return answers'} 
         PrimTyConI _ _ _ -> return answers
-        otherwise -> do {report True ("getTyNames: pattern didn't match for " ++ (nameBase ty_name)); return answers'} 
+        otherwise -> do {reportError ("getTyNames: pattern didn't match for " ++ (nameBase ty_name)); return answers'} 
    }
 
 baseTypeNames = S.fromList [ ''Int, ''Char, ''Digit, ''Text, ''String, ''StringFW, ''StringME 
@@ -119,7 +119,7 @@ mkPrettyInstance' worklist done decls =
          (nestedTyNames, decls') <- case info of 
                    TyConI (NewtypeD [] ty_name' [] (NormalC ty_name'' [(NotStrict, AppT ListT ty)]) derives) -> do -- List
                      { let nestedTyNames = getTyNames ty
---                     ; report True ("list case " ++ (nameBase ty_name))
+--                     ; reportError ("list case " ++ (nameBase ty_name))
                      ; (itemsE,itemsP) <- doGenPE "list"
                      ; let mapE  = AppE (AppE (VarE 'map) (VarE 'ppr)) itemsE
                      ; let bodyE = AppE (AppE (VarE 'namedlist_ppr) (nameToStrLit ty_name)) mapE
@@ -130,26 +130,26 @@ mkPrettyInstance' worklist done decls =
                    TyConI (NewtypeD [] ty_name' [] (NormalC ty_name'' [(NotStrict, AppT (AppT (ConT ty_con_name) ty_arg1) ty_arg2) ]) derives) -> do  -- curry rep (Map)
                      { let nestedTyNames = getTyNames ty_arg2
                      ; (argP, body) <- mkPatBody tyBaseName pprCon2E
---                     ; report True ("curry rep case " ++ (nameBase ty_name))
+--                     ; reportError ("curry rep case " ++ (nameBase ty_name))
                      ; let clause = Clause [argP] body []
                      ; return (nestedTyNames, [instD, FunD specificPprName [clause]]) 
                      }
                    TyConI (NewtypeD [] ty_name' [] (NormalC ty_name'' [(NotStrict, AppT (ConT ty_con_name) ty_arg) ]) derives) -> do  -- con rep (Set)
                      { let nestedTyNames = getTyNames ty_arg
                      ; (argP, body) <- mkPatBody tyBaseName pprCon1E
---                     ; report True ("con rep case " ++ (nameBase ty_name))
+--                     ; reportError ("con rep case " ++ (nameBase ty_name))
                      ; let clause = Clause [argP] body []
                      ; return (nestedTyNames, [instD, FunD specificPprName [clause]]) 
                      }
                    TyConI (NewtypeD [] ty_name' [] (NormalC ty_name'' [(NotStrict, ConT core_name)]) derives) -> do  -- App, Typedef
                      { (argP, body) <- mkPatBody tyBaseName pprE
---                     ; report True ("app, typedef case " ++ (nameBase ty_name))
+--                     ; reportError ("app, typedef case " ++ (nameBase ty_name))
                      ; let clause = Clause [argP] body []
                      ; return (S.singleton core_name, [instD, FunD specificPprName [clause]]) 
                      }
                    TyConI (NewtypeD [] ty_name' [] (NormalC ty_name'' [(NotStrict, ty)]) derives) | isTuple ty -> do    -- Tuple
                      { let nestedTyNames = getTyNames ty
---                     ; report True ("tuple case " ++ (nameBase ty_name))
+--                     ; reportError ("tuple case " ++ (nameBase ty_name))
                      ; let (len, tys) = tupleTyToListofTys ty
                      ; (exps, pats) <- doGenPEs len "tuple"
                      ; let bodyE = AppE (AppE (VarE 'namedtuple_ppr) (LitE (StringL tyBaseName)))  (pprListEs exps)
@@ -173,18 +173,18 @@ mkPrettyInstance' worklist done decls =
                      } 
                    TyConI (DataD _ ty_name' _ cons  derives) -> do
                     {
---                      report True ("DataD pattern didn't match for"++(nameBase ty_name)) 
+--                      reportError ("DataD pattern didn't match for"++(nameBase ty_name)) 
                     ; return (S.empty, [])} 
                    TyConI (TySynD ty_name' [] ty) -> do 
                      { let nestedTyNames = getTyNames ty
---                     ; report True ("tysyn for"++(nameBase ty_name)) 
+--                     ; reportError ("tysyn for"++(nameBase ty_name)) 
                      ; return (nestedTyNames, [])} 
                    TyConI (TySynD ty_name' tyVarBndrs ty) -> do 
                      { let nestedTyNames = getTyNames ty
---                     ; report True ("tysyn for"++(nameBase ty_name)) 
+--                     ; reportError ("tysyn for"++(nameBase ty_name)) 
                      ; return (nestedTyNames, [])} 
-                   TyConI dec -> do {report True ("otherwise; tyconI case "++(nameBase ty_name)) ; return (S.empty, [])} 
-                   otherwise -> do {report True ("pattern didn't match for "++(nameBase ty_name)) ; return (S.empty, [])} 
+                   TyConI dec -> do {reportError ("otherwise; tyconI case "++(nameBase ty_name)) ; return (S.empty, [])} 
+                   otherwise -> do {reportError ("pattern didn't match for "++(nameBase ty_name)) ; return (S.empty, [])} 
          let newWorklist = worklist `S.union` nestedTyNames
          let newDecls = decls'++decls
          mkPrettyInstance' newWorklist newDone newDecls

@@ -23,7 +23,7 @@ import Data.Data
 
 
 type PadsPrinter a = a -> FList
-	
+
 -- Lazy append-lists 
 
 type FList = B.ByteString -> B.ByteString

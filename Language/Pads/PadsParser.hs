@@ -19,6 +19,7 @@ import Language.Pads.MetaData
 import Language.Pads.RegExp
 import Data.Char
 
+import Control.Applicative (Applicative(..))
 import Control.Monad
 
 parseStringInput :: PadsParser a -> String -> (a,String)
@@ -60,7 +61,9 @@ instance Monad PadsParser where
                                      ((w,bs''),b') = f v # bs'
                                  in ((w,bs''), b && b')
 
-
+instance Applicative PadsParser where
+  pure  = return
+  (<*>) = ap
 
 badReturn  r = PadsParser $ \bs -> ((r,bs), False)
 mdReturn (rep,md) = PadsParser $ 

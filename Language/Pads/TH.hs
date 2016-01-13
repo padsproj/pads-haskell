@@ -1,6 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell, MagicHash #-}
 {-# OPTIONS_GHC -Wall #-}
-{-# OPTIONS -fglasgow-exts #-}
 
 {-
 ** *********************************************************************
@@ -113,7 +112,7 @@ patToTy pat = case pat of
   RecP name _fieldPats -> ConT name
   ListP pats  -> mkListT (map patToTy pats)
   SigP _ ty   -> ty
-  ParensP pat -> patToTy pat
+  ParensP pat' -> patToTy pat'
   _           -> error ("patToTy: unexpected pat: " ++ show pat)
 
 litToTy :: TH.Lit -> TH.Type
@@ -157,8 +156,8 @@ boolToExpE False = ConE 'False
 -- generate globally scoped unique variables as suggested in https://ghc.haskell.org/trac/ghc/ticket/5398
 mangleName :: Name -> Name
 mangleName name@(Name occ fl) = case fl of
-	NameU u -> Name (mangle_occ occ u) fl
-	_       -> name
+  NameU (I# u) -> Name (mangle_occ occ u) fl
+  _            -> name
   where
-	mangle_occ :: OccName -> Int# -> OccName
-	mangle_occ occ uniq = mkOccName (occString occ ++ "-" ++ show (I# uniq))
+  mangle_occ :: OccName -> Int# -> OccName
+  mangle_occ occ' uniq = mkOccName (occString occ' ++ "_" ++ show (I# uniq))

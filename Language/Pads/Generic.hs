@@ -70,8 +70,8 @@ printBS r = let f = (printFL r) in f B.empty
 
 printFile :: Pads rep md => FilePath -> (rep,md) -> IO ()
 printFile filepath r = do
-	let str = printBS r
-	B.writeFile filepath str
+  let str = printBS r
+  B.writeFile filepath str
 
 printFileRep :: Pads rep md => FilePath -> rep -> IO ()
 printFileRep filepath r = printFile filepath (r,defaultMd r)
@@ -79,16 +79,16 @@ printFileRep filepath r = printFile filepath (r,defaultMd r)
 type family PadsArg rep :: *
 
 class (Data rep, PadsMD md, PadsMD (Meta rep)) => Pads1 arg rep md | rep -> md, rep -> arg where
-	def1 :: arg -> rep
-	def1 =  \_ -> gdef
-	defaultMd1 :: arg -> rep -> md
-	defaultMd1 _ _ = myempty
-	parsePP1  :: arg -> PadsParser (rep,md)
-	printFL1 :: arg -> PadsPrinter (rep,md)
-	defaultRepMd1 :: arg -> (rep,md)
-	defaultRepMd1 arg = (rep,md) where
-		rep = def1 arg
-		md = defaultMd1 arg rep
+  def1 :: arg -> rep
+  def1 =  \_ -> gdef
+  defaultMd1 :: arg -> rep -> md
+  defaultMd1 _ _ = myempty
+  parsePP1  :: arg -> PadsParser (rep,md)
+  printFL1 :: arg -> PadsPrinter (rep,md)
+  defaultRepMd1 :: arg -> (rep,md)
+  defaultRepMd1 arg = (rep,md) where
+    rep = def1 arg
+    md = defaultMd1 arg rep
 
 parseRep1 :: Pads1 arg rep md => arg -> String -> rep
 parseRep1 arg cs = fst $ fst $ parseStringInput (parsePP1 arg) cs
@@ -119,9 +119,9 @@ printBS1 :: Pads1 arg rep md => arg -> (rep,md) -> (B.ByteString)
 printBS1 arg r = let f = (printFL1 arg r) in f B.empty
 printFile1 :: Pads1 arg rep md => arg -> FilePath -> (rep,md) -> IO ()
 printFile1 arg filepath r = do
-	let str = printBS1 arg r
-	B.writeFile filepath str
-	
+  let str = printBS1 arg r
+  B.writeFile filepath str
+  
 printFileRep1 :: Pads1 arg rep md => arg -> FilePath -> rep -> IO ()
 printFileRep1 arg filepath r = printFile1 arg filepath (r,defaultMd1 arg r)
 
