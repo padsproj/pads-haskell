@@ -12,6 +12,7 @@ Examples/data/VcardSmall.vcf
 
 cabal.sandbox.config
 .cabal-sandbox/*
+/.stack-work/
 /cabal-dev/
 /dist/
 *.o
