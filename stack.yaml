@@ -1,0 +1,7 @@
+flags: {}
+packages:
+- '.'
+extra-deps:
+- mainland-pretty-0.4.1.2
+- text-1.2.2.0
+resolver: lts-5.3
