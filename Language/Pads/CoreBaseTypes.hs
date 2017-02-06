@@ -355,7 +355,9 @@ binary_printFL (Binary bstr, bmd) = addBString bstr
 
 -----------------------------------------------------------------
 
--- string with end character
+-- | string with end character. Ex:
+--
+-- > StringC ','
 type StringC = String
 type StringC_md = Base_md
 
@@ -374,7 +376,7 @@ stringC_printFL c (str, bmd) = addString str
 
 -----------------------------------------------------------------
 
--- string of fixed length
+-- | string of fixed length
 type StringFW = String
 type StringFW_md = Base_md
 
@@ -396,7 +398,7 @@ stringFW_printFL n (str, bmd)  = addString (take n str)
 
 -----------------------------------------------------------------
 
--- string of variable length
+-- | string of variable length
 type StringVW = String
 type StringVW_md = Base_md
 
@@ -436,7 +438,9 @@ stringVW_printFL n (str, bmd)  = addString (take n str)
 
 -----------------------------------------------------------------
 
--- string with matching expression
+-- | string with matching expression. For example:
+--
+-- > [pads| type StrME = StringME 'a+' |]
 type StringME = String
 type StringME_md = Base_md
 
@@ -457,6 +461,10 @@ stringME_printFL re (str, bmd) = addString str
 
 -----------------------------------------------------------------
 
+-- | string matching given native regex. PADS uses posix regex (from the
+--   regex-posix package). For example:
+--
+-- > [pads| StringSE <| RE "b|c" |>|]
 type StringSE = String
 type StringSE_md = Base_md
 
@@ -478,7 +486,9 @@ stringSE_printFL re (str, bmd) = addString str
 
 -----------------------------------------------------------------
 
--- string with a predicate
+-- | string with a predicate. For example:
+--
+-- > [pads| type Digits = StringP Char.isDigit |]
 type StringP = String
 type StringP_md = Base_md
 
@@ -496,7 +506,7 @@ stringP_printFL p (str, bmd) = addString str
 
 -----------------------------------------------------------------
 
--- string predicate with escape condition
+-- | string predicate with escape condition
 type StringPESC = String
 type StringPESC_md = Base_md
 
@@ -599,6 +609,7 @@ reLit_printFL :: RE -> FList
 reLit_printFL (RE re) = addString "--REGEXP LITERAL-- "
 reLit_printFL (REd re def) = addString def
 
+-- | End of File
 type EOF = ()
 type EOF_md = Base_md
 
@@ -608,7 +619,7 @@ eof_parseM = do
   if isEof then returnClean ()
            else returnError () (E.ExtraBeforeLiteral "Eof")
 
-
+-- | End of Record
 type EOR = ()
 type EOR_md = Base_md
 

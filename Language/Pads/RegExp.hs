@@ -12,7 +12,8 @@
 module Language.Pads.RegExp where
 import Data.Data
 
-{- Regular expression support -}
-data RE = RE String | REd String String
+-- | Regular expression support. PADS uses the regex-posix package.
+data RE = RE String -- ^ A regular expression printed as its match
+        | REd String String -- ^ A regular expression printed as the second arg
   deriving (Eq, Data, Typeable, Show)
 
