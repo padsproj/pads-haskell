@@ -78,7 +78,7 @@ instance Pretty UTCTime where
 
 strToUTC :: String -> Pos -> (StringSE, Base_md) -> (UTCTime, Base_md)
 strToUTC fmt pos (input, input_bmd) = 
-  case parseTime Data.Time.defaultTimeLocale fmt input of 
+  case parseTimeM True Data.Time.defaultTimeLocale fmt input of 
        Nothing -> (gdef, mergeBaseMDs [errPD, input_bmd])
        Just t  -> (t, input_bmd)
   where
@@ -99,7 +99,7 @@ instance Pretty TimeZone where
 
 strToTz :: Pos -> (StringSE, Base_md) -> (TimeZone, Base_md)
 strToTz pos (input, input_bmd) = 
-  case parseTime Data.Time.defaultTimeLocale "%z" input of 
+  case parseTimeM True Data.Time.defaultTimeLocale "%z" input of 
        Nothing -> (gdef,  mergeBaseMDs [mkErrBasePD (TransformToDstFail "TimeZoneSE" input " (conversion failed)") (Just pos), input_bmd])
        Just t  -> (t, input_bmd)
 

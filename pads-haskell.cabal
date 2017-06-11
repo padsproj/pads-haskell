@@ -56,7 +56,7 @@ Extra-source-files:  Examples/First.hs, Examples/AI.hs, Examples/Binary.hs,
                      Examples/data/binary, 
                      Examples/data/a2b.c, Examples/data/calls10.a, Examples/data/calls10.b,
                      Examples/data/genBin.c, Examples/data/binTest.a, Examples/data/binTest.b
-                     Documentation/Info/Pads-Index.txt
+                     Documentation/Info/PADS-Index.txt
                      Documentation/Info/PackagesUsedInPads.txt
                      Documentation/Info/Pads-grammar.tex
                      Documentation/Info/Pads-grammar.pdf
