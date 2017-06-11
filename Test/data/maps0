@@ -1,0 +1,33 @@
+00400000-00422000 r-xp 00000000 fe:02 4968                               /usr/bin/less
+00622000-00623000 r--p 00022000 fe:02 4968                               /usr/bin/less
+00623000-00627000 rw-p 00023000 fe:02 4968                               /usr/bin/less
+00627000-0062b000 rw-p 00000000 00:00 0 
+00aa0000-00ac1000 rw-p 00000000 00:00 0                                  [heap]
+7f1ae9999000-7f1ae99b2000 r-xp 00000000 fe:02 93235                      /usr/lib/libpthread-2.25.so
+7f1ae99b2000-7f1ae9bb1000 ---p 00019000 fe:02 93235                      /usr/lib/libpthread-2.25.so
+7f1ae9bb1000-7f1ae9bb2000 r--p 00018000 fe:02 93235                      /usr/lib/libpthread-2.25.so
+7f1ae9bb2000-7f1ae9bb3000 rw-p 00019000 fe:02 93235                      /usr/lib/libpthread-2.25.so
+7f1ae9bb3000-7f1ae9bb7000 rw-p 00000000 00:00 0 
+7f1ae9bb7000-7f1ae9d52000 r-xp 00000000 fe:02 93077                      /usr/lib/libc-2.25.so
+7f1ae9d52000-7f1ae9f51000 ---p 0019b000 fe:02 93077                      /usr/lib/libc-2.25.so
+7f1ae9f51000-7f1ae9f55000 r--p 0019a000 fe:02 93077                      /usr/lib/libc-2.25.so
+7f1ae9f55000-7f1ae9f57000 rw-p 0019e000 fe:02 93077                      /usr/lib/libc-2.25.so
+7f1ae9f57000-7f1ae9f5b000 rw-p 00000000 00:00 0 
+7f1ae9f5b000-7f1ae9fcd000 r-xp 00000000 fe:02 108084                     /usr/lib/libpcre.so.1.2.8
+7f1ae9fcd000-7f1aea1cc000 ---p 00072000 fe:02 108084                     /usr/lib/libpcre.so.1.2.8
+7f1aea1cc000-7f1aea1cd000 r--p 00071000 fe:02 108084                     /usr/lib/libpcre.so.1.2.8
+7f1aea1cd000-7f1aea1ce000 rw-p 00072000 fe:02 108084                     /usr/lib/libpcre.so.1.2.8
+7f1aea1ce000-7f1aea235000 r-xp 00000000 fe:02 106343                     /usr/lib/libncursesw.so.6.0
+7f1aea235000-7f1aea434000 ---p 00067000 fe:02 106343                     /usr/lib/libncursesw.so.6.0
+7f1aea434000-7f1aea438000 r--p 00066000 fe:02 106343                     /usr/lib/libncursesw.so.6.0
+7f1aea438000-7f1aea43a000 rw-p 0006a000 fe:02 106343                     /usr/lib/libncursesw.so.6.0
+7f1aea43a000-7f1aea45d000 r-xp 00000000 fe:02 93078                      /usr/lib/ld-2.25.so
+7f1aea490000-7f1aea629000 r--p 00000000 fe:02 96759                      /usr/lib/locale/locale-archive
+7f1aea629000-7f1aea62d000 rw-p 00000000 00:00 0 
+7f1aea65c000-7f1aea65d000 r--p 00022000 fe:02 93078                      /usr/lib/ld-2.25.so
+7f1aea65d000-7f1aea65e000 rw-p 00023000 fe:02 93078                      /usr/lib/ld-2.25.so
+7f1aea65e000-7f1aea65f000 rw-p 00000000 00:00 0 
+7fff3cc14000-7fff3cc35000 rw-p 00000000 00:00 0                          [stack]
+7fff3cc3a000-7fff3cc3c000 r--p 00000000 00:00 0                          [vvar]
+7fff3cc3c000-7fff3cc3e000 r-xp 00000000 00:00 0                          [vdso]
+ffffffffff600000-ffffffffff601000 r-xp 00000000 00:00 0                  [vsyscall]

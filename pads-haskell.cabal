@@ -15,8 +15,8 @@ Synopsis:            PADS data description language for Haskell
 -- A longer description of the package.
 Description:     Massive amounts of useful data are stored and processed in
   ad hoc formats for which common tools like parsers,
-  printers, query engines and format converters are not readily 
-  available.  Pads/Haskell is a domain-specific language that 
+  printers, query engines and format converters are not readily
+  available.  Pads/Haskell is a domain-specific language that
   facilitates the generation of data processing tools for ad hoc
   formats. Pads/Haskell includes features such as
   dependent, polymorphic and recursive datatypes, which allow
@@ -40,7 +40,7 @@ Author:              Kathleen Fisher and John Launchbury
 Maintainer:          kathleen.fisher@gmail.com
 
 -- A copyright notice.
--- Copyright:           
+-- Copyright:
 
 
 Category:            Language
@@ -53,7 +53,7 @@ Extra-source-files:  Examples/First.hs, Examples/AI.hs, Examples/Binary.hs,
                      Examples/data/README
                      Examples/data/test_file
                      Examples/data/ai.3000, Examples/data/ai.big,
-                     Examples/data/binary, 
+                     Examples/data/binary,
                      Examples/data/a2b.c, Examples/data/calls10.a, Examples/data/calls10.b,
                      Examples/data/genBin.c, Examples/data/binTest.a, Examples/data/binTest.b
                      Documentation/Info/PADS-Index.txt
@@ -63,7 +63,7 @@ Extra-source-files:  Examples/First.hs, Examples/AI.hs, Examples/Binary.hs,
 
 
 -- Constraint on the version of Cabal needed to build this package.
-Cabal-version:       >=1.2
+Cabal-version:       >=1.10
 
 
 Library
@@ -72,12 +72,19 @@ Library
                        Language.Pads.BaseTypes, Language.Pads.Quote,
                        Language.Pads.Syntax,    Language.Pads.Parser,
                        Language.Pads.Generic,   Language.Pads.RegExp
-                       Language.Pads.Pretty,    Language.Pads.Source, 
+                       Language.Pads.Pretty,    Language.Pads.Source,
                        Language.Pads.TH,        Language.Pads.Testing,
                        Language.Pads.Library.BinaryUtilities,
-                       Language.Pads.Library.Native, 
+                       Language.Pads.Library.Native,
                        Language.Pads.Library.BigEndian,
-                       Language.Pads.Library.LittleEndian
+                       Language.Pads.Library.LittleEndian,
+                       Language.Pads.CodeGen,
+                       Language.Pads.CoreBaseTypes,
+                       Language.Pads.Errors,
+                       Language.Pads.MetaData,
+                       Language.Pads.PadsParser,
+                       Language.Pads.PadsPrinter,
+                       Language.Pads.LazyList
 
 
   -- Packages needed in order to build this package.
@@ -98,14 +105,46 @@ Library
                     time >= 1.4.2
 
   -- Modules not exported by this package.
-  Other-modules:       Language.Pads.CodeGen,
-                       Language.Pads.CoreBaseTypes, 
-                       Language.Pads.Errors, 
-                       Language.Pads.MetaData, 
-                       Language.Pads.PadsParser,
-                       Language.Pads.PadsPrinter,
-                       Language.Pads.LazyList 
-  
+
+  default-language: Haskell2010
+
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
-  -- Build-tools:         
-  
+  -- Build-tools:
+
+Test-Suite examples
+  Type:           exitcode-stdio-1.0
+  Main-Is:        Test/Examples.hs
+  build-depends:  base
+                , old-locale, haskell-src, template-haskell
+                , mainland-pretty, containers, time, syb, parsec
+                , haskell-src-meta, Glob, bytestring, regex-posix
+                , QuickCheck, HUnit
+                , Cabal
+                , test-framework
+                , test-framework-hunit
+                , test-framework-quickcheck2
+                , directory, byteorder
+  default-language: Haskell2010
+  other-modules:  Examples.Proc, Examples.First, Examples.AI, Examples.Binary
+                , Language.Pads.Testing
+                , Language.Pads.BaseTypes
+                , Language.Pads.CodeGen
+                , Language.Pads.CoreBaseTypes
+                , Language.Pads.Errors
+                , Language.Pads.GenPretty
+                , Language.Pads.Generic
+                , Language.Pads.MetaData
+                , Language.Pads.PadsParser
+                , Language.Pads.PadsPrinter
+                , Language.Pads.Padsc
+                , Language.Pads.Parser
+                , Language.Pads.Pretty
+                , Language.Pads.Quote
+                , Language.Pads.RegExp
+                , Language.Pads.Source
+                , Language.Pads.Syntax
+                , Language.Pads.TH
+                , Language.Pads.Library.BigEndian
+                , Language.Pads.Library.BinaryUtilities
+                , Language.Pads.Library.LittleEndian
+                , Language.Pads.Library.Native

@@ -19,10 +19,10 @@ ws = REd "[\t ]+|$" " "
 ---- PADS EXAMPLES
 
 -- Regression expects to be run from the Examples directory.
-test = runTestTT tests
+test = runTestTT (TestList tests)
 
 
-tests = TestList[ TestLabel "MyChar"  myChar_test
+tests =         [ TestLabel "MyChar"  myChar_test
                 , TestLabel "IntPair" intPair_test 
                 , TestLabel "Bar"     bar_test 
                 , TestLabel "Bar2"    bar2_test 

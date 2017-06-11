@@ -750,13 +750,14 @@ genPrintConstr doDef (mkName -> recName) args predM = do
   (mdEs,  mdPs)  <- getPEforFields (return . SigE (VarE 'myempty) . mkMDTy False) newName fields
   let ptys = map (\(n,(s,ty),p) -> ty) fields
 
-  let genBody mdEs = do
-      let genTyRepMd (ty,r,m) = if hasRep ty then return (ty,r,m) else genDefTy ty >>= \def -> return (ty,SigE def (mkRepTy ty),m)
-      ty_rep_mds <- mapM genTyRepMd $ zip3 ptys repEs mdEs
-      expE <- mapM (\(ty,repE,mdE) -> genPrintTy ty $ Just $ TupE [repE,mdE]) ty_rep_mds
-      let printItemsE = ListE expE
-      let caseBody = NormalB (AppE (VarE 'concatFL) printItemsE)
-      return caseBody
+  let genBody mdEs = (do
+      { let genTyRepMd = (\(ty,r,m) -> if hasRep ty then return (ty,r,m) else genDefTy ty >>= (\def -> return (ty,SigE def (mkRepTy ty),m)))
+      ; ty_rep_mds <- mapM genTyRepMd $ zip3 ptys repEs mdEs
+      ; expE <- mapM (\(ty,repE,mdE) -> genPrintTy ty $ Just $ TupE [repE,mdE]) ty_rep_mds
+      ; let printItemsE = ListE expE
+      ; let caseBody = NormalB (AppE (VarE 'concatFL) printItemsE)
+      ; return caseBody
+      })
 
   let repPat = ConP recName (filterByHasRep ptys $ map snd repPs)  
   let mdPat  = TupP[SigP WildP (ConT ''Base_md), ConP (getStructInnerMDName recName) (map snd mdPs)]

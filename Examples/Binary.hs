@@ -7,9 +7,9 @@ import qualified Language.Pads.Library.Native as Native
 import Language.Pads.Testing
 import System.IO.Unsafe (unsafePerformIO)
 
-test = runTestTT tests
+test = runTestTT $ TestList tests
 
-tests = TestList[TestLabel "Calls" call_test    
+tests =         [TestLabel "Calls" call_test    
                 ,TestLabel "Calls" callNoRec_test
                 ,TestLabel "BaseTypes" testRec_test]
 
