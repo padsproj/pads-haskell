@@ -28,7 +28,7 @@ type RawStream = B.ByteString   -- This is the type that should be used in other
 data Source = Source { current  :: B.ByteString
                      , rest     :: B.ByteString
                      , loc      :: Loc
-                     --, bit      :: Int
+                     , bit      :: Int
                      , disc     :: RecordDiscipline
                      , eorAtEOF :: Bool  -- Relevant for seperator-based record disciplines: Single, Multi
                                          -- Set when current record is last record and separtor appeared at end.
@@ -58,6 +58,8 @@ zeroLoc   = Loc {lineNumber = 0,  byteOffset = 0}
 
 zeroPos = locToPos zeroLoc
 
+zeroBit = 7
+
 incLineNumber :: Loc -> Loc
 incLineNumber Loc{lineNumber, ..} = Loc{ lineNumber = lineNumber+1
                                        , byteOffset = 0}
@@ -85,7 +87,7 @@ getRecordDiscipline = disc
 
 
 {- SOURCE CREATION -}
-emptySource = Source {current = B.empty, rest = B.empty, loc = zeroLoc, eorAtEOF = False, disc = NoDiscipline}
+emptySource = Source {current = B.empty, rest = B.empty, loc = zeroLoc, bit = zeroBit, eorAtEOF = False, disc = NoDiscipline}
 
 padsSourceFromString :: String -> Source
 padsSourceFromString str = padsSourceFromByteString (strToByteString str)
@@ -110,6 +112,7 @@ padsSourceFromByteString bs =
     let rawSource = Source{ current  = B.empty
                           , rest     = bs
                           , loc      = zeroLoc
+                          , bit      = zeroBit
                           , disc     = none
                           , eorAtEOF = False
                           }
@@ -120,6 +123,7 @@ padsSourceFromByteStringWithDisc d bs =
     let rawSource = Source{ current  = B.empty
                           , rest     = bs
                           , loc      = zeroLoc
+                          , bit      = zeroBit
                           , disc     = d
                           , eorAtEOF = False
                           }
@@ -139,8 +143,8 @@ getNextLine :: Source -> Source
 getNextLine (s @ Source {current, rest, loc, disc, eorAtEOF}) =
       if isEOF s then s
       else if eorAtEOF || B.null rest then
-            (Source {current = B.empty, rest = B.empty, loc = incLineNumber loc, disc, eorAtEOF = False})
-      else  (Source {current = nextLine, rest=residual, loc = incLineNumber loc, disc, eorAtEOF = eorAtEOF'})
+            (Source {current = B.empty, rest = B.empty, loc = incLineNumber loc, bit = zeroBit, disc, eorAtEOF = False})
+      else  (Source {current = nextLine, rest=residual, loc = incLineNumber loc, bit = zeroBit, disc, eorAtEOF = eorAtEOF'}) --TODO: is this bit positioning sound?
         where (nextLine, residual, eorAtEOF') = breakUsingDisc rest disc
 
 srcLineBegin :: Source -> (Maybe String, Source)
@@ -173,16 +177,16 @@ unputCurrentLine (s @ Source {current, rest, loc, disc, eorAtEOF}) =
                                      else current
                                 else B.concat [current, B.singleton n, rest]
                         loc'  = if B.null current then loc else decLineNumber loc
-                    in Source {current = B.empty, rest = rest', loc = loc', disc = NoDiscipline, eorAtEOF = False}
+                    in Source {current = B.empty, rest = rest', loc = loc', bit = zeroBit, disc = NoDiscipline, eorAtEOF = False}
         Multi  br -> let rest' = if B.null rest
                                 then if eorAtEOF
                                      then B.concat [current, br]
                                      else current
                                 else B.concat [current, rest]
                          loc'  = if B.null current then loc else decLineNumber loc
-                    in Source {current = B.empty, rest = rest', loc = loc', disc = NoDiscipline, eorAtEOF = False}
-        Bytes n -> Source {current = B.empty, rest = B.append current rest, loc = decLineNumber loc, disc = NoDiscipline, eorAtEOF = False}
-        NoPartition -> Source {current = B.empty, rest = current, loc = decLineNumber loc, disc = NoDiscipline, eorAtEOF = False}
+                    in Source {current = B.empty, rest = rest', loc = loc', bit = zeroBit, disc = NoDiscipline, eorAtEOF = False}
+        Bytes n -> Source {current = B.empty, rest = B.append current rest, loc = decLineNumber loc, bit = zeroBit, disc = NoDiscipline, eorAtEOF = False}
+        NoPartition -> Source {current = B.empty, rest = current, loc = decLineNumber loc, bit = zeroBit, disc = NoDiscipline, eorAtEOF = False}
         NoDiscipline -> s
 
 
