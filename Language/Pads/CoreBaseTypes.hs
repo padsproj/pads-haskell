@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables, 
-             MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances, 
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables,
+             MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances,
              FlexibleInstances #-}
 
 {-
@@ -24,10 +24,10 @@ import Data.Maybe
 
 import qualified Language.Pads.Source as S
 import qualified Language.Pads.Errors as E
-import qualified Data.ByteString as B  
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C
 
-import Language.Pads.PadsPrinter 
+import Language.Pads.PadsPrinter
 
 import Language.Haskell.TH as TH
 import Language.Haskell.TH.Syntax
@@ -37,8 +37,9 @@ import qualified Data.List as List
 import Data.Word
 import Data.Char as Char
 import Data.Int
+import Data.Bits
 
-import Text.PrettyPrint.Mainland as PP   
+import Text.PrettyPrint.Mainland as PP
 
 import Control.Monad
 
@@ -68,8 +69,142 @@ instance Pads1 () Char Base_md where
   def1 () = char_def
 
 char_printFL :: PadsPrinter (Char, md)
-char_printFL (c,bmd) = addString [c] 
+char_printFL (c,bmd) = addString [c]
 
+
+-----------------------------------------------------------------
+
+type BitBool = Bool
+type BitBool_md = Base_md
+
+bitBool_parseM :: Int -> PadsParser (BitBool, Base_md)
+bitBool_parseM x =
+    handleEOF def "BitBool" $
+    handleEOR def "BitBool" $ do
+        let is_end = elem x [x * 10 | x <- [0..7]]
+        c <- (takeHeadB is_end)
+        let offset = (if is_end then div x 10 else x)
+        let bool = testBit c offset
+        if (0 <= x && x <= 7) || is_end
+            then returnClean bool
+            else returnError (bitBool_def x) E.BitRangeError
+
+        -- TODO: handle offsets of more than 7 or less than 0
+        -- with the provided metadata capturing system
+        -- Works, but not with metadata
+
+        -- Currently, need to terminate a byte with offset * 10
+        -- Do we want something different? Is there something better?
+        -- Getting rid of it would necessitate making the describer write the
+        -- description in order, might not be the best for multi-line data
+
+        -- Lines are fake with binary stuff
+        -- Change EOR definition to no discipline instead of newline discipline?
+
+
+bitBool_def :: Int -> Bool
+bitBool_def _ = False
+
+bitBool_printFL :: Int -> PadsPrinter (BitBool, md)
+bitBool_printFL _ (bb,bbmd) = fshow bb
+
+type instance PadsArg Bool = ()
+type instance Meta Bool = Base_md
+instance Pads1 () Bool Base_md where
+    parsePP1 () = bitBool_parseM 0
+    printFL1 () = bitBool_printFL 0
+    def1 () = bitBool_def 0
+
+-----------------------------------------------------------------
+
+
+-- type Bits8 = Word8
+-- type Bits8_md = Base_md
+--
+-- bits8_parseM :: Int -> PadsParser (Bits8, Base_md)
+-- bits8_parseM x =
+--     handleEOF def "Bits8" $
+--     handleEOR def "Bits8" $ do
+--         c <- takeHeadP
+--         returnClean 4
+--
+-- bits8_def :: Int -> Word8
+-- bits8_def _ = 0
+--
+-- bits8_printFL :: Int -> PadsPrinter (Bits8, md)
+-- bits8_printFL _ (b8,b8md) = fshow b8
+--
+-- type instance PadsArg Word8 = ()
+-- type instance Meta Word8 = Base_md
+-- instance Pads1 () Word8 Base_md where
+--     parsePP1 () = bits8_parseM 0
+--     printFL1 () = bits8_printFL 0
+--     def1 () = bits8_def 0
+
+
+type BitsAtOffset = Word
+type BitsAtOffset_md = Base_md
+
+bitsAtOffset_parseM :: (Word, Word) -> PadsParser (BitsAtOffset, Base_md)
+bitsAtOffset_parseM (b,o) =
+    handleEOF 0 "BitsAtOffset" $
+    handleEOR 0 "BitsAtOffset" $ do
+        let leave_byte = True
+        bs <- (takeBytesP' True (div b 8))
+        returnClean 7
+
+
+
+bitsAtOffset_def :: (Word, Word) -> BitsAtOffset
+bitsAtOffset_def _ = 0
+
+bitsAtOffset_printFL :: (Word, Word) -> PadsPrinter (BitsAtOffset, md)
+bitsAtOffset_printFL _ (x,xmd) = fshow x
+
+-- type instance PadsArg Word = ()
+-- type instance Meta Word = Base_md
+-- instance Pads1 () Word Base_md where
+--     parsePP1 () = bitsAtOffset_parseM (0,0)
+--     printFL1 () = bitsAtOffset_printFL (0,0)
+--     def1 () = bitsAtOffset_def (0,0)
+
+-- getBitsAtOffset :: B.ByteString -> Int -> Int -> Word
+-- getBitsAtOffset bs bits offset = shiftR (getBits bs bits offset) offset
+--
+-- Get the bits from this byte, left shift them by an appropriate amount,
+-- then recursively add to them the remaining bits from the remaining bytes
+-- Offset is specified from the rightmost/least significant end of the string
+--
+-- getBits :: B.ByteString -> Int -> Int -> Word
+-- getBits bs bits offset =
+--     let b = if (bits + offset) `mod` 8 == 0
+--             then 8
+--             else (bits + offset) `mod` 8
+--         m = onesmask b
+--         l = B.length bs * 8
+--         bs' = B.drop ((l - (bits + offset)) `div` 8) bs
+--         h = fromIntegral $ B.head bs'
+--         l' = B.length bs'
+--     in  if l' <= 1
+--         then h .&. (onesmaskat bits offset)
+--         else (shiftL (h .&. m) ((l' * 8) - 8))
+--              +
+--              (getBits (B.tail bs') (bits - b) offset)
+--
+
+getBits_OffsetFromLeft :: B.ByteString -> Int -> Int -> Word
+getBits_OffsetFromLeft bstring bits offset =
+    let bits_from_this_byte = min bits 8
+        offset_in_this_byte = offset `mod` 8
+        mask = onesmaskat bits_from_this_byte (8 - bits_from_this_byte - offset_in_this_byte)
+        bstring' = B.drop 0 bstring
+    in 0
+
+onesmask :: Int -> Word
+onesmask b = (shiftL 1 b) - 1
+
+onesmaskat :: Int -> Int -> Word
+onesmaskat b o = shiftL (onesmask b) o
 
 -----------------------------------------------------------------
 
@@ -80,7 +215,7 @@ int_parseM :: PadsParser (Int,Base_md)
 int_parseM =
   handleEOF def "Int" $
   handleEOR def "Int" $ do
-    c <- peekHeadP 
+    c <- peekHeadP
     let isNeg = (c == '-')
     when isNeg (takeHeadP >> return ())
     digits <- satisfy Char.isDigit
@@ -110,7 +245,7 @@ integer_parseM :: PadsParser (Integer,Base_md)
 integer_parseM =
   handleEOF def "Integer" $
   handleEOR def "Integer" $ do
-    c <- peekHeadP 
+    c <- peekHeadP
     let isNeg = (c == '-')
     when isNeg (takeHeadP >> return ())
     digits <- satisfy Char.isDigit
@@ -141,26 +276,26 @@ float_parseM =
   handleEOF def "Float" $
   handleEOR def "Float" $ do
     -- Get leading sign
-    c <- peekHeadP 
+    c <- peekHeadP
     let isNeg = (c == '-')
     when isNeg (takeHeadP >> return ())
     let sign = if isNeg then "-" else ""
     -- Get digits before any dot
     digits1 <- satisfy Char.isDigit
     -- Get optional dot
-    d <- peekHeadP 
+    d <- peekHeadP
     let hasDot = (d == '.')
     when hasDot (takeHeadP >> return ())
     let dec = if hasDot then "." else ""
     -- Get digits after dot
     digits2 <- satisfy Char.isDigit
     -- Get optional exponent marker
-    e <- peekHeadP 
+    e <- peekHeadP
     let hasExp = (e == 'e')
     when hasExp (takeHeadP >> return ())
     let exp = if hasExp then "e" else ""
     -- Get optional exponent sign
-    es <- peekHeadP 
+    es <- peekHeadP
     let hasESign = (es == '-')
     when hasESign (takeHeadP >> return ())
     let expSign = if hasESign then "-" else ""
@@ -194,26 +329,26 @@ double_parseM =
   handleEOF def "Double" $
   handleEOR def "Double" $ do
     -- Get leading sign
-    c <- peekHeadP 
+    c <- peekHeadP
     let isNeg = (c == '-')
     when isNeg (takeHeadP >> return ())
     let sign = if isNeg then "-" else ""
     -- Get digits before any dot
     digits1 <- satisfy Char.isDigit
     -- Get optional dot
-    d <- peekHeadP 
+    d <- peekHeadP
     let hasDot = (d == '.')
     when hasDot (takeHeadP >> return ())
     let dec = if hasDot then "." else ""
     -- Get digits after dot
     digits2 <- satisfy Char.isDigit
     -- Get optional exponent marker
-    e <- peekHeadP 
+    e <- peekHeadP
     let hasExp = (e == 'e')
     when hasExp (takeHeadP >> return ())
     let exp = if hasExp then "e" else ""
     -- Get optional exponent sign
-    es <- peekHeadP 
+    es <- peekHeadP
     let hasESign = (es == '-')
     when hasESign (takeHeadP >> return ())
     let expSign = if hasESign then "-" else ""
@@ -263,7 +398,7 @@ digit_parseM  =
   handleEOF def "Pdigit" $
   handleEOR def "Pdigit" $ do
     c <- takeHeadP
-    if isDigit c 
+    if isDigit c
       then returnClean (digitToInt c)
       else returnError def (E.FoundWhenExpecting [c] "Digit")
 
@@ -370,7 +505,7 @@ stringC_parseM c =
 
 stringC_def c = ""
 
-stringC_printFL :: Char -> PadsPrinter (StringC, Base_md) 
+stringC_printFL :: Char -> PadsPrinter (StringC, Base_md)
 stringC_printFL c (str, bmd) = addString str
 
 
@@ -385,8 +520,8 @@ stringFW_parseM 0 = returnClean ""
 stringFW_parseM n =
   handleEOF (stringFW_def n) "StringFW" $
   handleEOR (stringFW_def n) "StringFW" $ do
-    str <- takeP n 
-    if (length str) == n 
+    str <- takeP n
+    if (length str) == n
       then returnClean str
       else returnError (stringFW_def n) (E.Insufficient (length str) n)
 
@@ -407,7 +542,7 @@ stringVW_parseM 0 = returnClean ""
 stringVW_parseM n =
   handleEOF (stringVW_def n) "StringVW" $
   handleEOR (stringVW_def n) "StringVW" $ do
-    str <- takeP n 
+    str <- takeP n
     returnClean str
 
 stringVW_def :: Int -> StringVW
@@ -445,10 +580,10 @@ type StringME = String
 type StringME_md = Base_md
 
 stringME_parseM :: RE -> PadsParser (StringME, Base_md)
-stringME_parseM re = 
+stringME_parseM re =
   handleEOF (stringME_def re) "StringME" $ do
     match <- regexMatchP re
-    case match of 
+    case match of
       Just str -> returnClean str
       Nothing  -> returnError (stringME_def re) (E.RegexMatchFail (show re))
 
@@ -456,7 +591,7 @@ stringME_def (RE re) = "" -- should invert the re
 stringME_def (REd re d) = d
 
 stringME_printFL :: RE -> PadsPrinter (StringME, Base_md)
-stringME_printFL re (str, bmd) = addString str       
+stringME_printFL re (str, bmd) = addString str
            -- We're not likely to check that str matches re
 
 -----------------------------------------------------------------
@@ -470,10 +605,10 @@ type StringSE_md = Base_md
 
 stringSE_parseM :: RE -> PadsParser (StringSE, Base_md)
 stringSE_parseM re =
-  checkEOF (stringSE_def re) "StringSE" $ 
+  checkEOF (stringSE_def re) "StringSE" $
   checkEOR (stringSE_def re) "StringSE" $ do
     match <- regexStopP re
-    case match of 
+    case match of
       Just str -> returnClean str
       Nothing  -> returnError (stringSE_def re) (E.RegexMatchFail (show re))
 
@@ -494,7 +629,7 @@ type StringP_md = Base_md
 
 stringP_parseM :: (Char -> Bool) -> PadsParser (StringP, Base_md)
 stringP_parseM p =
-  handleEOF (stringP_def p) "StringP" $ 
+  handleEOF (stringP_def p) "StringP" $
   handleEOR (stringP_def p) "StringP" $ do
     str <- satisfy p
     returnClean str
@@ -511,13 +646,13 @@ type StringPESC = String
 type StringPESC_md = Base_md
 
 stringPESC_parseM :: (Bool, (Char, [Char])) -> PadsParser(StringPESC, Base_md)
-stringPESC_parseM arg @ (endIfEOR, (escape, stops)) = 
+stringPESC_parseM arg @ (endIfEOR, (escape, stops)) =
  let (doEOF, doEOR) = if endIfEOR then (checkEOF, checkEOR) else (handleEOF, handleEOR)
  in
   doEOF "" "StringPESC" $
-  doEOR "" "StringPESC" $ do 
+  doEOR "" "StringPESC" $ do
     { c1 <- peekHeadP
-    ; if c1 `elem` stops then 
+    ; if c1 `elem` stops then
          returnClean ""
       else if c1 == escape then do
          { takeHeadP
@@ -528,12 +663,12 @@ stringPESC_parseM arg @ (endIfEOR, (escape, stops)) =
                    { (rest, rest_md) <- stringPESC_parseM arg
                    ;  return (c2:rest, rest_md)
                    }
-              else do 
+              else do
                    { (rest, rest_md) <- stringPESC_parseM arg
                    ; return (c1:c2:rest, rest_md)
                    }
             }
-         } else do 
+         } else do
             { c1 <- takeHeadP
             ; (rest, rest_md) <- stringPESC_parseM arg
             ; return (c1:rest, rest_md)
@@ -560,7 +695,7 @@ class LitParse a where
 
 strLit_parseM :: String -> PadsParser ((), Base_md)
 strLit_parseM s =
-  handleEOF () s $ 
+  handleEOF () s $
   handleEOR () s $ do
     match <- scanStrP s
     case match of
@@ -579,12 +714,12 @@ charLit_parseM :: Char -> PadsParser ((),Base_md)
 charLit_parseM c =
   handleEOF () (mkStr c) $
   handleEOR () (mkStr c) $ do
-    c' <- takeHeadP 
+    c' <- takeHeadP
     if c == c' then returnClean () else do
       foundIt <- scanP c
-      returnError () (if foundIt 
+      returnError () (if foundIt
                       then E.ExtraBeforeLiteral (mkStr c)
-                      else E.MissingLiteral     (mkStr c)) 
+                      else E.MissingLiteral     (mkStr c))
 
 charLit_printFL :: Char -> FList
 charLit_printFL c = addString [c]
@@ -601,8 +736,8 @@ instance LitParse RE where
 reLit_parseM :: RE -> PadsParser ((), Base_md)
 reLit_parseM re = do
   (match, md) <- stringME_parseM re
-  if numErrors md == 0 
-    then return ((), md) 
+  if numErrors md == 0
+    then return ((), md)
     else badReturn ((), md)
 
 reLit_printFL :: RE -> FList
@@ -624,7 +759,7 @@ type EOR = ()
 type EOR_md = Base_md
 
 eor_parseM :: PadsParser (EOR, Base_md)
-eor_parseM = 
+eor_parseM =
    handleEOF () "EOR" $ do
    isEor <- isEORP
    if isEor then doLineEnd
@@ -675,48 +810,48 @@ void_printFL v = nil
 
 
 
-pstrLit_printQ :: String -> FList 
+pstrLit_printQ :: String -> FList
 pstrLit_printQ str = addString str
 
-tuple_printQ :: (String, String, String) -> FList 
+tuple_printQ :: (String, String, String) -> FList
 tuple_printQ (s1,s2,s3) = pstrLit_printQ s1 +++ pstrLit_printQ s2 +++ pstrLit_printQ s3
 
-rtuple_printQ :: (String, String, String) -> FList 
+rtuple_printQ :: (String, String, String) -> FList
 rtuple_printQ ss = tuple_printQ ss +++ (addString ['\n'])
 
-list_printQ :: [(String,String,String)] -> FList 
+list_printQ :: [(String,String,String)] -> FList
 list_printQ [] =  nil
 list_printQ (item:items) = rtuple_printQ item +++ list_printQ items
 
-            
-            
-            
+
+
+
 
 
 
 
 ----------------------------------
 
-handleEOF val str p 
-  = do { isEof <- isEOFP 
+handleEOF val str p
+  = do { isEof <- isEOFP
        ; if isEof then
-           returnError val (E.FoundWhenExpecting "EOF" str) 
+           returnError val (E.FoundWhenExpecting "EOF" str)
          else p}
 
-handleEOR val str p 
-  = do { isEor <- isEORP 
+handleEOR val str p
+  = do { isEor <- isEORP
        ; if isEor then
            returnError val (E.FoundWhenExpecting "EOR" str)
          else p}
 
-checkEOF val str p 
-  = do { isEof <- isEOFP 
+checkEOF val str p
+  = do { isEof <- isEOFP
        ; if isEof then
            returnClean val
          else p}
 
-checkEOR val str p 
-  = do { isEor <- isEORP 
+checkEOR val str p
+  = do { isEor <- isEORP
        ; if isEor then
            returnClean val
          else p}
@@ -734,7 +869,7 @@ bytes_parseM n =
   handleEOF (def1 n) "Bytes" $
   handleEOR (def1 n) "Bytes" $ do
     bytes <- takeBytesP n
-    if B.length bytes == n 
+    if B.length bytes == n
       then returnClean bytes
       else returnError (def1 n) (E.Insufficient (B.length bytes) n)
 

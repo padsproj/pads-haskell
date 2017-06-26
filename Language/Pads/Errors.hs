@@ -15,7 +15,7 @@ import Text.PrettyPrint.Mainland as PP
 import qualified Language.Pads.Source as S
 import Data.Data
 
-data ErrMsg = 
+data ErrMsg =
    FoundWhenExpecting String String
  | MissingLiteral String
  | ExtraBeforeLiteral String
@@ -28,6 +28,7 @@ data ErrMsg =
  | PredicateFailure
  | ExtraStuffBeforeTy String String
  | FileError String String
+ | BitRangeError
    deriving (Typeable, Data, Eq, Ord, Show)
 
 {- XXX-KSF: fix pretty printing to use pretty printing combinators rather than string ++ -}
@@ -44,26 +45,26 @@ instance Pretty ErrMsg where
   ppr UnderlyingTypedefFail  = text "Pads predicate is true, but underlying type had an error."
   ppr PredicateFailure       = text "Pads predicate is false."
   ppr (FileError err file) = text ("Problem with file: " ++ file ++ "("++ err ++ ").")
+  ppr BitRangeError = text "Requested bit out of character/byte range."
 
 data ErrInfo = ErrInfo { msg      :: ErrMsg,
                          position :: Maybe S.Pos }
    deriving (Typeable, Data, Eq, Ord, Show)
 
 instance Pretty ErrInfo where
-  ppr (ErrInfo {msg,position}) = PP.ppr msg <+> 
-       case position of 
+  ppr (ErrInfo {msg,position}) = PP.ppr msg <+>
+       case position of
          Nothing -> empty
          Just pos -> (text "at:") <+>  PP.ppr pos
 
 
 
-mergeErrInfo (ErrInfo{msg=msg1, position=position1}) (ErrInfo{msg=msg2, position=position2}) = 
+mergeErrInfo (ErrInfo{msg=msg1, position=position1}) (ErrInfo{msg=msg2, position=position2}) =
              (ErrInfo{msg=msg1, position=position1})
 
 
-maybeMergeErrInfo m1 m2 = case (m1,m2) of 
-          (Nothing,Nothing) -> Nothing 
-          (Just p, Nothing) -> Just p     
+maybeMergeErrInfo m1 m2 = case (m1,m2) of
+          (Nothing,Nothing) -> Nothing
+          (Just p, Nothing) -> Just p
           (Nothing, Just p) -> Just p
           (Just p1, Just p2) -> Just (mergeErrInfo p1 p2)
-
