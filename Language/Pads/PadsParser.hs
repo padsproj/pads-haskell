@@ -327,8 +327,8 @@ takeP n = primPads (S.take (fromInt n))
 takeBytesP :: Integral a => a -> PadsParser S.RawStream
 takeBytesP n = primPads (S.takeBytes (fromInt n))
 
-takeBytesP' :: Integral a => Bool -> a -> PadsParser S.RawStream
-takeBytesP' b n = primPads (S.takeBytes' b (fromInt n))
+-- takeBytesP' :: Integral a => Bool -> a -> PadsParser S.RawStream
+-- takeBytesP' b n = primPads (S.takeBytes' b (fromInt n))
 
 fromInt :: (Integral a1, Num a) => a1 -> a
 fromInt n = fromInteger $ toInteger n

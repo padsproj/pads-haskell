@@ -20,6 +20,7 @@ import Data.Int
 import Data.Data
 import Data.Word
 import Data.Char
+import Data.Bits
 import qualified Data.ByteString.Char8 as Char8
 
 type RawStream = B.ByteString   -- This is the type that should be used in other files!!!
@@ -140,7 +141,7 @@ isEOR = B.null . current
 {- Called when current is empty to get the next record, where the disc field defines what constitutes a record.
    NOOP when isEOF is already true. -}
 getNextLine :: Source -> Source
-getNextLine (s @ Source {current, rest, loc, disc, eorAtEOF}) =
+getNextLine (s @ Source {current, rest, loc, bit, disc, eorAtEOF}) =
       if isEOF s then s
       else if eorAtEOF || B.null rest then
             (Source {current = B.empty, rest = B.empty, loc = incLineNumber loc, bit = zeroBit, disc, eorAtEOF = False})
@@ -250,6 +251,35 @@ takeHeadBB True  (s @ Source{current,loc, ..}) =
 takeHeadBB False (s @ Source{current, ..}) =
     (B.head current, s)
 
+-- takeBit :: Int -> Source -> (Word8, Source)
+-- takeBit b (s @ Source{current,loc,bit, ..}) =
+--     let returnbit = shiftR (B.head current .&. Data.Bits.bit bit) bit
+--         nextbit = if bit == 0 then zeroBit else bit
+--     in  case b > bit
+--           of True  -> (returnbit, s{current = B.tail current, loc = incOffset loc, Language.Pads.Source.bit = nextbit}) -- Next byte
+--              False -> (returnbit, s{Language.Pads.Source.bit = nextbit}) -- Same byte
+
+takeBits :: Int -> Source -> (Word, Source)
+takeBits b (s @ Source{current,loc,bit, ..}) =
+    let bitsincludinghead = ((zeroBit - bit) + b)
+        bytestotake = if   bitsincludinghead `mod` 8 == 0
+                      then bitsincludinghead `div` 8
+                      else bitsincludinghead `div` 8 + 1
+        head = B.take bytestotake current
+        tail = B.drop (bytestotake - 1) current
+        newbit = bitsincludinghead `mod` 8
+        bits = byteStringToNum $ B.unpack head
+    in (0, s{current = tail,
+             loc = incOffsetBy loc (B.length head - 1),
+             Language.Pads.Source.bit = newbit})
+
+byteStringToNum :: [Word8] -> Word
+byteStringToNum [] = 0
+byteStringToNum (x:xs) = shiftL (fromIntegral x) (length xs * 8) + byteStringToNum xs
+
+onesMask :: Int -> Word
+onesMask b = (shiftL 1 b) - 1
+
 takeHeadM :: Source -> (Maybe Char, Source)
 takeHeadM (s @ Source{current,loc, ..}) =
   if B.null current then (Nothing, s)
@@ -318,14 +348,18 @@ takeBytes n (s @ Source{current,loc, ..}) =
      in (head, s{current= tail, loc = incOffsetBy loc incOffset})
 
 
-takeBytes' :: Bool -> Int -> Source -> (B.ByteString, Source)
-takeBytes' b n (s @ Source{current,loc, ..}) =
-    if   b
-    then let head = B.take n current
-             tail = B.drop (n - 1) current
-             incOffset = n - 1
-         in  (head, s{current = tail, loc = incOffsetBy loc incOffset})
-    else takeBytes n s
+-- takeBytes' :: Int -> Source -> (B.ByteString, Source)
+-- takeBytes' n (s @ Source{current,loc,bit, ..}) =
+--     let
+
+-- takeBytes' :: Bool -> Int -> Source -> (B.ByteString, Source)
+-- takeBytes' b n (s @ Source{current,loc, ..}) =
+--     if   b
+--     then let head = B.take n current
+--              tail = B.drop (n - 1) current
+--              incOffset = n - 1
+--          in  (head, s{current = tail, loc = incOffsetBy loc incOffset})
+--     else takeBytes n s
 
 
 take :: Int -> Source -> (String, Source)

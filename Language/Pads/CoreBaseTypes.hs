@@ -81,6 +81,8 @@ bitBool_parseM :: Int -> PadsParser (BitBool, Base_md)
 bitBool_parseM x =
     handleEOF def "BitBool" $
     handleEOR def "BitBool" $ do
+        -- b <- (takeBitP x)
+        -- returnClean (b == 1)
         let is_end = elem x [x * 10 | x <- [0..7]]
         c <- (takeHeadB is_end)
         let offset = (if is_end then div x 10 else x)
@@ -97,9 +99,6 @@ bitBool_parseM x =
         -- Do we want something different? Is there something better?
         -- Getting rid of it would necessitate making the describer write the
         -- description in order, might not be the best for multi-line data
-
-        -- Lines are fake with binary stuff
-        -- Change EOR definition to no discipline instead of newline discipline?
 
 
 bitBool_def :: Int -> Bool
@@ -142,24 +141,40 @@ instance Pads1 () Bool Base_md where
 --     def1 () = bits8_def 0
 
 
-type BitsAtOffset = Word
-type BitsAtOffset_md = Base_md
+type BitField = Word
+type BitField_md = Base_md
 
-bitsAtOffset_parseM :: (Word, Word) -> PadsParser (BitsAtOffset, Base_md)
-bitsAtOffset_parseM (b,o) =
-    handleEOF 0 "BitsAtOffset" $
-    handleEOR 0 "BitsAtOffset" $ do
-        let leave_byte = True
-        bs <- (takeBytesP' True (div b 8))
-        returnClean 7
+bitField_parseM :: Int -> PadsParser (BitField, Base_md)
+bitField_parseM x =
+    handleEOF def "BitField" $
+    handleEOR def "BitField" $ do
+        returnClean 5
+
+bitField_def :: Int -> BitField
+bitField_def _ = 0
+
+bitField_printFL :: Int -> PadsPrinter (BitField, md)
+bitField_printFL _ (x, xmd) = fshow x
 
 
-
-bitsAtOffset_def :: (Word, Word) -> BitsAtOffset
-bitsAtOffset_def _ = 0
-
-bitsAtOffset_printFL :: (Word, Word) -> PadsPrinter (BitsAtOffset, md)
-bitsAtOffset_printFL _ (x,xmd) = fshow x
+-- type BitsAtOffset = Word
+-- type BitsAtOffset_md = Base_md
+--
+-- bitsAtOffset_parseM :: (Word, Word) -> PadsParser (BitsAtOffset, Base_md)
+-- bitsAtOffset_parseM (b,o) =
+--     handleEOF 0 "BitsAtOffset" $
+--     handleEOR 0 "BitsAtOffset" $ do
+--         let leave_byte = True
+--         bs <- (takeBytesP' True (div b 8))
+--         returnClean 7
+--
+--
+--
+-- bitsAtOffset_def :: (Word, Word) -> BitsAtOffset
+-- bitsAtOffset_def _ = 0
+--
+-- bitsAtOffset_printFL :: (Word, Word) -> PadsPrinter (BitsAtOffset, md)
+-- bitsAtOffset_printFL _ (x,xmd) = fshow x
 
 -- type instance PadsArg Word = ()
 -- type instance Meta Word = Base_md
@@ -192,19 +207,19 @@ bitsAtOffset_printFL _ (x,xmd) = fshow x
 --              (getBits (B.tail bs') (bits - b) offset)
 --
 
-getBits_OffsetFromLeft :: B.ByteString -> Int -> Int -> Word
-getBits_OffsetFromLeft bstring bits offset =
-    let bits_from_this_byte = min bits 8
-        offset_in_this_byte = offset `mod` 8
-        mask = onesmaskat bits_from_this_byte (8 - bits_from_this_byte - offset_in_this_byte)
-        bstring' = B.drop 0 bstring
-    in 0
+-- getBits_OffsetFromLeft :: B.ByteString -> Int -> Int -> Word
+-- getBits_OffsetFromLeft bstring bits offset =
+--     let bits_from_this_byte = min bits 8
+--         offset_in_this_byte = offset `mod` 8
+--         mask = onesmaskat bits_from_this_byte (8 - bits_from_this_byte - offset_in_this_byte)
+--         bstring' = B.drop 0 bstring
+--     in 0
 
-onesmask :: Int -> Word
-onesmask b = (shiftL 1 b) - 1
-
-onesmaskat :: Int -> Int -> Word
-onesmaskat b o = shiftL (onesmask b) o
+-- onesmask :: Int -> Word
+-- onesmask b = (shiftL 1 b) - 1
+--
+-- onesmaskat :: Int -> Int -> Word
+-- onesmaskat b o = shiftL (onesmask b) o
 
 -----------------------------------------------------------------
 
