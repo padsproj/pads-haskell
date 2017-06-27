@@ -245,37 +245,35 @@ takeHead :: Source -> (Char, Source)
 takeHead (s @ Source{current,loc, ..}) =
     (word8ToChr $ B.head current, s{current = B.tail current, loc = incOffset loc})
 
-takeHeadBB :: Bool -> Source -> (Word8, Source)
-takeHeadBB True  (s @ Source{current,loc, ..}) =
-    (B.head current, s{current = B.tail current, loc = incOffset loc})
-takeHeadBB False (s @ Source{current, ..}) =
-    (B.head current, s)
-
--- takeBit :: Int -> Source -> (Word8, Source)
--- takeBit b (s @ Source{current,loc,bit, ..}) =
---     let returnbit = shiftR (B.head current .&. Data.Bits.bit bit) bit
---         nextbit = if bit == 0 then zeroBit else bit
---     in  case b > bit
---           of True  -> (returnbit, s{current = B.tail current, loc = incOffset loc, Language.Pads.Source.bit = nextbit}) -- Next byte
---              False -> (returnbit, s{Language.Pads.Source.bit = nextbit}) -- Same byte
+-- takeHeadBB :: Bool -> Source -> (Word8, Source)
+-- takeHeadBB True  (s @ Source{current,loc, ..}) =
+--     (B.head current, s{current = B.tail current, loc = incOffset loc})
+-- takeHeadBB False (s @ Source{current, ..}) =
+--     (B.head current, s)
 
 takeBits :: Int -> Source -> (Word, Source)
 takeBits b (s @ Source{current,loc,bit, ..}) =
     let bitsincludinghead = ((zeroBit - bit) + b)
-        bytestotake = if   bitsincludinghead `mod` 8 == 0
-                      then bitsincludinghead `div` 8
-                      else bitsincludinghead `div` 8 + 1
-        head = B.take bytestotake current
-        tail = B.drop (bytestotake - 1) current
-        newbit = bitsincludinghead `mod` 8
-        bits = byteStringToNum $ B.unpack head
-    in (0, s{current = tail,
-             loc = incOffsetBy loc (B.length head - 1),
-             Language.Pads.Source.bit = newbit})
+        partialbyteread = bitsincludinghead `mod` 8 /= 0
+        bytestoread = if   partialbyteread
+                      then bitsincludinghead `div` 8 + 1
+                      else bitsincludinghead `div` 8
+        head = B.take bytestoread current
+        tail = if   partialbyteread
+               then B.drop (bytestoread - 1) current
+               else B.drop bytestoread current
+        newbit = zeroBit - (bitsincludinghead `mod` 8)
+        bytes = byteStringToNum head
+        bits = (shiftR bytes (8 * bytestoread - bitsincludinghead)) .&. onesMask b
+    in (bits, s{current = tail,
+              loc = incOffsetBy loc (B.length head - if partialbyteread then 1 else 0),
+              Language.Pads.Source.bit = newbit})
 
-byteStringToNum :: [Word8] -> Word
-byteStringToNum [] = 0
-byteStringToNum (x:xs) = shiftL (fromIntegral x) (length xs * 8) + byteStringToNum xs
+byteStringToNum :: B.ByteString -> Word
+byteStringToNum bs =
+    shiftR (foldl (\bits byte ->
+                      shiftL (bits + (fromIntegral byte)) 8) 0 (B.unpack bs))
+           8
 
 onesMask :: Int -> Word
 onesMask b = (shiftL 1 b) - 1
@@ -346,21 +344,6 @@ takeBytes n (s @ Source{current,loc, ..}) =
      let (head, tail) = B.splitAt n current
          incOffset    = B.length head
      in (head, s{current= tail, loc = incOffsetBy loc incOffset})
-
-
--- takeBytes' :: Int -> Source -> (B.ByteString, Source)
--- takeBytes' n (s @ Source{current,loc,bit, ..}) =
---     let
-
--- takeBytes' :: Bool -> Int -> Source -> (B.ByteString, Source)
--- takeBytes' b n (s @ Source{current,loc, ..}) =
---     if   b
---     then let head = B.take n current
---              tail = B.drop (n - 1) current
---              incOffset = n - 1
---          in  (head, s{current = tail, loc = incOffsetBy loc incOffset})
---     else takeBytes n s
-
 
 take :: Int -> Source -> (String, Source)
 take n s = let (bs, s') = takeBytes n s

@@ -77,19 +77,19 @@ char_printFL (c,bmd) = addString [c]
 type BitBool = Bool
 type BitBool_md = Base_md
 
-bitBool_parseM :: Int -> PadsParser (BitBool, Base_md)
-bitBool_parseM x =
+bitBool_parseM :: PadsParser (BitBool, Base_md)
+bitBool_parseM =
     handleEOF def "BitBool" $
     handleEOR def "BitBool" $ do
-        -- b <- (takeBitP x)
-        -- returnClean (b == 1)
-        let is_end = elem x [x * 10 | x <- [0..7]]
-        c <- (takeHeadB is_end)
-        let offset = (if is_end then div x 10 else x)
-        let bool = testBit c offset
-        if (0 <= x && x <= 7) || is_end
-            then returnClean bool
-            else returnError (bitBool_def x) E.BitRangeError
+        b <- takeBitsP 1
+        returnClean (b == 1)
+        -- let is_end = elem x [x * 10 | x <- [0..7]]
+        -- c <- (takeHeadB is_end)
+        -- let offset = (if is_end then div x 10 else x)
+        -- let bool = testBit c offset
+        -- if (0 <= x && x <= 7) || is_end
+        --     then returnClean bool
+        --     else returnError (bitBool_def x) E.BitRangeError
 
         -- TODO: handle offsets of more than 7 or less than 0
         -- with the provided metadata capturing system
@@ -100,55 +100,29 @@ bitBool_parseM x =
         -- Getting rid of it would necessitate making the describer write the
         -- description in order, might not be the best for multi-line data
 
+bitBool_def = False
 
-bitBool_def :: Int -> Bool
-bitBool_def _ = False
-
-bitBool_printFL :: Int -> PadsPrinter (BitBool, md)
-bitBool_printFL _ (bb,bbmd) = fshow bb
+bitBool_printFL :: PadsPrinter (BitBool, md)
+bitBool_printFL (bb,bbmd) = fshow bb
 
 type instance PadsArg Bool = ()
 type instance Meta Bool = Base_md
 instance Pads1 () Bool Base_md where
-    parsePP1 () = bitBool_parseM 0
-    printFL1 () = bitBool_printFL 0
-    def1 () = bitBool_def 0
+    parsePP1 () = bitBool_parseM
+    printFL1 () = bitBool_printFL
+    def1 () = bitBool_def
 
 -----------------------------------------------------------------
-
-
--- type Bits8 = Word8
--- type Bits8_md = Base_md
---
--- bits8_parseM :: Int -> PadsParser (Bits8, Base_md)
--- bits8_parseM x =
---     handleEOF def "Bits8" $
---     handleEOR def "Bits8" $ do
---         c <- takeHeadP
---         returnClean 4
---
--- bits8_def :: Int -> Word8
--- bits8_def _ = 0
---
--- bits8_printFL :: Int -> PadsPrinter (Bits8, md)
--- bits8_printFL _ (b8,b8md) = fshow b8
---
--- type instance PadsArg Word8 = ()
--- type instance Meta Word8 = Base_md
--- instance Pads1 () Word8 Base_md where
---     parsePP1 () = bits8_parseM 0
---     printFL1 () = bits8_printFL 0
---     def1 () = bits8_def 0
-
 
 type BitField = Word
 type BitField_md = Base_md
 
 bitField_parseM :: Int -> PadsParser (BitField, Base_md)
 bitField_parseM x =
-    handleEOF def "BitField" $
-    handleEOR def "BitField" $ do
-        returnClean 5
+    handleEOF 0 "BitField" $
+    handleEOR 0 "BitField" $ do
+        b <- takeBitsP x
+        returnClean b
 
 bitField_def :: Int -> BitField
 bitField_def _ = 0
@@ -156,32 +130,6 @@ bitField_def _ = 0
 bitField_printFL :: Int -> PadsPrinter (BitField, md)
 bitField_printFL _ (x, xmd) = fshow x
 
-
--- type BitsAtOffset = Word
--- type BitsAtOffset_md = Base_md
---
--- bitsAtOffset_parseM :: (Word, Word) -> PadsParser (BitsAtOffset, Base_md)
--- bitsAtOffset_parseM (b,o) =
---     handleEOF 0 "BitsAtOffset" $
---     handleEOR 0 "BitsAtOffset" $ do
---         let leave_byte = True
---         bs <- (takeBytesP' True (div b 8))
---         returnClean 7
---
---
---
--- bitsAtOffset_def :: (Word, Word) -> BitsAtOffset
--- bitsAtOffset_def _ = 0
---
--- bitsAtOffset_printFL :: (Word, Word) -> PadsPrinter (BitsAtOffset, md)
--- bitsAtOffset_printFL _ (x,xmd) = fshow x
-
--- type instance PadsArg Word = ()
--- type instance Meta Word = Base_md
--- instance Pads1 () Word Base_md where
---     parsePP1 () = bitsAtOffset_parseM (0,0)
---     printFL1 () = bitsAtOffset_printFL (0,0)
---     def1 () = bitsAtOffset_def (0,0)
 
 -- getBitsAtOffset :: B.ByteString -> Int -> Int -> Word
 -- getBitsAtOffset bs bits offset = shiftR (getBits bs bits offset) offset
@@ -205,21 +153,6 @@ bitField_printFL _ (x, xmd) = fshow x
 --         else (shiftL (h .&. m) ((l' * 8) - 8))
 --              +
 --              (getBits (B.tail bs') (bits - b) offset)
---
-
--- getBits_OffsetFromLeft :: B.ByteString -> Int -> Int -> Word
--- getBits_OffsetFromLeft bstring bits offset =
---     let bits_from_this_byte = min bits 8
---         offset_in_this_byte = offset `mod` 8
---         mask = onesmaskat bits_from_this_byte (8 - bits_from_this_byte - offset_in_this_byte)
---         bstring' = B.drop 0 bstring
---     in 0
-
--- onesmask :: Int -> Word
--- onesmask b = (shiftL 1 b) - 1
---
--- onesmaskat :: Int -> Int -> Word
--- onesmaskat b o = shiftL (onesmask b) o
 
 -----------------------------------------------------------------
 

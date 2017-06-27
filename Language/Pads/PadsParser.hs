@@ -327,6 +327,8 @@ takeP n = primPads (S.take (fromInt n))
 takeBytesP :: Integral a => a -> PadsParser S.RawStream
 takeBytesP n = primPads (S.takeBytes (fromInt n))
 
+takeBitsP :: Integral a => a -> PadsParser Word
+takeBitsP b = primPads (S.takeBits (fromInt b))
 -- takeBytesP' :: Integral a => Bool -> a -> PadsParser S.RawStream
 -- takeBytesP' b n = primPads (S.takeBytes' b (fromInt n))
 
@@ -345,8 +347,8 @@ peekHeadP = queryP S.head
 takeHeadP :: PadsParser Char
 takeHeadP = primPads S.takeHead
 
-takeHeadB :: Bool -> PadsParser Word8
-takeHeadB b = primPads (S.takeHeadBB b)
+-- takeHeadB :: Bool -> PadsParser Word8
+-- takeHeadB b = primPads (S.takeHeadBB b)
 
 takeHeadStrP :: String -> PadsParser Bool
 takeHeadStrP str = primPads (S.takeHeadStr str)
