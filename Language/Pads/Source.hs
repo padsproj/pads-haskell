@@ -245,12 +245,6 @@ takeHead :: Source -> (Char, Source)
 takeHead (s @ Source{current,loc, ..}) =
     (word8ToChr $ B.head current, s{current = B.tail current, loc = incOffset loc})
 
--- takeHeadBB :: Bool -> Source -> (Word8, Source)
--- takeHeadBB True  (s @ Source{current,loc, ..}) =
---     (B.head current, s{current = B.tail current, loc = incOffset loc})
--- takeHeadBB False (s @ Source{current, ..}) =
---     (B.head current, s)
-
 takeBits :: Int -> Source -> (Word, Source)
 takeBits b (s @ Source{current,loc,bit, ..}) =
     let bitsincludinghead = ((zeroBit - bit) + b)

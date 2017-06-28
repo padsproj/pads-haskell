@@ -79,38 +79,22 @@ type BitBool_md = Base_md
 
 bitBool_parseM :: PadsParser (BitBool, Base_md)
 bitBool_parseM =
-    handleEOF def "BitBool" $
-    handleEOR def "BitBool" $ do
+    handleEOF False "BitBool" $
+    handleEOR False "BitBool" $ do
         b <- takeBitsP 1
         returnClean (b == 1)
-        -- let is_end = elem x [x * 10 | x <- [0..7]]
-        -- c <- (takeHeadB is_end)
-        -- let offset = (if is_end then div x 10 else x)
-        -- let bool = testBit c offset
-        -- if (0 <= x && x <= 7) || is_end
-        --     then returnClean bool
-        --     else returnError (bitBool_def x) E.BitRangeError
-
-        -- TODO: handle offsets of more than 7 or less than 0
-        -- with the provided metadata capturing system
-        -- Works, but not with metadata
-
-        -- Currently, need to terminate a byte with offset * 10
-        -- Do we want something different? Is there something better?
-        -- Getting rid of it would necessitate making the describer write the
-        -- description in order, might not be the best for multi-line data
 
 bitBool_def = False
 
 bitBool_printFL :: PadsPrinter (BitBool, md)
 bitBool_printFL (bb,bbmd) = fshow bb
 
-type instance PadsArg Bool = ()
-type instance Meta Bool = Base_md
-instance Pads1 () Bool Base_md where
-    parsePP1 () = bitBool_parseM
-    printFL1 () = bitBool_printFL
-    def1 () = bitBool_def
+-- type instance PadsArg Bool = ()
+-- type instance Meta Bool = Base_md
+-- instance Pads1 () Bool Base_md where
+--     parsePP1 () = bitBool_parseM
+--     printFL1 () = bitBool_printFL
+--     def1 () = bitBool_def
 
 -----------------------------------------------------------------
 
@@ -130,29 +114,12 @@ bitField_def _ = 0
 bitField_printFL :: Int -> PadsPrinter (BitField, md)
 bitField_printFL _ (x, xmd) = fshow x
 
-
--- getBitsAtOffset :: B.ByteString -> Int -> Int -> Word
--- getBitsAtOffset bs bits offset = shiftR (getBits bs bits offset) offset
---
--- Get the bits from this byte, left shift them by an appropriate amount,
--- then recursively add to them the remaining bits from the remaining bytes
--- Offset is specified from the rightmost/least significant end of the string
---
--- getBits :: B.ByteString -> Int -> Int -> Word
--- getBits bs bits offset =
---     let b = if (bits + offset) `mod` 8 == 0
---             then 8
---             else (bits + offset) `mod` 8
---         m = onesmask b
---         l = B.length bs * 8
---         bs' = B.drop ((l - (bits + offset)) `div` 8) bs
---         h = fromIntegral $ B.head bs'
---         l' = B.length bs'
---     in  if l' <= 1
---         then h .&. (onesmaskat bits offset)
---         else (shiftL (h .&. m) ((l' * 8) - 8))
---              +
---              (getBits (B.tail bs') (bits - b) offset)
+-- type instance PadsArg Word = ()
+-- type instance Meta Word = Base_md
+-- instance Pads1 () Word Base_md where
+--     parsePP1 () = bitField_parseM
+--     printFL1 () = bitField_printFL
+--     def1 () = bitField_def
 
 -----------------------------------------------------------------
 
