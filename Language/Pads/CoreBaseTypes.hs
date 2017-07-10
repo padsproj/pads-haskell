@@ -98,7 +98,7 @@ bitBool_printFL (bb,bbmd) = fshow bb
 
 -----------------------------------------------------------------
 
-type BitField = Word
+type BitField = Integer
 type BitField_md = Base_md
 
 bitField_parseM :: Integral a => a -> PadsParser (BitField, Base_md)

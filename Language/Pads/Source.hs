@@ -88,7 +88,7 @@ getRecordDiscipline = disc
 
 
 {- SOURCE CREATION -}
-emptySource = Source {current = B.empty, rest = B.empty, loc = zeroLoc, bit = zeroBit, eorAtEOF = False, disc = none}
+emptySource = Source {current = B.empty, rest = B.empty, loc = zeroLoc, bit = zeroBit, eorAtEOF = False, disc = newline}
 
 padsSourceFromString :: String -> Source
 padsSourceFromString str = padsSourceFromByteString (strToByteString str)
@@ -114,7 +114,7 @@ padsSourceFromByteString bs =
                           , rest     = bs
                           , loc      = zeroLoc
                           , bit      = zeroBit
-                          , disc     = none
+                          , disc     = newline
                           , eorAtEOF = False
                           }
     in getNextLine rawSource
@@ -245,7 +245,7 @@ takeHead :: Source -> (Char, Source)
 takeHead (s @ Source{current,loc, ..}) =
     (word8ToChr $ B.head current, s{current = B.tail current, loc = incOffset loc})
 
-takeBits :: Int -> Source -> (Word, Source)
+takeBits :: Int -> Source -> (Integer, Source)
 takeBits b (s @ Source{current,loc,bit, ..}) =
     let bitsincludinghead = ((zeroBit - bit) + b)
         partialbyteread = bitsincludinghead `mod` 8 /= 0
@@ -263,13 +263,12 @@ takeBits b (s @ Source{current,loc,bit, ..}) =
               loc = incOffsetBy loc (B.length head - if partialbyteread then 1 else 0),
               Language.Pads.Source.bit = newbit})
 
-byteStringToNum :: B.ByteString -> Word
+byteStringToNum :: B.ByteString -> Integer
 byteStringToNum bs =
     shiftR (foldl (\bits byte ->
-                      shiftL (bits + (fromIntegral byte)) 8) 0 (B.unpack bs))
-           8
+                      shiftL (bits + (fromIntegral byte)) 8) 0 (B.unpack bs)) 8
 
-onesMask :: Int -> Word
+onesMask :: Int -> Integer
 onesMask b = (shiftL 1 b) - 1
 
 takeHeadM :: Source -> (Maybe Char, Source)
