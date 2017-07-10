@@ -327,7 +327,7 @@ takeP n = primPads (S.take (fromInt n))
 takeBytesP :: Integral a => a -> PadsParser S.RawStream
 takeBytesP n = primPads (S.takeBytes (fromInt n))
 
-takeBitsP :: Integral a => a -> PadsParser Word
+takeBitsP :: Integral a => a -> PadsParser Integer
 takeBitsP b = primPads (S.takeBits (fromInt b))
 
 fromInt :: (Integral a1, Num a) => a1 -> a
