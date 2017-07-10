@@ -101,17 +101,17 @@ bitBool_printFL (bb,bbmd) = fshow bb
 type BitField = Word
 type BitField_md = Base_md
 
-bitField_parseM :: Int -> PadsParser (BitField, Base_md)
+bitField_parseM :: Integral a => a -> PadsParser (BitField, Base_md)
 bitField_parseM x =
     handleEOF 0 "BitField" $
     handleEOR 0 "BitField" $ do
         b <- takeBitsP x
         returnClean b
 
-bitField_def :: Int -> BitField
+bitField_def :: Integral a => a -> BitField
 bitField_def _ = 0
 
-bitField_printFL :: Int -> PadsPrinter (BitField, md)
+bitField_printFL :: Integral a => a -> PadsPrinter (BitField, md)
 bitField_printFL _ (x, xmd) = fshow x
 
 -- type instance PadsArg Word = ()

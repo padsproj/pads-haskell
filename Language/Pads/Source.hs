@@ -88,7 +88,7 @@ getRecordDiscipline = disc
 
 
 {- SOURCE CREATION -}
-emptySource = Source {current = B.empty, rest = B.empty, loc = zeroLoc, bit = zeroBit, eorAtEOF = False, disc = NoDiscipline}
+emptySource = Source {current = B.empty, rest = B.empty, loc = zeroLoc, bit = zeroBit, eorAtEOF = False, disc = none}
 
 padsSourceFromString :: String -> Source
 padsSourceFromString str = padsSourceFromByteString (strToByteString str)

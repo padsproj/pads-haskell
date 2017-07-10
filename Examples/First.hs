@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, TypeFamilies, TypeSynonymInstances, TemplateHaskell, QuasiQuotes, 
+{-# LANGUAGE FlexibleContexts, TypeFamilies, TypeSynonymInstances, TemplateHaskell, QuasiQuotes,
              MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
              DeriveDataTypeable, ScopedTypeVariables #-}
 
@@ -23,15 +23,15 @@ test = runTestTT (TestList tests)
 
 
 tests =         [ TestLabel "MyChar"  myChar_test
-                , TestLabel "IntPair" intPair_test 
-                , TestLabel "Bar"     bar_test 
-                , TestLabel "Bar2"    bar2_test 
-                , TestLabel "Bazr"    bazr_test 
-                , TestLabel "MyInt"   myInt_test 
-                , TestLabel "StrTy"   strTy_test 
-                , TestLabel "StrTy1"  strTy1_test 
-                , TestLabel "Baz"     baz_test 
-                , TestLabel "Phex32FW"  phex32FW_test 
+                , TestLabel "IntPair" intPair_test
+                , TestLabel "Bar"     bar_test
+                , TestLabel "Bar2"    bar2_test
+                , TestLabel "Bazr"    bazr_test
+                , TestLabel "MyInt"   myInt_test
+                , TestLabel "StrTy"   strTy_test
+                , TestLabel "StrTy1"  strTy1_test
+                , TestLabel "Baz"     baz_test
+                , TestLabel "Phex32FW"  phex32FW_test
                 , TestLabel "IntRange" test_intRange24
                 , TestLabel "IntRange" test_intRange0
                 , TestLabel "IntRange" test_intRange256
@@ -96,8 +96,8 @@ tests =         [ TestLabel "MyChar"  myChar_test
                 , TestLabel "Stringln" test_stringln
                 , TestLabel "Compound" test_myData
                 , TestLabel "Compound" test_hp_data
-                , TestLabel "Doc"  test_hp_data_file_parse
---                , TestLabel "Doc"  myDoc_test
+--                , TestLabel "Doc"  test_hp_data_file_parse   -- If these tests are meant to be run from the examples directory,
+--                , TestLabel "Doc"  myDoc_test                -- one ought to type file paths as such
                 , TestLabel "Literal"  litRec_test
                 , TestLabel "Literal"  whiteSpace_test
                 , TestLabel "Literal"  whiteSpace2_test
@@ -112,6 +112,11 @@ tests =         [ TestLabel "MyChar"  myChar_test
                 , TestLabel "StringFWs" stringFWs_test
                 , TestLabel "StringESCs" stringESCs_test
                 , TestLabel "StringPs" stringPs_test
+                , TestLabel "BitBools" bitBools_test
+                , TestLabel "BitBools" bitBools_test2
+                , TestLabel "ArithPixel" arithPixel_test
+                , TestLabel "IncompleteBitBools" incompleteBitBools_test
+                , TestLabel "Mixed" mixed_test
                 ]
 
 [pads|  |]
@@ -187,15 +192,15 @@ input_strHex = "12abcds"
 strHex_result = strHex_parseS input_strHex
 
 {- Testing for Phex32FW, which is in Pads.Language.BaseTypes -}
-input_hex32FW = "12bc34"  
-phex32FW_results = phex32FW_parseS 4 input_hex32FW   
+input_hex32FW = "12bc34"
+phex32FW_results = phex32FW_parseS 4 input_hex32FW
 phex32FW_expects = (4796, 0, "34")
 phex32FW_test    = mkTestCase "phex32FW" phex32FW_expects phex32FW_results
 
-input2_hex32FW = "00bc34"  
+input2_hex32FW = "00bc34"
 strhex32FW_result2 = phex32FW_parseS 4 input2_hex32FW    -- ((Phex32FW (188),Errors: 0),"34")
 
-input3_hex32FW = "gbc34"  
+input3_hex32FW = "gbc34"
 strhex32FW_result3 = phex32FW_parseS 4 input3_hex32FW    -- Prints error message
 
 [pads| type  HexPair = (Phex32FW 2, ',', Phex32FW 3) |]
@@ -245,7 +250,7 @@ result_intRangeP24 = intRangeP_parseS (0, 256) intRange24_input
 expect_intRangeP24 = (24,0,"")
 test_intRangeP24 = mkTestCase "IntRangeP24" expect_intRangeP24 result_intRangeP24
 
-result_intRangeP0  = intRangeP_parseS (0, 256) intRange0_input 
+result_intRangeP0  = intRangeP_parseS (0, 256) intRange0_input
 expect_intRangeP0 = (0,0,"")
 test_intRangeP0 = mkTestCase "IntRangeP0" expect_intRangeP0 result_intRangeP0
 
@@ -270,8 +275,8 @@ test_intRangePBad    = mkTestCase "IntRangePBad" expect_intRangePBad result_intR
 
 
 
-[pads| data  Record (bound::Int) = Record 
-                {  i1 :: Int, 
+[pads| data  Record (bound::Int) = Record
+                {  i1 :: Int,
               ',', i2 :: Int where <| i1 + i2 <= bound |>   } |]
 
 input_Record = "24,45"
@@ -280,7 +285,7 @@ expect_Record = (Record {i1 = 24, i2 = 45},0,"")
 test_Record   = mkTestCase "Record" expect_Record result_Record
 
 [pads| data Id =  Numeric Int
-               |  Alpha   (StringC ',')  |] 
+               |  Alpha   (StringC ',')  |]
 
 input_IdInt = "23"
 result_IdInt = id_parseS input_IdInt
@@ -292,9 +297,9 @@ result_IdStr = id_parseS input_IdStr
 expect_IdStr = (Alpha ("hello"),0,"")
 test_IdStr = mkTestCase "IdAlpha" expect_IdStr result_IdStr
 
-[pads| data Id2 (bound::Int) = 
+[pads| data Id2 (bound::Int) =
             Numeric2 (constrain n::Int where <| n <= bound |>)
-          | Alpha2   (StringC ',') |] 
+          | Alpha2   (StringC ',') |]
 input_IdInt2 = "23"
 result_IdInt2 = id2_parseS 10 input_IdInt2
 expect_IdInt2 =  (Alpha2 ("23"),0,"")
@@ -309,7 +314,7 @@ test_IdStr2 = mkTestCase "IdAlpha2" expect_IdStr2 result_IdStr2
 
 [pads| data Id3  = Numeric3  (IntRangeP <|(1,10)|>)
                  | Numeric3a Int
-                 | Lit3     ','               |] 
+                 | Lit3     ','               |]
 input_IdInt3 = "24"
 result_IdInt3 = id3_parseS input_IdInt3
 expect_IdInt3 = (Numeric3a (24),0,"")
@@ -340,22 +345,22 @@ result_AB_test2 = aB_test_parseS input_AB_test2
 expect_AB_test2 = (AB_test {field_AB = AB},1,"")
 test_AB_test2 = mkTestCase "AB_test2" expect_AB_test2 result_AB_test2
 
-[pads| data Method  = GET | PUT | LINK | UNLINK | POST  
-       data Version = Version 
-              {"HTTP/" 
+[pads| data Method  = GET | PUT | LINK | UNLINK | POST
+       data Version = Version
+              {"HTTP/"
               , major :: Int, '.'
-              , minor :: Int} 
+              , minor :: Int}
 |]
 
 checkVersion :: Method -> Version -> Bool
-checkVersion method version = 
+checkVersion method version =
   case method of
     LINK   -> major version == 1 && minor version == 0
     UNLINK -> major version == 1 && minor version == 0
     _ -> True
 
-[pads| data Request = Request 
-             { '"',  method  :: Method       
+[pads| data Request = Request
+             { '"',  method  :: Method
              , ' ',  url     :: StringC ' '
              , ' ',  version :: Version where <| checkVersion method version |>
              , '"'
@@ -449,7 +454,7 @@ expect_entries_nosep_noterm2 = ([],0,"")
 test_entries_nosep_noterm2 = mkTestCase "NoSep_NoTerm2" expect_entries_nosep_noterm2 result_entries_nosep_noterm2
 
 
-[pads| type  EvenInt = constrain x :: Digit where <| x `mod` 2 == 0 |> 
+[pads| type  EvenInt = constrain x :: Digit where <| x `mod` 2 == 0 |>
        type  EvenInts = [EvenInt] |]
 input_evenInts = "2465"
 result_evenInt = evenInt_parseS input_evenInts
@@ -515,7 +520,7 @@ test_digitListTermB   = mkTestCase "DigitListTermB" expect_digitListTermB result
 
 [pads| type DigitListTermSep = [Digit | '|' ] terminator ';' |]
 input_digitListTermSepG = "1|2|3|4|5|6;hello"
-result_digitListTermSepG = digitListTermSep_parseS input_digitListTermSepG 
+result_digitListTermSepG = digitListTermSep_parseS input_digitListTermSepG
 expect_digitListTermSepG = ([1,2,3,4,5,6], 0,"hello")
 test_digitListTermSepG = mkTestCase "digitListTermSepG" expect_digitListTermSepG result_digitListTermSepG
 
@@ -562,7 +567,7 @@ result_WithVoid = withVoid_parseS input_WithVoid
 expect_WithVoid =  ('a',0,"rest")
 test_WithVoid = mkTestCase "WithVoid" expect_WithVoid result_WithVoid
 
-[pads| data VoidOpt   = PDigit Digit | Pcolor "red" | Pnothing Void 
+[pads| data VoidOpt   = PDigit Digit | Pcolor "red" | Pnothing Void
        type VoidEntry = (VoidOpt, StringFW 3)                    |]
 input_voidEntry1 = "9abcdef"
 result_voidEntry1 = voidEntry_parseS input_voidEntry1
@@ -579,11 +584,11 @@ result_voidEntry3 = voidEntry_parseS input_voidEntry3
 expect_voidEntry3 =  ((Pnothing,"abc"),0,"def")
 test_voidEntry3 = mkTestCase "VoidEntry3" expect_voidEntry3 result_voidEntry3
 
-[pads| data Switch (which :: Int) =  
+[pads| data Switch (which :: Int) =
          case <| which |> of
              0 ->         Even Int where <| even `mod` 2 == 0 |>
            | 1 ->         Comma   ','
-           | otherwise -> Missing Void |] 
+           | otherwise -> Missing Void |]
 input_switch0 = "2hello"
 input_switch1 = ",hello"
 input_switchOther = "hello"
@@ -606,16 +611,16 @@ result_stringln = stringLn_parseS "hello\ngoodbye"
 expect_stringln = ("hello",0,"\ngoodbye")
 test_stringln = mkTestCase "stringln" expect_stringln result_stringln
 
-[pads| data MyBody (which::Int) = 
+[pads| data MyBody (which::Int) =
          case <| which |> of
             0         -> First Int
           | 1         -> Second (StringC ',')
           | otherwise -> Other Void
 
-       data MyEntry = MyEntry 
+       data MyEntry = MyEntry
           { header  :: Int, ','
           , body    :: MyBody header, ','
-          , trailer :: Char}  
+          , trailer :: Char}
 
        type MyData = [Line MyEntry] terminator EOF      |]
 
@@ -628,9 +633,9 @@ test_myData = mkTestCase "MyData" expect_myData result_myData
 
 
 
-[pads| data HP = HP { student_num  :: Int, ',', 
+[pads| data HP = HP { student_num  :: Int, ',',
                       student_name :: StringFW student_num }
-       type HP_data = [Line HP] terminator EOF |]   
+       type HP_data = [Line HP] terminator EOF |]
 
 input_hp_data = "8,Hermione\n3,Ron\n5,Harry\n"
 result_hp_data = hP_data_parseS input_hp_data
@@ -644,7 +649,7 @@ test_hp_data = mkTestCase "HP Data" expect_hp_data result_hp_data
 test_file = "Examples/data/test_file"
 result_hp_data_file_parse :: (HP_data, HP_data_md) = unsafePerformIO $ parseFileWith hP_data_parseM test_file
 
-expect_hp_data_file_parse = 
+expect_hp_data_file_parse =
   ( [HP {student_num = 8, student_name = "Hermione"},
      HP {student_num = 3, student_name = "Ron"},
      HP {student_num = 5, student_name = "Harry"}], 0)
@@ -690,7 +695,7 @@ rE_ty_test = mkTestCase "regular expression abbreviation for StringME" rE_ty_exp
 
 
 [pads| type Disc = (Int, EOR, Int, EOR, (partition (Int, EOR, Int, EOR) using windows), Int, EOR) |]
-disc_input = "1\n2\n3\r\n4\r\n5\n"        
+disc_input = "1\n2\n3\r\n4\r\n5\n"
 disc_result = disc_parseS disc_input
 disc_expects = ((1,2,(3,4),5),0,"")
 disc_test = mkTestCase "multiple record disciplines" disc_expects disc_result
@@ -703,7 +708,7 @@ exxy_expects = (Exxy {exxy = 32635, aa = 'd'},0,"ef")
 exxy_test = mkTestCase "label overlap" exxy_expects exxy_result
 
 [pads| type OneLine  = [Char] terminator EOR
-       type Lines    = [OneLine] terminator EOF 
+       type Lines    = [OneLine] terminator EOF
        type LinesFW  = partition Lines using <| bytes 3 |>
 |]
 
@@ -774,3 +779,52 @@ stringPs_result = stringPs_parseS stringPs_input
 stringPs_expects = (["123","","123"],2, "")
 stringPs_test = mkTestCase "stringPs" stringPs_expects stringPs_result
 
+
+{- Bit-level functionality tests -}
+
+[pads| type BitBools = (partition [BitBool] using none) |]
+bitBools_input = "a" -- binary 01100001
+bitBools_result = bitBools_parseS bitBools_input
+bitBools_expects = ([False,True,True,False,False,False,False,True], 0, "")
+bitBools_test = mkTestCase "bitBools" bitBools_expects bitBools_result
+
+bitBools_input2 = "a\n" -- binary 01100001 00001010
+bitBools_result2 = bitBools_parseS bitBools_input2
+bitBools_expects2 = ([False,True,True,False,False,False,False,True,
+                      False,False,False,False,True,False,True,False], 0, "")
+bitBools_test2 = mkTestCase "bitBools" bitBools_expects2 bitBools_result2
+
+[pads| type IncompleteBitBools = (partition (BitBool,
+                                             BitBool,
+                                             BitBool) using none) |]
+incompleteBitBools_input = "4"
+incompleteBitBools_result = incompleteBitBools_parseS incompleteBitBools_input
+incompleteBitBools_expects = ((False,False,True), 0, "4")
+incompleteBitBools_test = mkTestCase "incompleteBitBools"
+                                     incompleteBitBools_expects
+                                     incompleteBitBools_result
+
+[pads| type ArithPixel = (partition (BitField 9,
+                                     BitField 5,
+                                     BitField 5,
+                                     BitField 5,
+                                     BitField 4,
+                                     BitField 4) using none) |]
+arithPixel_input = map word8ToChr [136,114,32,0]
+arithPixel_result = arithPixel_parseS arithPixel_input
+arithPixel_expects = ((272,28,17,0,0,0), 0, "")
+arithPixel_test = mkTestCase "arithPixel" arithPixel_expects arithPixel_result
+
+[pads| type Mixed = (partition (StringC ' ',
+                                ' ',
+                                BitBool,
+                                BitBool,
+                                BitBool,
+                                BitBool,
+                                BitBool,
+                                BitField 3,
+                                Char) using none) |]
+mixed_input = "Hello \nc"
+mixed_result = mixed_parseS mixed_input
+mixed_expects = (("Hello",False,False,False,False,True,2,'c'), 0, "")
+mixed_test = mkTestCase "mixed" mixed_expects mixed_result
