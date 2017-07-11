@@ -96,8 +96,8 @@ tests =         [ TestLabel "MyChar"  myChar_test
                 , TestLabel "Stringln" test_stringln
                 , TestLabel "Compound" test_myData
                 , TestLabel "Compound" test_hp_data
---                , TestLabel "Doc"  test_hp_data_file_parse   -- If these tests are meant to be run from the examples directory,
---                , TestLabel "Doc"  myDoc_test                -- one ought to type file paths as such
+                , TestLabel "Doc" test_hp_data_file_parse
+                , TestLabel "Doc" myDoc_test
                 , TestLabel "Literal"  litRec_test
                 , TestLabel "Literal"  whiteSpace_test
                 , TestLabel "Literal"  whiteSpace2_test
@@ -116,7 +116,12 @@ tests =         [ TestLabel "MyChar"  myChar_test
                 , TestLabel "BitBools" bitBools_test2
                 , TestLabel "ArithPixel" arithPixel_test
                 , TestLabel "IncompleteBitBools" incompleteBitBools_test
-                , TestLabel "Mixed" mixed_test
+--                , TestLabel "Mixed" mixed_test
+                , TestLabel "OddWidths" oddWidths_test
+                , TestLabel "LargeWidths" largeWidths_test
+                , TestLabel "Enumerated" enumerated_test
+                , TestLabel "EnumeratedWC" enumerated_test_wc
+                , TestLabel "EnumeratedBool" enumeratedBool_test
                 ]
 
 [pads|  |]
@@ -646,7 +651,7 @@ test_hp_data = mkTestCase "HP Data" expect_hp_data result_hp_data
 
 
 
-test_file = "Examples/data/test_file"
+test_file = "data/test_file"
 result_hp_data_file_parse :: (HP_data, HP_data_md) = unsafePerformIO $ parseFileWith hP_data_parseM test_file
 
 expect_hp_data_file_parse =
@@ -660,7 +665,7 @@ test_hp_data_file_parse = mkFileTestCase "HP file" expect_hp_data_file_parse res
 strToBS = B.pack . (map chrToWord8)
 
 [pads| newtype MyDoc = MyDoc Text |]
-myDoc_input_file = "Examples/data/test_file"
+myDoc_input_file = "data/test_file"
 myDoc_result :: (MyDoc, MyDoc_md) = unsafePerformIO $ parseFile myDoc_input_file
 myDoc_expects = (MyDoc (Text (strToBS "8,Hermione\n3,Ron\n5,Harry\n")),0)
 myDoc_test = mkFileTestCase "myDoc" myDoc_expects myDoc_result
@@ -815,16 +820,82 @@ arithPixel_result = arithPixel_parseS arithPixel_input
 arithPixel_expects = ((272,28,17,0,0,0), 0, "")
 arithPixel_test = mkTestCase "arithPixel" arithPixel_expects arithPixel_result
 
-[pads| type Mixed = (partition (StringC ' ',
-                                ' ',
-                                BitBool,
-                                BitBool,
-                                BitBool,
-                                BitBool,
-                                BitBool,
-                                BitField 3,
-                                Char) using none) |]
-mixed_input = "Hello \nc"
-mixed_result = mixed_parseS mixed_input
-mixed_expects = (("Hello",False,False,False,False,True,2,'c'), 0, "")
-mixed_test = mkTestCase "mixed" mixed_expects mixed_result
+-- Both of these descriptions, in tandem with some of the testing between them,
+-- cause errors in unusual circumstances
+
+-- [pads| type Mixed = (partition (StringC ' ',
+--                                 ' ',
+--                                 BitBool,
+--                                 BitField 2,
+--                                 BitBool,
+--                                 BitBool,
+--                                 BitField 3,
+--                                 Char) using none) |]
+
+-- mixed_input = "Hello \nc"
+-- mixed_result = mixed_parseS mixed_input
+-- mixed_expects = (("Hello",False,0,False,True,2,'c'), 0, "")
+-- mixed_test = mkTestCase "mixed" mixed_expects mixed_result
+
+-- [pads| type Mixed2 = (partition (StringC ' ',
+--                                  ' ',
+--                                  Char,
+--                                  Int,
+--                                  Char,
+--                                  Char,
+--                                  Int,
+--                                  Char) using none) |]
+
+[pads| type OddWidths = (partition (BitField 19,
+                                    BitField 39,
+                                    BitField 1,
+                                    BitField 5) using none) |]
+
+oddWidths_input = map word8ToChr [104,46,174,3,185,8,6,158]
+oddWidths_result = oddWidths_parseS oddWidths_input
+oddWidths_expects = ((213365,240768000026,0,30), 0, "")
+oddWidths_test = mkTestCase "oddWidths" oddWidths_expects oddWidths_result
+
+[pads| type LargeWidths = (partition (BitField 7,
+                                      BitField 89,
+                                      BitField 65) using none) |]
+
+largeWidths_input = map word8ToChr [1,0,0,0,0,0,0,0,0,0,0,1,128,0,0,0,0,0,0,0,128]
+largeWidths_result = largeWidths_parseS largeWidths_input
+largeWidths_expects = ((0,309485009821345068724781057,18446744073709551617), 0, map word8ToChr [128])
+largeWidths_test = mkTestCase "largeWidths" largeWidths_expects largeWidths_result
+
+[pads| data EnumType (x :: BitField) = case x of 0 -> ZERO
+                                               | 1 -> ONE
+                                               | 2 -> TWO {}
+                                               | _ -> OTHER
+
+       data Enumerate = Enumerate {x :: BitField 3,
+                                        BitField 5,
+                                   y :: EnumType x}
+
+       type Enumerated = (partition Enumerate using none) |]
+
+enumerated_input = map word8ToChr [64]
+enumerated_result = enumerated_parseS enumerated_input
+enumerated_expects = (Enumerate {x = 2, y = TWO}, 0, "")
+enumerated_test = mkTestCase "Enumerated" enumerated_expects enumerated_result
+
+enumerated_input_wc = map word8ToChr [255]
+enumerated_result_wc = enumerated_parseS enumerated_input_wc
+enumerated_expects_wc = (Enumerate {x = 7, y = OTHER}, 0, "")
+enumerated_test_wc = mkTestCase "EnumeratedWC" enumerated_expects_wc enumerated_result_wc
+
+[pads| data EnumTypeBool (x' :: BitBool) = case x' of True  -> ON
+                                                    | False -> OFF
+
+       data EnumerateBool = EnumerateBool {BitField 7,
+                                           x' :: BitBool,
+                                           y' :: EnumTypeBool x'}
+
+       type EnumeratedBool = (partition EnumerateBool using none) |]
+
+enumeratedBool_input = map word8ToChr [1]
+enumeratedBool_result = enumeratedBool_parseS enumeratedBool_input
+enumeratedBool_expects = (EnumerateBool {x' = True, y' = ON}, 0, "")
+enumeratedBool_test = mkTestCase "EnumeratedBool" enumeratedBool_expects enumeratedBool_result
