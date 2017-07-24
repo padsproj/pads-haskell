@@ -48,7 +48,10 @@ data BranchInfo = BRecord String [FieldInfo] (Maybe Exp)
   deriving (Eq, Data, Typeable, Show)
 
 type FieldInfo = (Maybe String, ConstrArg, Maybe Exp)
-type ConstrArg = (Strict, PadsTy)
+type ConstrArg = (PadsStrict, PadsTy)
+
+data PadsStrict = IsStrict | NotStrict | Unpacked
+  deriving (Eq, Data, Typeable, Show)
 
 type QString = [String]  -- qualified names
 

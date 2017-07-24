@@ -119,13 +119,14 @@ mkTyRepMDDecl name args ty = [repType, mdType]
 
 mkDataRepMDDecl :: Derivation -> UString -> [LString] -> PadsData -> [QString] -> Q [Dec]
 mkDataRepMDDecl derivation name args branches ds = do
-  bs <- mapM mkMDUnion bs
-  let imdDecl  = DataD [] (mkIMDName name) tyArgsMD bs (derive [])
+  bs' <- mapM (return . mkMDUnion) bs
+  imdDecl  <- dataD (cxt []) (mkIMDName name) tyArgsMD Nothing bs'  (derive [])
+  bs'' <- mapM (return . mkRepUnion) bs
+  dataDecl <- dataD (cxt []) (mkRepName name) tyArgs   Nothing bs'' (derive ds)
   derivesData <- derivation dataDecl
   derivesImd <- derivation imdDecl
   return $ [dataDecl, mdDecl, imdDecl] ++ derivesData ++ derivesImd
   where
-    dataDecl = DataD [] (mkRepName name) tyArgs (map mkRepUnion bs) (derive ds)
     mdDecl   = TySynD   (mkMDName name)  tyArgsMD (mkTupleT [ConT ''Base_md, imdApp])
     tyArgs   = map (PlainTV . mkName) args
     tyArgsMD   = map (PlainTV . mkName . (++"_md")) args
@@ -134,26 +135,37 @@ mkDataRepMDDecl derivation name args branches ds = do
                  PUnion bnchs    -> bnchs
                  PSwitch exp pbs -> [b | (p,b) <- pbs]
 
-mkRepUnion :: BranchInfo -> Con
-mkRepUnion (BConstr c args expM) = NormalC (mkConstrName c) reps
-  where reps = [(strict,mkRepTy ty) | (strict,ty) <- args, hasRep ty]
-mkRepUnion (BRecord c fields expM) = RecC (mkConstrName c) lreps
-  where lreps = [(mkName l,strict,mkRepTy ty) | (Just l,(strict,ty),_) <- fields, hasRep ty]
+mkStrict :: PadsStrict -> Q Strict
+mkStrict NotStrict  = bang noSourceUnpackedness noSourceStrictness  -- i.e. notStrict
+mkStrict IsStrict   = bang noSourceUnpackedness sourceStrict        -- i.e. isStrict
+
+mkRepUnion :: BranchInfo -> ConQ
+mkRepUnion (BConstr c args expM) = normalC (mkConstrName c) reps
+  where reps = [bangType (mkStrict strict) (return $ mkRepTy ty) | (strict,ty) <- args, hasRep ty]
+mkRepUnion (BRecord c fields expM) = recC (mkConstrName c) lreps
+  where lreps = [ varBangType
+                    (mkName l)
+                    (bangType (mkStrict strict)
+                              (return $ mkRepTy ty))
+                | (Just l,(strict,ty),_) <- fields, hasRep ty]
 
 mkMDUnion :: BranchInfo -> Q Con
-mkMDUnion (BConstr c args expM) = return $ NormalC (mkConstrIMDName c) mds
+mkMDUnion (BConstr c args expM) = normalC (mkConstrIMDName c) mds
   where   
-    mds = [(NotStrict,mkMDTy False ty) | (_,ty) <- args] --MD , hasRep ty]
+    mds = [bangType (mkStrict NotStrict) (return $ mkMDTy False ty) | (_,ty) <- args] --MD , hasRep ty]
 mkMDUnion (BRecord c fields expM) = do
-  { lmds <- sequence [ do { fn <- genLabMDName "m" lM; return (fn,NotStrict,mkMDTy False ty)}
-                     | (lM,(_,ty),_) <- fields] 
-  ; return$ RecC (mkConstrIMDName c) lmds
+  { let lmds = [ do { fn <- genLabMDName "m" lM
+                    ; varBangType fn (bangType (mkStrict NotStrict) (return $ mkMDTy False ty))
+                    }
+               | (lM,(_,ty),_) <- fields
+               ]
+  ; recC (mkConstrIMDName c) lmds
   }
 --MD    lmds <- return [(mkFieldMDName l,NotStrict,mkMDTy ty) | (Just l,(_,ty),_) <- fields, hasRep ty]
 
-derive :: [QString] -> [Name]
-derive ds =  map (mkName . qName) ds
-  ++ [mkName d | d<-["Show","Eq","Typeable","Data","Ord"], not (d `elem` map last ds)]
+derive :: [QString] -> CxtQ
+derive ds = cxt (map (conT . mkName . qName) ds
+  ++ [conT $ mkName d | d<-["Show","Eq","Typeable","Data","Ord"], not (d `elem` map last ds)])
 
 
 -----------------------------------------------------------
@@ -162,13 +174,12 @@ derive ds =  map (mkName . qName) ds
 
 mkNewRepMDDecl :: Derivation -> UString -> [LString] -> BranchInfo -> [QString] -> Q [Dec]
 mkNewRepMDDecl derivation name args branch ds = do
-  bs <- mkMDUnion branch
-  let imdDecl  = NewtypeD [] (mkIMDName name) tyArgsMD bs (derive [])
+  imdDecl  <- newtypeD (cxt []) (mkIMDName name) tyArgsMD Nothing (mkMDUnion  branch) (derive [])
+  dataDecl <- newtypeD (cxt []) (mkRepName name) tyArgs   Nothing (mkRepUnion branch) (derive ds)
   derivesData <- derivation dataDecl
   derivesImd <- derivation imdDecl
   return $ [dataDecl, mdDecl, imdDecl] ++ derivesData ++ derivesImd
   where
-    dataDecl = NewtypeD [] (mkRepName name) tyArgs (mkRepUnion branch) (derive ds)
     mdDecl   = TySynD   (mkMDName name)  tyArgsMD (mkTupleT [ConT ''Base_md, imdApp])
     tyArgs   = map (PlainTV . mkName) args
     tyArgsMD   = map (PlainTV . mkName . (++"_md")) args
@@ -251,7 +262,11 @@ mkPadsInstance str args mb@(Nothing)
 mkPadsInstance str args mb@(Just ety) 
   = buildInst mb str args (ConT ''Pads1 `AppT` ety)
 
-buildInst mb str args pads = [InstanceD ctx inst [parsePP_method, printFL_method,def_method],TySynInstD ''Meta $ TySynEqn [ty_name] meta_ty,TySynInstD ''PadsArg $ TySynEqn [ty_name] arg_ty]
+buildInst mb str args pads =
+    [ InstanceD Nothing ctx inst [parsePP_method, printFL_method,def_method]
+    , TySynInstD ''Meta $ TySynEqn [ty_name] meta_ty
+    , TySynInstD ''PadsArg $ TySynEqn [ty_name] arg_ty
+    ]
   where
   arg_ty = case mb of
     Nothing -> TupleT 0
