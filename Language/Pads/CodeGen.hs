@@ -31,6 +31,7 @@ import qualified Data.Map as M
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import Control.Monad
+import Language.Haskell.TH.Syntax (lift)
 
 import Debug.Trace
 
@@ -51,16 +52,17 @@ make_pads_declarations' derivation ds = fmap concat (mapM (genPadsDecl derivatio
 
 genPadsDecl :: Derivation -> PadsDecl -> Q [Dec]
 
-genPadsDecl derivation (PadsDeclType name args pat padsTy) = do
+genPadsDecl derivation pd@(PadsDeclType name args pat padsTy) = do
   let typeDecs = mkTyRepMDDecl name args padsTy
   parseM  <- genPadsParseM name args pat padsTy
   parseS  <- genPadsParseS name args pat
   printFL <- genPadsPrintFL name args pat padsTy
   def <- genPadsDef name args pat padsTy
   let sigs = mkPadsSignature name args (fmap patType pat)
-  return $ typeDecs ++ parseM ++ parseS ++ printFL ++ def ++ sigs
+  ast <- astDecl name pd
+  return $ ast : typeDecs ++ parseM ++ parseS ++ printFL ++ def ++ sigs
 
-genPadsDecl derivation (PadsDeclData name args pat padsData derives) = do
+genPadsDecl derivation pd@(PadsDeclData name args pat padsData derives) = do
   dataDecs <- mkDataRepMDDecl derivation name args padsData derives
   parseM <- genPadsDataParseM name args pat padsData 
   parseS <- genPadsParseS name args pat
@@ -68,9 +70,10 @@ genPadsDecl derivation (PadsDeclData name args pat padsData derives) = do
   def <- genPadsDataDef name args pat padsData
   let instances = mkPadsInstance name args (fmap patType pat)
   let sigs = mkPadsSignature name args (fmap patType pat)
-  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
+  ast <- astDecl name pd
+  return $ ast : dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
 
-genPadsDecl derivation (PadsDeclNew name args pat branch derives) = do
+genPadsDecl derivation pd@(PadsDeclNew name args pat branch derives) = do
   dataDecs <- mkNewRepMDDecl derivation name args branch derives
   parseM <- genPadsNewParseM name args pat branch 
   parseS <- genPadsParseS name args pat
@@ -78,16 +81,20 @@ genPadsDecl derivation (PadsDeclNew name args pat branch derives) = do
   def <- genPadsNewDef name args pat branch
   let instances = mkPadsInstance name args (fmap patType pat)
   let sigs = mkPadsSignature name args (fmap patType pat)
-  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
+  ast <- astDecl name pd
+  return $ ast : dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
 
-genPadsDecl derivation (PadsDeclObtain name args padsTy exp) = do
+genPadsDecl derivation pd@(PadsDeclObtain name args padsTy exp) = do
   let mdDec = mkObtainMDDecl name args padsTy
   parseM  <- genPadsObtainParseM name args padsTy exp
   parseS  <- genPadsParseS name args Nothing
   printFL <- genPadsObtainPrintFL name args padsTy exp
   def <- genPadsObtainDef name args padsTy exp
   let sigs = mkPadsSignature name args Nothing
-  return $ mdDec ++ parseM ++ parseS ++ printFL ++ def ++ sigs
+  ast <- astDecl name pd
+  return $ ast : mdDec ++ parseM ++ parseS ++ printFL ++ def ++ sigs
+
+astDecl name pd = funD (mkName $ "ast_" ++ name) [clause [] (normalB $ lift pd) []]
 
 patType :: Pat -> Type
 patType p = case p of

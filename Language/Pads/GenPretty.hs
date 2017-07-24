@@ -113,7 +113,7 @@ mkPrettyInstance' worklist done decls =
          let inst = AppT (ConT ''Pretty) (ConT ty_name)   
          let genericPprName = mkName "ppr"
          let ppr_method = ValD (VarP genericPprName) (NormalB (VarE specificPprName)) []
-         let instD = InstanceD [] inst [ppr_method]
+         let instD = InstanceD Nothing [] inst [ppr_method]
          let newDone = S.insert ty_name done
          info <- reify ty_name
          (nestedTyNames, decls') <- case info of 
