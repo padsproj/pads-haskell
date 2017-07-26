@@ -4,14 +4,15 @@ pads website (www.padsproj.org).
 
 # Building
 
-`pads-haskell` currently requires GHC 7.10.3. This project provides an
-appropriate [Stack][1] configuration file.
+`pads-haskell` currently requires GHC 8.0.2.
 
 ## Setup
 
-To install an appropriate GHC tool chain:
+To generate an appropriate [Stack][1] configuration file and install an
+appropriate GHC tool chain:
 
 ```bash
+$ stack init
 $ stack setup
 ```
 
