@@ -49,6 +49,7 @@ import Language.Pads.PadsPrinter
 
 import Data.Data
 import Text.PrettyPrint.Mainland hiding (line,  dot)
+import Text.PrettyPrint.Mainland.Class
 
 
 

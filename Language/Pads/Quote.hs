@@ -30,7 +30,7 @@
 -}
 
 module Language.Pads.Quote
-    (pads,padsDerivation)
+    (pads,padsDerivation,pparseDerivation)
     where
 
 import Prelude hiding (exp, init)
@@ -42,15 +42,28 @@ import Language.Haskell.TH.Quote (QuasiQuoter(..))
 import Language.Pads.CodeGen
 import qualified Language.Pads.Parser as P
 
+-- | The PADS quasiquoter which can be invoked by e.g.:
+--
+-- > [pads| type MyType = (Int, Int) |]
 pads :: QuasiQuoter
 pads = padsDerivation (const $ return [])
 
+-- | Same as @pads@, but parametrized by a higher order function which
+-- constructs a list of Haskell decls to splice into scope for each PADS
+-- metadata and data declaration. Namely the @type@, @newtype@, and @data@ PADS
+-- constructs get passed into @derivation@ as a template haskell declaration.
+--
+-- PADS only supports quasiquotes in place of a Haskell declaration
+-- (expressions, patterns, and types produce errors).
 padsDerivation :: Derivation -> QuasiQuoter
 padsDerivation derivation = QuasiQuoter (error "parse expression")
                     (error "parse pattern")
                     (error "parse type")
                     (pparseDerivation derivation)
 
+-- | Just the "declaration" parser for a PADS quasiquotation. Glues together
+-- @'P.parsePadsDecls'@ and @'make_pads_declarations''@, the parser and code
+-- generator.
 pparseDerivation :: Derivation -> String -> Q [Dec]
 pparseDerivation derivation input = do
     loc <- location
@@ -59,6 +72,4 @@ pparseDerivation derivation input = do
     case P.parsePadsDecls fileName line column input of
       Left err -> unsafePerformIO $ fail $ show err
       Right x  -> make_pads_declarations' derivation x
-
-
 

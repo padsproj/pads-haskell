@@ -18,6 +18,7 @@ import Language.Pads.TH
 import Language.Haskell.TH as TH hiding (ppr)
 
 import Text.PrettyPrint.Mainland
+import Text.PrettyPrint.Mainland.Class
 
 import qualified Data.List as L
 import qualified Data.Set as S

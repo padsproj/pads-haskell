@@ -16,6 +16,7 @@ import qualified Data.Map as M
 import qualified Language.Haskell.TH as TH
 
 import Text.PrettyPrint.Mainland as PP
+import Text.PrettyPrint.Mainland.Class
 import Language.Pads.Syntax
 import qualified Language.Pads.Parser as P
 import Language.Pads.RegExp

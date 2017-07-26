@@ -12,6 +12,7 @@
 
 module Language.Pads.Errors where
 import Text.PrettyPrint.Mainland as PP
+import Text.PrettyPrint.Mainland.Class
 import qualified Language.Pads.Source as S
 import Data.Data
 
@@ -50,10 +51,10 @@ data ErrInfo = ErrInfo { msg      :: ErrMsg,
    deriving (Typeable, Data, Eq, Ord, Show)
 
 instance Pretty ErrInfo where
-  ppr (ErrInfo {msg,position}) = PP.ppr msg <+> 
+  ppr (ErrInfo {msg,position}) = ppr msg <+> 
        case position of 
          Nothing -> empty
-         Just pos -> (text "at:") <+>  PP.ppr pos
+         Just pos -> (text "at:") <+>  ppr pos
 
 
 

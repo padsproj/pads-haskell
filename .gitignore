@@ -23,4 +23,5 @@ cabal.sandbox.config
 *.dvi
 .cabal-sandbox
 cabal-sandbox-config
+stack.yaml
 

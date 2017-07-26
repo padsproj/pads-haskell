@@ -15,6 +15,7 @@ import qualified Data.ByteString as B   -- abstraction for input data
 import qualified Text.Regex.Posix as TRP
 import Language.Pads.RegExp                        -- user-specified regular expressions
 import Text.PrettyPrint.Mainland as PP 
+import Text.PrettyPrint.Mainland.Class
 
 import Data.Int
 import Data.Data
@@ -404,11 +405,11 @@ instance Pretty Source where
     ppr (Source{current, rest, ..}) = text "Current:" <+> text (show current)
 
 instance Pretty Loc where
- ppr (Loc{lineNumber,byteOffset}) = text "Line:" <+> PP.ppr lineNumber <> text ", Offset:" <+> PP.ppr byteOffset 
+ ppr (Loc{lineNumber,byteOffset}) = text "Line:" <+> ppr lineNumber <> text ", Offset:" <+> ppr byteOffset 
 
 instance Pretty Pos where 
   ppr (Pos{begin,end}) = case end of
-                                Nothing -> PP.ppr begin
-                                Just end_loc ->  text "from:" <+> PP.ppr begin <+> text "to:" <+> PP.ppr end_loc
+                                Nothing -> ppr begin
+                                Just end_loc ->  text "from:" <+> ppr begin <+> text "to:" <+> ppr end_loc
 
 
