@@ -50,7 +50,7 @@ instance Pretty BranchInfo where
   ppr (BConstr con constrArgs predOpt) = (ppr_conApp con constrArgs) <> (ppr_optPred predOpt)
 
 ppr_conApp con constrArgs = case constrArgs of
-  [(TH.NotStrict,arg)] | argIsCon con arg  -> text con
+  [(NotStrict,arg)] | argIsCon con arg  -> text con
   otherwise -> text con <+> (spread (map ppr_constrArgApp constrArgs))
 
 
@@ -73,8 +73,8 @@ ppr_alpha padsTy
   | isAtomicTy padsTy = ppr padsTy
   | otherwise         = parens (ppr padsTy)
 
-ppr_strict TH.IsStrict  = text "!" 
-ppr_strict TH.NotStrict = empty 
+ppr_strict IsStrict  = text "!" 
+ppr_strict NotStrict = empty 
 
 isAtomicTy (PList _ _ _ )   = True
 isAtomicTy (PTycon _ )      = True
