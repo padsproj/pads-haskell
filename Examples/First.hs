@@ -809,7 +809,7 @@ incompleteBitBools_test = mkTestCase "incompleteBitBools"
                                      incompleteBitBools_expects
                                      incompleteBitBools_result
 
-[pads| type ArithPixel = (partition (BitField 9,
+[pads| type ArithPixel = (partition (Bits16 9,
                                      BitField 5,
                                      BitField 5,
                                      BitField 5,
@@ -820,31 +820,17 @@ arithPixel_result = arithPixel_parseS arithPixel_input
 arithPixel_expects = ((272,28,17,0,0,0), 0, "")
 arithPixel_test = mkTestCase "arithPixel" arithPixel_expects arithPixel_result
 
--- Both of these descriptions, in tandem with some of the testing between them,
--- cause errors in unusual circumstances
+[pads| type Mixed = (partition (StringC ' ',
+                                ' ',
+                                BitField 4,
+                                BitBool,
+                                BitField 3,
+                                Char) using none) |]
 
--- [pads| type Mixed = (partition (StringC ' ',
---                                 ' ',
---                                 BitBool,
---                                 BitField 2,
---                                 BitBool,
---                                 BitBool,
---                                 BitField 3,
---                                 Char) using none) |]
-
--- mixed_input = "Hello \nc"
--- mixed_result = mixed_parseS mixed_input
--- mixed_expects = (("Hello",False,0,False,True,2,'c'), 0, "")
--- mixed_test = mkTestCase "mixed" mixed_expects mixed_result
-
--- [pads| type Mixed2 = (partition (StringC ' ',
---                                  ' ',
---                                  Char,
---                                  Int,
---                                  Char,
---                                  Char,
---                                  Int,
---                                  Char) using none) |]
+mixed_input = "Hello " ++ (map word8ToChr [74]) ++ "c"
+mixed_result = mixed_parseS mixed_input
+mixed_expects = (("Hello",4,True,2,'c'), 0, "")
+mixed_test = mkTestCase "mixed" mixed_expects mixed_result
 
 [pads| type OddWidths = (partition (BitField 19,
                                     BitField 39,
@@ -865,10 +851,10 @@ largeWidths_result = largeWidths_parseS largeWidths_input
 largeWidths_expects = ((0,309485009821345068724781057,18446744073709551617), 0, map word8ToChr [128])
 largeWidths_test = mkTestCase "largeWidths" largeWidths_expects largeWidths_result
 
-[pads| data EnumType (x :: BitField) = case x of 0 -> ZERO
-                                               | 1 -> ONE
+[pads| data EnumType (x :: BitField) = case x of 0 -> ZERO {}
+                                               | 1 -> ONE {}
                                                | 2 -> TWO {}
-                                               | _ -> OTHER
+                                               | _ -> OTHER {}
 
        data Enumerate = Enumerate {x :: BitField 3,
                                         BitField 5,
@@ -886,8 +872,8 @@ enumerated_result_wc = enumerated_parseS enumerated_input_wc
 enumerated_expects_wc = (Enumerate {x = 7, y = OTHER}, 0, "")
 enumerated_test_wc = mkTestCase "EnumeratedWC" enumerated_expects_wc enumerated_result_wc
 
-[pads| data EnumTypeBool (x' :: BitBool) = case x' of True  -> ON
-                                                    | False -> OFF
+[pads| data EnumTypeBool (x' :: BitBool) = case x' of True  -> ON {}
+                                                    | False -> OFF {}
 
        data EnumerateBool = EnumerateBool {BitField 7,
                                            x' :: BitBool,

@@ -28,7 +28,7 @@ data ErrMsg =
  | PredicateFailure
  | ExtraStuffBeforeTy String String
  | FileError String String
- | BitRangeError
+ | BitWidthError Int
    deriving (Typeable, Data, Eq, Ord, Show)
 
 {- XXX-KSF: fix pretty printing to use pretty printing combinators rather than string ++ -}
@@ -45,7 +45,7 @@ instance Pretty ErrMsg where
   ppr UnderlyingTypedefFail  = text "Pads predicate is true, but underlying type had an error."
   ppr PredicateFailure       = text "Pads predicate is false."
   ppr (FileError err file) = text ("Problem with file: " ++ file ++ "("++ err ++ ").")
-  ppr BitRangeError = text "Requested bit out of character/byte range."
+  ppr (BitWidthError x) = text ("Bad field width: " ++ (show x) ++ " is an invalid width.")
 
 data ErrInfo = ErrInfo { msg      :: ErrMsg,
                          position :: Maybe S.Pos }

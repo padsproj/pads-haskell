@@ -3,5 +3,5 @@ packages:
 - '.'
 extra-deps:
 - mainland-pretty-0.4.1.2
-- text-1.2.2.0
+- normaldistribution-1.1.0.3
 resolver: lts-5.3

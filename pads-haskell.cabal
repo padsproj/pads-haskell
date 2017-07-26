@@ -102,7 +102,10 @@ Library
                     HUnit >= 1.2.5.2,
                     byteorder >= 1.0.4,
                     old-locale >= 1.0.0.6,
-                    time >= 1.4.2
+                    time >= 1.4.2,
+                    random >= 1.1,
+--                    random-fu >= 0.2.7.0
+                    normaldistribution >= 1.1.0.3
 
   -- Modules not exported by this package.
 
