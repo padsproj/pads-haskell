@@ -44,4 +44,13 @@ Counts {cases = 89, tried = 89, errors = 0, failures = 0}
 (0.11 secs, 0 bytes)
 ```
 
+# Contributing and Development
+
+In order to build and view the haddock documentation do the following:
+
+```bash
+stack haddock
+firefox `find .stack-work -name index.html | grep "html/pads-haskell"`
+```
+
 [1]: https://www.stackage.org/

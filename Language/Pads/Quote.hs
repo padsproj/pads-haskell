@@ -30,7 +30,7 @@
 -}
 
 module Language.Pads.Quote
-    (pads,padsDerivation,pparseDerivation)
+    (pads, padsDerivation, pparseDecl, make_pads_declarations)
     where
 
 import Prelude hiding (exp, init)
@@ -56,20 +56,33 @@ pads = padsDerivation (const $ return [])
 -- PADS only supports quasiquotes in place of a Haskell declaration
 -- (expressions, patterns, and types produce errors).
 padsDerivation :: Derivation -> QuasiQuoter
-padsDerivation derivation = QuasiQuoter (error "parse expression")
+padsDerivation derivation = QuasiQuoter
+                    pparseExp
                     (error "parse pattern")
                     (error "parse type")
-                    (pparseDerivation derivation)
+                    (pparseDecl derivation)
 
 -- | Just the "declaration" parser for a PADS quasiquotation. Glues together
 -- @'P.parsePadsDecls'@ and @'make_pads_declarations''@, the parser and code
 -- generator.
-pparseDerivation :: Derivation -> String -> Q [Dec]
-pparseDerivation derivation input = do
+pparseDecl :: Derivation -> String -> Q [Dec]
+pparseDecl derivation input = do
     loc <- location
     let fileName = loc_filename loc
     let (line,column) = loc_start loc
     case P.parsePadsDecls fileName line column input of
       Left err -> unsafePerformIO $ fail $ show err
       Right x  -> make_pads_declarations' derivation x
+
+-- | Just the "declaration" parser for a PADS quasiquotation. Glues together
+-- @'P.parsePadsDecls'@ and @'make_pads_declarations''@, the parser and code
+-- generator.
+pparseExp :: String -> Q Exp
+pparseExp input = do
+    loc <- location
+    let fileName = loc_filename loc
+    let (line,column) = loc_start loc
+    case P.parsePadsDecls fileName line column input of
+      Left err -> unsafePerformIO $ fail $ show err
+      Right x  -> make_pads_asts x
 

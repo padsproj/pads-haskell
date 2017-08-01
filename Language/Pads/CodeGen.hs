@@ -39,9 +39,22 @@ type BString = S.RawStream
 
 type Derivation = Dec -> Q [Dec]
 
+-- | Top level code gen function from Pads decls to Haskell decls
 make_pads_declarations :: [PadsDecl] -> Q [Dec]
 make_pads_declarations = make_pads_declarations' (const $ return [])
 
+-- | Top level code gen function from Pads decls to Haskell expression with just
+-- the PADS AST (no parser codegen)
+make_pads_asts :: [PadsDecl] -> Q Exp
+make_pads_asts = let
+    mpa pd@(PadsDeclType n _ _ _)     = [| ($(litE $ stringL n), $(lift pd)) |]
+    mpa pd@(PadsDeclData n _ _ _ _)   = [| ($(litE $ stringL n), $(lift pd)) |]
+    mpa pd@(PadsDeclNew n _ _ _ _)    = [| ($(litE $ stringL n), $(lift pd)) |]
+    mpa pd@(PadsDeclObtain n _ _ _)   = [| ($(litE $ stringL n), $(lift pd)) |]
+  in listE . (map mpa)
+
+-- | Top level code gen function from Pads decls to Haskell decls with the
+-- specified list of type classes for all of the generated Pads types to derive.
 make_pads_declarations' :: Derivation -> [PadsDecl] -> Q [Dec]
 make_pads_declarations' derivation ds = fmap concat (mapM (genPadsDecl derivation) ds)
 
@@ -51,7 +64,8 @@ make_pads_declarations' derivation ds = fmap concat (mapM (genPadsDecl derivatio
 ----------------------------------------------------------------------------
 
 genPadsDecl :: Derivation -> PadsDecl -> Q [Dec]
-
+-- ^ Generate all the top level Haskell declarations associated with a single
+-- Pads declaration.
 genPadsDecl derivation pd@(PadsDeclType name args pat padsTy) = do
   let typeDecs = mkTyRepMDDecl name args padsTy
   parseM  <- genPadsParseM name args pat padsTy
@@ -60,7 +74,7 @@ genPadsDecl derivation pd@(PadsDeclType name args pat padsTy) = do
   def <- genPadsDef name args pat padsTy
   let sigs = mkPadsSignature name args (fmap patType pat)
   ast <- astDecl name pd
-  return $ ast : typeDecs ++ parseM ++ parseS ++ printFL ++ def ++ sigs
+  return $ typeDecs ++ parseM ++ parseS ++ printFL ++ def ++ sigs
 
 genPadsDecl derivation pd@(PadsDeclData name args pat padsData derives) = do
   dataDecs <- mkDataRepMDDecl derivation name args padsData derives
@@ -71,7 +85,7 @@ genPadsDecl derivation pd@(PadsDeclData name args pat padsData derives) = do
   let instances = mkPadsInstance name args (fmap patType pat)
   let sigs = mkPadsSignature name args (fmap patType pat)
   ast <- astDecl name pd
-  return $ ast : dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
+  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
 
 genPadsDecl derivation pd@(PadsDeclNew name args pat branch derives) = do
   dataDecs <- mkNewRepMDDecl derivation name args branch derives
@@ -82,7 +96,7 @@ genPadsDecl derivation pd@(PadsDeclNew name args pat branch derives) = do
   let instances = mkPadsInstance name args (fmap patType pat)
   let sigs = mkPadsSignature name args (fmap patType pat)
   ast <- astDecl name pd
-  return $ ast : dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
+  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
 
 genPadsDecl derivation pd@(PadsDeclObtain name args padsTy exp) = do
   let mdDec = mkObtainMDDecl name args padsTy
@@ -92,10 +106,13 @@ genPadsDecl derivation pd@(PadsDeclObtain name args padsTy exp) = do
   def <- genPadsObtainDef name args padsTy exp
   let sigs = mkPadsSignature name args Nothing
   ast <- astDecl name pd
-  return $ ast : mdDec ++ parseM ++ parseS ++ printFL ++ def ++ sigs
+  return $ mdDec ++ parseM ++ parseS ++ printFL ++ def ++ sigs
 
+-- | A Haskell declaration containing the literal Pads AST representation of a
+-- Pads description (the syntax of Pads encoded as Haskell data constructors)
 astDecl name pd = funD (mkName $ "ast_" ++ name) [clause [] (normalB $ lift pd) []]
 
+-- | The Haskell 'Type' of a Haskell pattern 'Pat'.
 patType :: Pat -> Type
 patType p = case p of
   LitP lit -> case lit of
@@ -111,6 +128,8 @@ patType p = case p of
 -- GENERATE REP/MD TYPE DECLARATIONS
 -----------------------------------------------------------
 
+-- | Make the type declarations for the representation and the metadata of a
+-- Pads-defined type, @'PadsTy'@.
 mkTyRepMDDecl :: UString -> [UString] -> PadsTy -> [Dec]
 mkTyRepMDDecl name args ty = [repType, mdType]
   where
@@ -124,6 +143,8 @@ mkTyRepMDDecl name args ty = [repType, mdType]
 -- GENERATE REP/MD DATA DECLARATIONS
 -----------------------------------------------------------
 
+-- | Make the data type declarations for the representation and the metadata of
+-- a Pads-defined data type, @'PadsData'@.
 mkDataRepMDDecl :: Derivation -> UString -> [LString] -> PadsData -> [QString] -> Q [Dec]
 mkDataRepMDDecl derivation name args branches ds = do
   bs' <- mapM (return . mkMDUnion) bs
@@ -142,10 +163,14 @@ mkDataRepMDDecl derivation name args branches ds = do
                  PUnion bnchs    -> bnchs
                  PSwitch exp pbs -> [b | (p,b) <- pbs]
 
+-- | Convert a Pads strictness annotation into the appropriate Haskell
+-- strictness annotation in the template haskell Q monad for splicing.
 mkStrict :: PadsStrict -> Q Strict
 mkStrict NotStrict  = bang noSourceUnpackedness noSourceStrictness  -- i.e. notStrict
 mkStrict IsStrict   = bang noSourceUnpackedness sourceStrict        -- i.e. isStrict
 
+-- | Make the Haskell data type *constructor* (@'normalC'@ and @'recC'@) for the
+-- given fragment of a Pads type (@'BranchInfo'@).
 mkRepUnion :: BranchInfo -> ConQ
 mkRepUnion (BConstr c args expM) = normalC (mkConstrName c) reps
   where reps = [bangType (mkStrict strict) (return $ mkRepTy ty) | (strict,ty) <- args, hasRep ty]

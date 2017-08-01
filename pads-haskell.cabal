@@ -128,6 +128,7 @@ Test-Suite examples
                 , th-lift, transformers
   default-language: Haskell2010
   other-modules:  Examples.Proc, Examples.First, Examples.AI, Examples.Binary
+                , Examples.FirstPads
                 , Language.Pads.Testing
                 , Language.Pads.BaseTypes
                 , Language.Pads.CodeGen
