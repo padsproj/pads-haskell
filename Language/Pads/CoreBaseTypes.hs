@@ -71,6 +71,23 @@ instance Pads1 () Char Base_md where
 char_printFL :: PadsPrinter (Char, md)
 char_printFL (c,bmd) = addString [c]
 
+---------------------------------------------
+
+type CharNB = Char
+type CharNB_md = Base_md
+
+charNB_parseM :: PadsParser (CharNB, Base_md)
+charNB_parseM =
+    handleEOF 'X' "CharNB" $
+    handleEOR 'X' "CharNB" $ do
+        c <- takeBitsP 8
+        returnClean (S.word8ToChr (fromIntegral c :: Word8))
+
+charNB_def = char_def
+
+charNB_printFL :: PadsPrinter (CharNB, md)
+charNB_printFL (c, bmd) = addString [c]
+
 
 -----------------------------------------------------------------
 
@@ -81,7 +98,7 @@ bitBool_parseM :: PadsParser (BitBool, Base_md)
 bitBool_parseM =
     handleEOF False "BitBool" $
     handleEOR False "BitBool" $ do
-        b <- takeBitsP 1
+        b <- takeBits8P 1
         returnClean (b == 1)
 
 bitBool_def = False
@@ -101,7 +118,7 @@ bitBool_printFL (bb,bbmd) = fshow bb
 type BitField = Integer
 type BitField_md = Base_md
 
-bitField_parseM :: Integral a => a -> PadsParser (BitField, Base_md)
+bitField_parseM :: Int -> PadsParser (BitField, Base_md)
 bitField_parseM x =
     if   x < 0
     then returnError def (E.BitWidthError (fromIntegral x))
@@ -110,10 +127,10 @@ bitField_parseM x =
              b <- takeBitsP x
              returnClean b
 
-bitField_def :: Integral a => a -> BitField
+bitField_def :: Int -> BitField
 bitField_def _ = 0
 
-bitField_printFL :: Integral a => a -> PadsPrinter (BitField, md)
+bitField_printFL :: Int -> PadsPrinter (BitField, md)
 bitField_printFL _ (x, xmd) = fshow x
 
 -- type instance PadsArg Integer = ()
@@ -133,16 +150,8 @@ bits8_parseM x =
     then returnError 0 (E.BitWidthError (fromIntegral x))
     else handleEOF 0 "Bits8" $
          handleEOR 0 "Bits8" $ do
-             b <- takeBitsP x
-             returnClean ((fromIntegral b) :: Bits8)
-             --returnClean (fromIntegral b)
-
-bits8_def :: Int -> Bits8
-bits8_def _ = 0
-
-bits8_printFL :: Int -> PadsPrinter (Bits8, md)
-bits8_printFL _ (x, xmd) = fshow x
-
+             b <- takeBits8P x
+             returnClean b
 
 
 type Bits16 = Word16
@@ -154,15 +163,8 @@ bits16_parseM x =
     then returnError 0 (E.BitWidthError (fromIntegral x))
     else handleEOF 0 "Bits16" $
          handleEOR 0 "Bits16" $ do
-             b <- takeBitsP x
-             returnClean ((fromIntegral b) :: Bits16)
-
-bits16_def :: Integral a => a -> Bits16
-bits16_def _ = 0
-
-bits16_printFL :: Int -> PadsPrinter (Bits16, md)
-bits16_printFL _ (x, xmd) = fshow x
-
+             b <- takeBits16P x
+             returnClean b
 
 
 type Bits32 = Word32
@@ -174,15 +176,8 @@ bits32_parseM x =
     then returnError 0 (E.BitWidthError (fromIntegral x))
     else handleEOF 0 "Bits32" $
          handleEOR 0 "Bits32" $ do
-             b <- takeBitsP x
-             returnClean (fromIntegral b)
-
-bits32_def :: Int -> Bits32
-bits32_def _ = 0
-
-bits32_printFL :: Int -> PadsPrinter (Bits32, md)
-bits32_printFL _ (x, xmd) = fshow x
-
+             b <- takeBits32P x
+             returnClean b
 
 
 type Bits64 = Word64
@@ -194,13 +189,28 @@ bits64_parseM x =
     then returnError 0 (E.BitWidthError (fromIntegral x))
     else handleEOF 0 "Bits64" $
          handleEOR 0 "Bits64" $ do
-             b <- takeBitsP x
-             returnClean (fromIntegral b)
+             b <- takeBits64P x
+             returnClean b
 
+
+bits8_def :: Int -> Bits8
+bits16_def :: Int -> Bits16
+bits32_def :: Int -> Bits32
 bits64_def :: Int -> Bits64
+
+bits8_def  _ = 0
+bits16_def _ = 0
+bits32_def _ = 0
 bits64_def _ = 0
 
+bits8_printFL  :: Int -> PadsPrinter (Bits8, md)
+bits16_printFL :: Int -> PadsPrinter (Bits16, md)
+bits32_printFL :: Int -> PadsPrinter (Bits32, md)
 bits64_printFL :: Int -> PadsPrinter (Bits64, md)
+
+bits8_printFL  _ (x, xmd) = fshow x
+bits16_printFL _ (x, xmd) = fshow x
+bits32_printFL _ (x, xmd) = fshow x
 bits64_printFL _ (x, xmd) = fshow x
 
 -----------------------------------------------------------------

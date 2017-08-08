@@ -245,28 +245,143 @@ takeHead :: Source -> (Char, Source)
 takeHead (s @ Source{current,loc, ..}) =
     (word8ToChr $ B.head current, s{current = B.tail current, loc = incOffset loc})
 
+-- takeBits :: Int -> Source -> (Integer, Source)
+-- takeBits b (s @ Source{current,loc,bit, ..}) =
+--     let bitsincludinghead = ((zeroBit - bit) + b)
+--         partialbyteread = bitsincludinghead `mod` 8 /= 0
+--         bytestoread = if   partialbyteread
+--                       then bitsincludinghead `div` 8 + 1
+--                       else bitsincludinghead `div` 8
+--         head = B.take bytestoread current
+--         tail = if   partialbyteread
+--                then B.drop (bytestoread - 1) current
+--                else B.drop bytestoread current
+--         newbit = zeroBit - (bitsincludinghead `mod` 8)
+--         bytes = byteStringToNum head
+--         bits = (shiftR bytes (8 * bytestoread - bitsincludinghead)) .&. onesMask b
+--     in (bits, s{current = tail,
+--               loc = incOffsetBy loc (B.length head - if partialbyteread then 1 else 0),
+--               Language.Pads.Source.bit = newbit})
+
+-- bit represents the next unread bit
+-- guaranteed that b > 0 and b <= 8
+-- takeBits8 :: Int -> Source -> (Word64, Source)
+-- takeBits8 b (s @ Source{current,loc,bit, ..}) =
+--     let head = B.take (if (bit == zeroBit ) then 1 else 2) current
+--         tail = B.tail current
+
+bs = B.pack [70,181,9]
+
+partitionBS :: B.ByteString -> Int -> Int -> (B.ByteString, B.ByteString, Bool)
+partitionBS bS bitIndex bits =
+    let dist = ((bits - 1) `mod` 8) - bitIndex
+        partial = dist /= 0
+        hd = B.take (((bits - 1) `div` 8) + if dist > 0 then 2 else 1) bS
+        tl = B.drop (B.length hd - if partial then 1 else 0) bS
+    in  (hd, tl, partial)
+
+takeBits8 :: Int -> Source -> (Word8, Source)
+takeBits8 b (s @ Source{current,loc,bit, ..}) =
+    let (hd, tl, partial) = partitionBS current bit b
+        bytes = byteStringToWord8 hd
+        mask  = fromIntegral $ onesMask b
+        bits  = (shiftR bytes ((B.length hd * 8) - b - (zeroBit - bit))) .&. mask
+    in  (bits, s{current = tl,
+                 loc = incOffsetBy loc (B.length hd - if partial then 1 else 0),
+                 Language.Pads.Source.bit = zeroBit - (((zeroBit - bit) + b) `mod` 8)})
+
+takeBits16 :: Int -> Source -> (Word16, Source)
+takeBits16 b (s @ Source{current,loc,bit, ..}) =
+    let (hd, tl, partial) = partitionBS current bit b
+        bytes = byteStringToWord16 hd
+        mask  = fromIntegral $ onesMask b
+        bits  = (shiftR bytes ((B.length hd * 8) - b - (zeroBit - bit))) .&. mask
+    in  (bits, s{current = tl,
+                 loc = incOffsetBy loc (B.length hd - if partial then 1 else 0),
+                 Language.Pads.Source.bit = zeroBit - (((zeroBit - bit) + b) `mod` 8)})
+
+takeBits32 :: Int -> Source -> (Word32, Source)
+takeBits32 b (s @ Source{current,loc,bit, ..}) =
+    let (hd, tl, partial) = partitionBS current bit b
+        bytes = byteStringToWord32 hd
+        mask  = fromIntegral $ onesMask b
+        bits  = (shiftR bytes ((B.length hd * 8) - b - (zeroBit - bit))) .&. mask
+    in  (bits, s{current = tl,
+                 loc = incOffsetBy loc (B.length hd - if partial then 1 else 0),
+                 Language.Pads.Source.bit = zeroBit - (((zeroBit - bit) + b) `mod` 8)})
+
+takeBits64 :: Int -> Source -> (Word64, Source)
+takeBits64 b (s @ Source{current,loc,bit, ..}) =
+    let (hd, tl, partial) = partitionBS current bit b
+        bytes = byteStringToWord64 hd
+        mask  = fromIntegral $ onesMask b
+        bits  = (shiftR bytes ((B.length hd * 8) - b - (zeroBit - bit))) .&. mask
+    in  (bits, s{current = tl,
+                 loc = incOffsetBy loc (B.length hd - if partial then 1 else 0),
+                 Language.Pads.Source.bit = zeroBit - (((zeroBit - bit) + b) `mod` 8)})
+
 takeBits :: Int -> Source -> (Integer, Source)
 takeBits b (s @ Source{current,loc,bit, ..}) =
-    let bitsincludinghead = ((zeroBit - bit) + b)
-        partialbyteread = bitsincludinghead `mod` 8 /= 0
-        bytestoread = if   partialbyteread
-                      then bitsincludinghead `div` 8 + 1
-                      else bitsincludinghead `div` 8
-        head = B.take bytestoread current
-        tail = if   partialbyteread
-               then B.drop (bytestoread - 1) current
-               else B.drop bytestoread current
-        newbit = zeroBit - (bitsincludinghead `mod` 8)
-        bytes = byteStringToNum head
-        bits = (shiftR bytes (8 * bytestoread - bitsincludinghead)) .&. onesMask b
-    in (bits, s{current = tail,
-              loc = incOffsetBy loc (B.length head - if partialbyteread then 1 else 0),
-              Language.Pads.Source.bit = newbit})
+    let (hd, tl, partial) = partitionBS current bit b
+        bytes = byteStringToNum hd
+        mask  = fromIntegral $ onesMask b
+        bits  = (shiftR bytes ((B.length hd * 8) - b - (zeroBit - bit))) .&. mask
+    in  (bits, s{current = tl,
+                 loc = incOffsetBy loc (B.length hd - if partial then 1 else 0),
+                 Language.Pads.Source.bit = zeroBit - (((zeroBit - bit) + b) `mod` 8)})
+
+
+
+-- takeBits64 :: Int -> Source -> (Word64, Source)
+-- takeBits64 b (s @ Source{current,loc,bit, ..}) =
+--     let bitsincludinghead = ((zeroBit - bit) + b)
+--         partialbyteread = bitsincludinghead `mod` 8 /= 0
+--         bytestoread = if   partialbyteread
+--                       then bitsincludinghead `div` 8 + 1
+--                       else bitsincludinghead `div` 8
+--         head = B.take bytestoread current
+--         tail = if   partialbyteread
+--                then B.drop (bytestoread - 1) current
+--                else B.drop bytestoread current
+--         newbit = zeroBit - (bitsincludinghead `mod` 8)
+--         bytes = byteStringToWord64 head
+--         bits = (shiftR bytes (8 * bytestoread - bitsincludinghead)) .&. (fromIntegral $ onesMask b)
+--     in (bits, s{current = tail,
+--               loc = incOffsetBy loc (B.length head - if partialbyteread then 1 else 0),
+--               Language.Pads.Source.bit = newbit})
+
+
+byteStringToWord8 :: B.ByteString -> Word8
+byteStringToWord8 bs =
+    let bs' = map fromIntegral (B.unpack $ B.take 2 bs)
+        func byte (num, pow) = ((shiftL byte pow) + num, pow + 8)
+    in  fst $ foldr func (0,0) bs'
+
+byteStringToWord16 :: B.ByteString -> Word16
+byteStringToWord16 bs =
+    let bs' = map fromIntegral (B.unpack $ B.take 3 bs)
+        func byte (num, pow) = ((shiftL byte pow) + num, pow + 8)
+    in  fst $ foldr func (0,0) bs'
+
+byteStringToWord32 :: B.ByteString -> Word32
+byteStringToWord32 bs =
+    let bs' = map fromIntegral (B.unpack $ B.take 5 bs)
+        func byte (num, pow) = ((shiftL byte pow) + num, pow + 8)
+    in  fst $ foldr func (0,0) bs'
+
+byteStringToWord64 :: B.ByteString -> Word64
+byteStringToWord64 bs =
+    let bs' = map fromIntegral (B.unpack $ B.take 9 bs)
+        func byte (num, pow) = ((shiftL byte pow) + num, pow + 8)
+    in  fst $ foldr func (0,0) bs'
 
 byteStringToNum :: B.ByteString -> Integer
 byteStringToNum bs =
     shiftR (foldl (\bits byte ->
                       shiftL (bits + (fromIntegral byte)) 8) 0 (B.unpack bs)) 8
+
+
+x = B.pack [128,0,0,0,0,0,0,1,0,0,0,1]
 
 onesMask :: Int -> Integer
 onesMask b = (shiftL 1 b) - 1

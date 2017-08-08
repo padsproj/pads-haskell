@@ -330,6 +330,18 @@ takeBytesP n = primPads (S.takeBytes (fromInt n))
 takeBitsP :: Integral a => a -> PadsParser Integer
 takeBitsP b = primPads (S.takeBits (fromInt b))
 
+takeBits8P :: Integral a => a -> PadsParser Word8
+takeBits8P b = primPads (S.takeBits8 (fromInt b))
+
+takeBits16P :: Integral a => a -> PadsParser Word16
+takeBits16P b = primPads (S.takeBits16 (fromInt b))
+
+takeBits32P :: Integral a => a -> PadsParser Word32
+takeBits32P b = primPads (S.takeBits32 (fromInt b))
+
+takeBits64P :: Integral a => a -> PadsParser Word64
+takeBits64P b = primPads (S.takeBits64 (fromInt b))
+
 fromInt :: (Integral a1, Num a) => a1 -> a
 fromInt n = fromInteger $ toInteger n
 
