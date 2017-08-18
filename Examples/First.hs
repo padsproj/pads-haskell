@@ -116,12 +116,21 @@ tests =         [ TestLabel "MyChar"  myChar_test
                 , TestLabel "BitBools" bitBools_test2
                 , TestLabel "ArithPixel" arithPixel_test
                 , TestLabel "IncompleteBitBools" incompleteBitBools_test
---                , TestLabel "Mixed" mixed_test
+                , TestLabel "Mixed" mixed_test
                 , TestLabel "OddWidths" oddWidths_test
                 , TestLabel "LargeWidths" largeWidths_test
                 , TestLabel "Enumerated" enumerated_test
                 , TestLabel "EnumeratedWC" enumerated_test_wc
                 , TestLabel "EnumeratedBool" enumeratedBool_test
+                , TestLabel "NBA_char" nBA_char_test
+                , TestLabel "NBA_char_aligned" nBA_char_aligned_test
+                , TestLabel "NBA_BS" nBA_BS_test
+                , TestLabel "NBA_BS_aligned" nBA_BS_aligned_test
+                , TestLabel "NBA_StringFW" nBA_StringFW_test
+                , TestLabel "NBA_StringFW_aligned" nBA_StringFW_aligned_test
+                , TestLabel "NBA_StringFW_err" nBA_StringFW_err_test
+                , TestLabel "NBA_StringC" nBA_StringC_test
+                , TestLabel "NBA_StringC_aligned" nBA_StringC_aligned_test
                 ]
 
 [pads|  |]
@@ -810,11 +819,11 @@ incompleteBitBools_test = mkTestCase "incompleteBitBools"
                                      incompleteBitBools_result
 
 [pads| type ArithPixel = (partition (Bits16 9,
-                                     BitField 5,
-                                     BitField 5,
-                                     BitField 5,
-                                     BitField 4,
-                                     BitField 4) using none) |]
+                                     Bits8 5,
+                                     Bits8 5,
+                                     Bits8 5,
+                                     Bits8 4,
+                                     Bits8 4) using none) |]
 arithPixel_input = map word8ToChr [136,114,32,0]
 arithPixel_result = arithPixel_parseS arithPixel_input
 arithPixel_expects = ((272,28,17,0,0,0), 0, "")
@@ -822,9 +831,9 @@ arithPixel_test = mkTestCase "arithPixel" arithPixel_expects arithPixel_result
 
 [pads| type Mixed = (partition (StringC ' ',
                                 ' ',
-                                BitField 4,
+                                Bits8 4,
                                 BitBool,
-                                BitField 3,
+                                Bits8 3,
                                 Char) using none) |]
 
 mixed_input = "Hello " ++ (map word8ToChr [74]) ++ "c"
@@ -832,17 +841,17 @@ mixed_result = mixed_parseS mixed_input
 mixed_expects = (("Hello",4,True,2,'c'), 0, "")
 mixed_test = mkTestCase "mixed" mixed_expects mixed_result
 
-[pads| type OddWidths = (partition (BitField 19,
-                                    BitField 39,
-                                    BitField 1,
-                                    BitField 5) using none) |]
+[pads| type OddWidths = (partition (Bits32 19,
+                                    Bits64 39,
+                                    Bits8 1,
+                                    Bits8 5) using none) |]
 
 oddWidths_input = map word8ToChr [104,46,174,3,185,8,6,158]
 oddWidths_result = oddWidths_parseS oddWidths_input
 oddWidths_expects = ((213365,240768000026,0,30), 0, "")
 oddWidths_test = mkTestCase "oddWidths" oddWidths_expects oddWidths_result
 
-[pads| type LargeWidths = (partition (BitField 7,
+[pads| type LargeWidths = (partition (Bits8 7,
                                       BitField 89,
                                       BitField 65) using none) |]
 
@@ -851,13 +860,13 @@ largeWidths_result = largeWidths_parseS largeWidths_input
 largeWidths_expects = ((0,309485009821345068724781057,18446744073709551617), 0, map word8ToChr [128])
 largeWidths_test = mkTestCase "largeWidths" largeWidths_expects largeWidths_result
 
-[pads| data EnumType (x :: BitField) = case x of 0 -> ZERO {}
+[pads| data EnumType (x :: Bits8) = case x of 0 -> ZERO {}
                                                | 1 -> ONE {}
                                                | 2 -> TWO {}
                                                | _ -> OTHER {}
 
-       data Enumerate = Enumerate {x :: BitField 3,
-                                        BitField 5,
+       data Enumerate = Enumerate {x :: Bits8 3,
+                                        Bits8 5,
                                    y :: EnumType x}
 
        type Enumerated = (partition Enumerate using none) |]
@@ -875,7 +884,7 @@ enumerated_test_wc = mkTestCase "EnumeratedWC" enumerated_expects_wc enumerated_
 [pads| data EnumTypeBool (x' :: BitBool) = case x' of True  -> ON {}
                                                     | False -> OFF {}
 
-       data EnumerateBool = EnumerateBool {BitField 7,
+       data EnumerateBool = EnumerateBool {Bits8 7,
                                            x' :: BitBool,
                                            y' :: EnumTypeBool x'}
 
@@ -885,3 +894,66 @@ enumeratedBool_input = map word8ToChr [1]
 enumeratedBool_result = enumeratedBool_parseS enumeratedBool_input
 enumeratedBool_expects = (EnumerateBool {x' = True, y' = ON}, 0, "")
 enumeratedBool_test = mkTestCase "EnumeratedBool" enumeratedBool_expects enumeratedBool_result
+
+[pads| type NBA_char = (partition (Bits8 3, CharNB, Bits8 5) using none) |]
+
+nBA_char_input = map word8ToChr [70,181] -- 01000110 10110101
+nBA_char_result = nBA_char_parseS nBA_char_input
+nBA_char_expects = ((2,'5',21), 0, "") -- 010 00110101 10101
+nBA_char_test = mkTestCase "NBA_char" nBA_char_expects nBA_char_result
+
+[pads| type NBA_char_aligned = (partition (CharNB, CharNB) using none)|]
+
+nBA_char_aligned_input = map word8ToChr [70,181]
+nBA_char_aligned_result = nBA_char_aligned_parseS nBA_char_aligned_input
+nBA_char_aligned_expects = ((word8ToChr 70, word8ToChr 181), 0, "")
+nBA_char_aligned_test = mkTestCase "NBA_char_aligned" nBA_char_aligned_expects nBA_char_aligned_result
+
+[pads| type NBA_BS = (partition (Bits8 6, BytesNB 2, Bits8 2) using none) |]
+
+nBA_BS_input = map word8ToChr [99,234,3] -- 01100011 11101010 0000011
+nBA_BS_result = nBA_BS_parseS nBA_BS_input
+nBA_BS_expects = ((24, B.pack [250,128], 3), 0, "")
+nBA_BS_test = mkTestCase "NBA_BS" nBA_BS_expects nBA_BS_result
+
+[pads| type NBA_BS_aligned = (partition (BytesNB 4) using none) |]
+
+nBA_BS_aligned_input = map word8ToChr [9,8,7,255]
+nBA_BS_aligned_result = nBA_BS_aligned_parseS nBA_BS_aligned_input
+nBA_BS_aligned_expects = ((B.pack [9,8,7,255]), 0, "")
+nBA_BS_aligned_test = mkTestCase "NBA_BS_aligned" nBA_BS_aligned_expects nBA_BS_aligned_result
+
+[pads| type NBA_StringFW = (partition (Bits8 4, StringFWNB 3, Bits8 4) using none) |]
+
+nBA_StringFW_input = map word8ToChr [134,22,38,63] --1000 0110 0001 0110 0010 0110 0011 1111
+nBA_StringFW_result = nBA_StringFW_parseS nBA_StringFW_input
+nBA_StringFW_expects = ((8,"abc",15),0,"")
+nBA_StringFW_test = mkTestCase "NBA_StringFW" nBA_StringFW_expects nBA_StringFW_result
+
+[pads| type NBA_StringFW_aligned = (partition (StringFWNB 15) using none) |]
+
+nBA_StringFW_aligned_input = map word8ToChr (replicate 15 97)
+nBA_StringFW_aligned_result = nBA_StringFW_aligned_parseS nBA_StringFW_aligned_input
+nBA_StringFW_aligned_expects = (("aaaaaaaaaaaaaaa"),0,"")
+nBA_StringFW_aligned_test = mkTestCase "NBA_StringFW_aligned" nBA_StringFW_aligned_expects nBA_StringFW_aligned_result
+
+[pads| type NBA_StringFW_err = (partition (StringFWNB 3) using none) |]
+
+nBA_StringFW_err_input = map word8ToChr [99,99]
+nBA_StringFW_err_result = nBA_StringFW_err_parseS nBA_StringFW_err_input
+nBA_StringFW_err_expects = (("XXX"),1,"")
+nBA_StringFW_err_test = mkTestCase "NBA_StringFW_err" nBA_StringFW_err_expects nBA_StringFW_err_result
+
+[pads| type NBA_StringC = (partition (Bits8 2, StringCNB 'z', CharNB, Bits8 6) using none) |]
+
+nBA_StringC_input = map word8ToChr [158,30,94,149] -- 10 011110 00 011110 01 011110 10 010101
+nBA_StringC_result = nBA_StringC_parseS nBA_StringC_input
+nBA_StringC_expects = ((2,"xy",'z',21),0,"")
+nBA_StringC_test = mkTestCase "NBA_StringC" nBA_StringC_expects nBA_StringC_result
+
+[pads| type NBA_StringC_aligned = (partition (StringCNB 'z') using none) |]
+
+nBA_StringC_aligned_input = "xyz"
+nBA_StringC_aligned_result = nBA_StringC_aligned_parseS nBA_StringC_aligned_input
+nBA_StringC_aligned_expects = (("xy"),0,"z")
+nBA_StringC_aligned_test = mkTestCase "NBA_StringC_aligned" nBA_StringC_aligned_expects nBA_StringC_aligned_result

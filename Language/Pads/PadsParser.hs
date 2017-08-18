@@ -327,6 +327,9 @@ takeP n = primPads (S.take (fromInt n))
 takeBytesP :: Integral a => a -> PadsParser S.RawStream
 takeBytesP n = primPads (S.takeBytes (fromInt n))
 
+takeBytesNBP :: Integral a => a -> PadsParser S.RawStream
+takeBytesNBP n = primPads (S.takeBytesNB (fromInt n))
+
 takeBitsP :: Integral a => a -> PadsParser Integer
 takeBitsP b = primPads (S.takeBits (fromInt b))
 
@@ -380,6 +383,9 @@ getAllP = primPads S.drainSource
 getAllBinP :: PadsParser S.RawStream
 getAllBinP = primPads S.rawSource
 
+drainSourceNBP :: PadsParser String
+drainSourceNBP = primPads S.drainSourceNB
+
 satisfy p = primPads loop
  where loop s = if S.isEOF s || S.isEOR s then ([],s) else
           let c = S.head s in
@@ -388,6 +394,9 @@ satisfy p = primPads loop
             (c:xs, s')
           else
             ([],s)
+
+satisfyNBP :: (Char -> Bool) -> (PadsParser String)
+satisfyNBP p = primPads (S.satisfyNB p)
 
 digitListToInt :: Bool -> [Char] -> Int
 digitListToInt isNeg digits = if isNeg then negate raw else raw

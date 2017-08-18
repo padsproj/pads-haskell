@@ -121,7 +121,7 @@ type BitField_md = Base_md
 bitField_parseM :: Int -> PadsParser (BitField, Base_md)
 bitField_parseM x =
     if   x < 0
-    then returnError def (E.BitWidthError (fromIntegral x))
+    then returnError def (E.BitWidthError 0 (fromIntegral x))
     else handleEOF 0 "BitField" $
          handleEOR 0 "BitField" $ do
              b <- takeBitsP x
@@ -147,11 +147,11 @@ type Bits8_md = Base_md
 bits8_parseM :: Int -> PadsParser (Bits8, Base_md)
 bits8_parseM x =
     if   x < 1 || x > 8
-    then returnError 0 (E.BitWidthError (fromIntegral x))
+    then returnError 0 (E.BitWidthError 8 (fromIntegral x))
     else handleEOF 0 "Bits8" $
          handleEOR 0 "Bits8" $ do
              b <- takeBits8P x
-             returnClean b
+             returnClean b--(fromIntegral b :: Word8)
 
 
 type Bits16 = Word16
@@ -160,11 +160,11 @@ type Bits16_md = Base_md
 bits16_parseM :: Int -> PadsParser (Bits16, Base_md)
 bits16_parseM x =
     if   x < 1 || x > 16
-    then returnError 0 (E.BitWidthError (fromIntegral x))
+    then returnError 0 (E.BitWidthError 16 (fromIntegral x))
     else handleEOF 0 "Bits16" $
          handleEOR 0 "Bits16" $ do
              b <- takeBits16P x
-             returnClean b
+             returnClean b--(fromIntegral b :: Word16)
 
 
 type Bits32 = Word32
@@ -173,11 +173,11 @@ type Bits32_md = Base_md
 bits32_parseM :: Int -> PadsParser (Bits32, Base_md)
 bits32_parseM x =
     if   x < 1 || x > 32
-    then returnError 0 (E.BitWidthError (fromIntegral x))
+    then returnError 0 (E.BitWidthError 32 (fromIntegral x))
     else handleEOF 0 "Bits32" $
          handleEOR 0 "Bits32" $ do
              b <- takeBits32P x
-             returnClean b
+             returnClean b--(fromIntegral b :: Word32)
 
 
 type Bits64 = Word64
@@ -186,17 +186,17 @@ type Bits64_md = Base_md
 bits64_parseM :: Int -> PadsParser (Bits64, Base_md)
 bits64_parseM x =
     if   x < 1 || x > 64
-    then returnError 0 (E.BitWidthError (fromIntegral x))
+    then returnError 0 (E.BitWidthError 64 (fromIntegral x))
     else handleEOF 0 "Bits64" $
          handleEOR 0 "Bits64" $ do
              b <- takeBits64P x
-             returnClean b
+             returnClean b--(fromIntegral b :: Word64)
 
 
-bits8_def :: Int -> Bits8
-bits16_def :: Int -> Bits16
-bits32_def :: Int -> Bits32
-bits64_def :: Int -> Bits64
+bits8_def  :: a -> Bits8
+bits16_def :: a -> Bits16
+bits32_def :: a -> Bits32
+bits64_def :: a -> Bits64
 
 bits8_def  _ = 0
 bits16_def _ = 0
@@ -438,6 +438,20 @@ instance Pads1 () String Base_md where
 string_printFL :: PadsPrinter (String, Base_md)
 string_printFL (str, bmd) = addString str
 
+-----------------------------------------------------------------
+
+type StringNB = String
+type StringNB_md = Base_md
+
+stringNB_parseM :: PadsParser (String, Base_md)
+stringNB_parseM = do
+    str <- drainSourceNBP
+    returnClean str
+
+stringNB_def = string_def
+
+stringNB_printFL :: PadsPrinter (String, Base_md)
+stringNB_printFL = string_printFL
 
 -----------------------------------------------------------------
 
@@ -515,6 +529,23 @@ stringC_def c = ""
 stringC_printFL :: Char -> PadsPrinter (StringC, Base_md)
 stringC_printFL c (str, bmd) = addString str
 
+-----------------------------------------------------------------
+
+type StringCNB = String
+type StringCNB_md = Base_md
+
+stringCNB_parseM :: Char -> PadsParser (StringCNB, Base_md)
+stringCNB_parseM c =
+    handleEOF (stringCNB_def c) "StringCNB" $
+    handleEOR (stringCNB_def c) "StringCNB" $ do
+        str <- satisfyNBP (\c' -> c /= c')
+        returnClean str
+
+stringCNB_def :: Char -> StringCNB
+stringCNB_def = stringC_def
+
+stringCNB_printFL :: Char -> PadsPrinter (StringCNB, Base_md)
+stringCNB_printFL = stringC_printFL
 
 -----------------------------------------------------------------
 
@@ -537,6 +568,28 @@ stringFW_def n = replicate n 'X'
 
 stringFW_printFL :: Int -> PadsPrinter (StringFW, Base_md)
 stringFW_printFL n (str, bmd)  = addString (take n str)
+
+-----------------------------------------------------------------
+
+type StringFWNB = String
+type StringFWNB_md = Base_md
+
+stringFWNB_parseM :: Int -> PadsParser (StringFW, Base_md)
+stringFWNB_parseM 0 = returnClean ""
+stringFWNB_parseM n =
+    handleEOF (stringFWNB_def n) "StringFWNB" $
+    handleEOR (stringFWNB_def n) "StringFWNB" $ do
+        str <- takeBytesNBP n
+        let str' = map S.word8ToChr (B.unpack str)
+        if (length str') == n
+            then returnClean str'
+            else returnError (stringFWNB_def n) (E.Insufficient (length str') n)
+
+stringFWNB_def :: Int -> StringFW
+stringFWNB_def n = replicate n 'X'
+
+stringFWNB_printFL :: Int -> PadsPrinter (StringFW, Base_md)
+stringFWNB_printFL = stringFW_printFL
 
 -----------------------------------------------------------------
 
@@ -894,7 +947,39 @@ instance Pads1 Int Bytes Bytes_md where
   printFL1 = bytes_printFL
   def1 i = bytes_def i
 
----- All the others can be derived from this: moved to BaseTypes.hs
+
+type BytesNB = S.RawStream
+type BytesNB_md = Base_md
+
+bytesNB_parseM :: Int -> PadsParser (BytesNB, BytesNB_md)
+bytesNB_parseM n =
+    handleEOF (def1 n) "BytesNB" $
+    handleEOR (def1 n) "BytesNB" $ do
+        bytes <- takeBytesNBP n
+        if B.length bytes == n
+            then returnClean bytes
+            else returnError (def1 n) (E.Insufficient (B.length bytes) n)
+
+bytesNB_printFL :: Int -> PadsPrinter (BytesNB, BytesNB_md)
+bytesNB_printFL = bytes_printFL
+
+bytesNB_def :: Int -> BytesNB
+bytesNB_def = bytes_def
+
+
+-- type instance PadsArg BytesNB = Int
+-- type instance Meta BytesNB = BytesNB_md
+-- instance Pads1 Int BytesNB BytesNB_md where
+--     parsePP1 = bytesNB_parseM
+--     printFL1 = bytesNB_printFL
+--     def1 i = bytesNB_def i
+
+
+
+
+
+
+--- All the others can be derived from this: moved to BaseTypes.hs
 
 
 
