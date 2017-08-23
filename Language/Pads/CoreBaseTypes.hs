@@ -1,5 +1,5 @@
-{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables, 
-             MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances, 
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables,
+             MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances,
              FlexibleInstances #-}
 
 {-
@@ -24,10 +24,10 @@ import Data.Maybe
 
 import qualified Language.Pads.Source as S
 import qualified Language.Pads.Errors as E
-import qualified Data.ByteString as B  
+import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C
 
-import Language.Pads.PadsPrinter 
+import Language.Pads.PadsPrinter
 
 import Language.Haskell.TH as TH
 import Language.Haskell.TH.Syntax
@@ -37,6 +37,7 @@ import qualified Data.List as List
 import Data.Word
 import Data.Char as Char
 import Data.Int
+import Data.Bits
 
 import Text.PrettyPrint.Mainland as PP
 import Text.PrettyPrint.Mainland.Class
@@ -66,8 +67,150 @@ instance Pads1 () Char Base_md where
   def1 () = char_def
 
 char_printFL :: PadsPrinter (Char, md)
-char_printFL (c,bmd) = addString [c] 
+char_printFL (c,bmd) = addString [c]
 
+---------------------------------------------
+
+type CharNB = Char
+type CharNB_md = Base_md
+
+charNB_parseM :: PadsParser (CharNB, Base_md)
+charNB_parseM =
+    handleEOF def "CharNB" $
+    handleEOR def "CharNB" $ do
+        c <- takeBitsP 8
+        returnClean (S.word8ToChr (fromIntegral c :: Word8))
+
+charNB_def :: Char
+charNB_def = char_def
+
+charNB_printFL :: PadsPrinter (CharNB, md)
+charNB_printFL (c, bmd) = addString [c]
+
+
+-----------------------------------------------------------------
+
+type BitBool = Bool
+type BitBool_md = Base_md
+
+bitBool_parseM :: PadsParser (BitBool, Base_md)
+bitBool_parseM =
+    handleEOF False "BitBool" $
+    handleEOR False "BitBool" $ do
+        b <- takeBits8P 1
+        returnClean (b == 1)
+
+bitBool_def = False
+
+bitBool_printFL :: PadsPrinter (BitBool, md)
+bitBool_printFL (bb,bbmd) = fshow bb
+
+-- type instance PadsArg Bool = ()
+-- type instance Meta Bool = Base_md
+-- instance Pads1 () Bool Base_md where
+--     parsePP1 () = bitBool_parseM
+--     printFL1 () = bitBool_printFL
+--     def1 () = bitBool_def
+
+-----------------------------------------------------------------
+
+type BitField = Integer
+type BitField_md = Base_md
+
+bitField_parseM :: Int -> PadsParser (BitField, Base_md)
+bitField_parseM x =
+    if   x < 0
+    then returnError def (E.BitWidthError 0 (fromIntegral x))
+    else handleEOF 0 "BitField" $
+         handleEOR 0 "BitField" $ do
+             b <- takeBitsP x
+             returnClean b
+
+bitField_def :: Int -> BitField
+bitField_def _ = 0
+
+bitField_printFL :: Int -> PadsPrinter (BitField, md)
+bitField_printFL _ (x, xmd) = fshow x
+
+-- type instance PadsArg Integer = ()
+-- type instance Meta Integer = Base_md
+-- instance Pads1 () Integer Base_md where
+--     parsePP1 () = bitField_parseM
+--     printFL1 () = bitField_printFL
+--     def1 () = bitField_def
+
+
+type Bits8 = Word8
+type Bits8_md = Base_md
+
+bits8_parseM :: Int -> PadsParser (Bits8, Base_md)
+bits8_parseM x =
+    if   x < 1 || x > 8
+    then returnError 0 (E.BitWidthError 8 (fromIntegral x))
+    else handleEOF 0 "Bits8" $
+         handleEOR 0 "Bits8" $ do
+             b <- takeBits8P x
+             returnClean b
+
+
+type Bits16 = Word16
+type Bits16_md = Base_md
+
+bits16_parseM :: Int -> PadsParser (Bits16, Base_md)
+bits16_parseM x =
+    if   x < 1 || x > 16
+    then returnError 0 (E.BitWidthError 16 (fromIntegral x))
+    else handleEOF 0 "Bits16" $
+         handleEOR 0 "Bits16" $ do
+             b <- takeBits16P x
+             returnClean b
+
+
+type Bits32 = Word32
+type Bits32_md = Base_md
+
+bits32_parseM :: Int -> PadsParser (Bits32, Base_md)
+bits32_parseM x =
+    if   x < 1 || x > 32
+    then returnError 0 (E.BitWidthError 32 (fromIntegral x))
+    else handleEOF 0 "Bits32" $
+         handleEOR 0 "Bits32" $ do
+             b <- takeBits32P x
+             returnClean b
+
+
+type Bits64 = Word64
+type Bits64_md = Base_md
+
+bits64_parseM :: Int -> PadsParser (Bits64, Base_md)
+bits64_parseM x =
+    if   x < 1 || x > 64
+    then returnError 0 (E.BitWidthError 64 (fromIntegral x))
+    else handleEOF 0 "Bits64" $
+         handleEOR 0 "Bits64" $ do
+             b <- takeBits64P x
+             returnClean b
+
+
+bits8_def  :: a -> Bits8
+bits16_def :: a -> Bits16
+bits32_def :: a -> Bits32
+bits64_def :: a -> Bits64
+
+bits8_def  _ = 0
+bits16_def _ = 0
+bits32_def _ = 0
+bits64_def _ = 0
+
+bits8_printFL  :: Int -> PadsPrinter (Bits8, md)
+bits16_printFL :: Int -> PadsPrinter (Bits16, md)
+bits32_printFL :: Int -> PadsPrinter (Bits32, md)
+bits64_printFL :: Int -> PadsPrinter (Bits64, md)
+
+bits8_printFL  _ (x, xmd) = fshow x
+bits16_printFL _ (x, xmd) = fshow x
+bits32_printFL _ (x, xmd) = fshow x
+bits64_printFL _ (x, xmd) = fshow x
 
 -----------------------------------------------------------------
 
@@ -79,7 +222,7 @@ int_parseM :: PadsParser (Int,Base_md)
 int_parseM =
   handleEOF def "Int" $
   handleEOR def "Int" $ do
-    c <- peekHeadP 
+    c <- peekHeadP
     let isNeg = (c == '-')
     when isNeg (takeHeadP >> return ())
     digits <- satisfy Char.isDigit
@@ -111,7 +254,7 @@ integer_parseM :: PadsParser (Integer,Base_md)
 integer_parseM =
   handleEOF def "Integer" $
   handleEOR def "Integer" $ do
-    c <- peekHeadP 
+    c <- peekHeadP
     let isNeg = (c == '-')
     when isNeg (takeHeadP >> return ())
     digits <- satisfy Char.isDigit
@@ -144,26 +287,26 @@ float_parseM =
   handleEOF def "Float" $
   handleEOR def "Float" $ do
     -- Get leading sign
-    c <- peekHeadP 
+    c <- peekHeadP
     let isNeg = (c == '-')
     when isNeg (takeHeadP >> return ())
     let sign = if isNeg then "-" else ""
     -- Get digits before any dot
     digits1 <- satisfy Char.isDigit
     -- Get optional dot
-    d <- peekHeadP 
+    d <- peekHeadP
     let hasDot = (d == '.')
     when hasDot (takeHeadP >> return ())
     let dec = if hasDot then "." else ""
     -- Get digits after dot
     digits2 <- satisfy Char.isDigit
     -- Get optional exponent marker
-    e <- peekHeadP 
+    e <- peekHeadP
     let hasExp = (e == 'e')
     when hasExp (takeHeadP >> return ())
     let exp = if hasExp then "e" else ""
     -- Get optional exponent sign
-    es <- peekHeadP 
+    es <- peekHeadP
     let hasESign = (es == '-')
     when hasESign (takeHeadP >> return ())
     let expSign = if hasESign then "-" else ""
@@ -199,26 +342,26 @@ double_parseM =
   handleEOF def "Double" $
   handleEOR def "Double" $ do
     -- Get leading sign
-    c <- peekHeadP 
+    c <- peekHeadP
     let isNeg = (c == '-')
     when isNeg (takeHeadP >> return ())
     let sign = if isNeg then "-" else ""
     -- Get digits before any dot
     digits1 <- satisfy Char.isDigit
     -- Get optional dot
-    d <- peekHeadP 
+    d <- peekHeadP
     let hasDot = (d == '.')
     when hasDot (takeHeadP >> return ())
     let dec = if hasDot then "." else ""
     -- Get digits after dot
     digits2 <- satisfy Char.isDigit
     -- Get optional exponent marker
-    e <- peekHeadP 
+    e <- peekHeadP
     let hasExp = (e == 'e')
     when hasExp (takeHeadP >> return ())
     let exp = if hasExp then "e" else ""
     -- Get optional exponent sign
-    es <- peekHeadP 
+    es <- peekHeadP
     let hasESign = (es == '-')
     when hasESign (takeHeadP >> return ())
     let expSign = if hasESign then "-" else ""
@@ -270,7 +413,7 @@ digit_parseM  =
   handleEOF def "Pdigit" $
   handleEOR def "Pdigit" $ do
     c <- takeHeadP
-    if isDigit c 
+    if isDigit c
       then returnClean (digitToInt c)
       else returnError def (E.FoundWhenExpecting [c] "Digit")
 
@@ -305,6 +448,20 @@ instance Pads1 () String Base_md where
 string_printFL :: PadsPrinter (String, Base_md)
 string_printFL (str, bmd) = addString str
 
+-----------------------------------------------------------------
+
+type StringNB = String
+type StringNB_md = Base_md
+
+stringNB_parseM :: PadsParser (String, Base_md)
+stringNB_parseM = do
+    str <- drainSourceNBP
+    returnClean str
+
+stringNB_def = string_def
+
+stringNB_printFL :: PadsPrinter (String, Base_md)
+stringNB_printFL = string_printFL
 
 -----------------------------------------------------------------
 
@@ -379,9 +536,26 @@ stringC_parseM c =
 
 stringC_def c = ""
 
-stringC_printFL :: Char -> PadsPrinter (StringC, Base_md) 
+stringC_printFL :: Char -> PadsPrinter (StringC, Base_md)
 stringC_printFL c (str, bmd) = addString str
 
+-----------------------------------------------------------------
+
+type StringCNB = String
+type StringCNB_md = Base_md
+
+stringCNB_parseM :: Char -> PadsParser (StringCNB, Base_md)
+stringCNB_parseM c =
+    handleEOF (stringCNB_def c) "StringCNB" $
+    handleEOR (stringCNB_def c) "StringCNB" $ do
+        str <- satisfyNBP (\c' -> c /= c')
+        returnClean str
+
+stringCNB_def :: Char -> StringCNB
+stringCNB_def = stringC_def
+
+stringCNB_printFL :: Char -> PadsPrinter (StringCNB, Base_md)
+stringCNB_printFL = stringC_printFL
 
 -----------------------------------------------------------------
 
@@ -394,8 +568,8 @@ stringFW_parseM 0 = returnClean ""
 stringFW_parseM n =
   handleEOF (stringFW_def n) "StringFW" $
   handleEOR (stringFW_def n) "StringFW" $ do
-    str <- takeP n 
-    if (length str) == n 
+    str <- takeP n
+    if (length str) == n
       then returnClean str
       else returnError (stringFW_def n) (E.Insufficient (length str) n)
 
@@ -404,6 +578,28 @@ stringFW_def n = replicate n 'X'
 
 stringFW_printFL :: Int -> PadsPrinter (StringFW, Base_md)
 stringFW_printFL n (str, bmd)  = addString (take n str)
+
+-----------------------------------------------------------------
+
+type StringFWNB = String
+type StringFWNB_md = Base_md
+
+stringFWNB_parseM :: Int -> PadsParser (StringFW, Base_md)
+stringFWNB_parseM 0 = returnClean ""
+stringFWNB_parseM n =
+    handleEOF (stringFWNB_def n) "StringFWNB" $
+    handleEOR (stringFWNB_def n) "StringFWNB" $ do
+        str <- takeBytesNBP n
+        let str' = map S.word8ToChr (B.unpack str)
+        if (length str') == n
+            then returnClean str'
+            else returnError (stringFWNB_def n) (E.Insufficient (length str') n)
+
+stringFWNB_def :: Int -> StringFW
+stringFWNB_def n = replicate n 'X'
+
+stringFWNB_printFL :: Int -> PadsPrinter (StringFW, Base_md)
+stringFWNB_printFL = stringFW_printFL
 
 -----------------------------------------------------------------
 
@@ -416,7 +612,7 @@ stringVW_parseM 0 = returnClean ""
 stringVW_parseM n =
   handleEOF (stringVW_def n) "StringVW" $
   handleEOR (stringVW_def n) "StringVW" $ do
-    str <- takeP n 
+    str <- takeP n
     returnClean str
 
 stringVW_def :: Int -> StringVW
@@ -454,10 +650,10 @@ type StringME = String
 type StringME_md = Base_md
 
 stringME_parseM :: RE -> PadsParser (StringME, Base_md)
-stringME_parseM re = 
+stringME_parseM re =
   handleEOF (stringME_def re) "StringME" $ do
     match <- regexMatchP re
-    case match of 
+    case match of
       Just str -> returnClean str
       Nothing  -> returnError (stringME_def re) (E.RegexMatchFail (show re))
 
@@ -465,7 +661,7 @@ stringME_def (RE re) = "" -- should invert the re
 stringME_def (REd re d) = d
 
 stringME_printFL :: RE -> PadsPrinter (StringME, Base_md)
-stringME_printFL re (str, bmd) = addString str       
+stringME_printFL re (str, bmd) = addString str
            -- We're not likely to check that str matches re
 
 -----------------------------------------------------------------
@@ -479,10 +675,10 @@ type StringSE_md = Base_md
 
 stringSE_parseM :: RE -> PadsParser (StringSE, Base_md)
 stringSE_parseM re =
-  checkEOF (stringSE_def re) "StringSE" $ 
+  checkEOF (stringSE_def re) "StringSE" $
   checkEOR (stringSE_def re) "StringSE" $ do
     match <- regexStopP re
-    case match of 
+    case match of
       Just str -> returnClean str
       Nothing  -> returnError (stringSE_def re) (E.RegexMatchFail (show re))
 
@@ -503,7 +699,7 @@ type StringP_md = Base_md
 
 stringP_parseM :: (Char -> Bool) -> PadsParser (StringP, Base_md)
 stringP_parseM p =
-  handleEOF (stringP_def p) "StringP" $ 
+  handleEOF (stringP_def p) "StringP" $
   handleEOR (stringP_def p) "StringP" $ do
     str <- satisfy p
     returnClean str
@@ -520,13 +716,13 @@ type StringPESC = String
 type StringPESC_md = Base_md
 
 stringPESC_parseM :: (Bool, (Char, [Char])) -> PadsParser(StringPESC, Base_md)
-stringPESC_parseM arg @ (endIfEOR, (escape, stops)) = 
+stringPESC_parseM arg @ (endIfEOR, (escape, stops)) =
  let (doEOF, doEOR) = if endIfEOR then (checkEOF, checkEOR) else (handleEOF, handleEOR)
  in
   doEOF "" "StringPESC" $
-  doEOR "" "StringPESC" $ do 
+  doEOR "" "StringPESC" $ do
     { c1 <- peekHeadP
-    ; if c1 `elem` stops then 
+    ; if c1 `elem` stops then
          returnClean ""
       else if c1 == escape then do
          { takeHeadP
@@ -537,12 +733,12 @@ stringPESC_parseM arg @ (endIfEOR, (escape, stops)) =
                    { (rest, rest_md) <- stringPESC_parseM arg
                    ;  return (c2:rest, rest_md)
                    }
-              else do 
+              else do
                    { (rest, rest_md) <- stringPESC_parseM arg
                    ; return (c1:c2:rest, rest_md)
                    }
             }
-         } else do 
+         } else do
             { c1 <- takeHeadP
             ; (rest, rest_md) <- stringPESC_parseM arg
             ; return (c1:rest, rest_md)
@@ -569,7 +765,7 @@ class LitParse a where
 
 strLit_parseM :: String -> PadsParser ((), Base_md)
 strLit_parseM s =
-  handleEOF () s $ 
+  handleEOF () s $
   handleEOR () s $ do
     match <- scanStrP s
     case match of
@@ -588,12 +784,12 @@ charLit_parseM :: Char -> PadsParser ((),Base_md)
 charLit_parseM c =
   handleEOF () (mkStr c) $
   handleEOR () (mkStr c) $ do
-    c' <- takeHeadP 
+    c' <- takeHeadP
     if c == c' then returnClean () else do
       foundIt <- scanP c
-      returnError () (if foundIt 
+      returnError () (if foundIt
                       then E.ExtraBeforeLiteral (mkStr c)
-                      else E.MissingLiteral     (mkStr c)) 
+                      else E.MissingLiteral     (mkStr c))
 
 charLit_printFL :: Char -> FList
 charLit_printFL c = addString [c]
@@ -610,8 +806,8 @@ instance LitParse RE where
 reLit_parseM :: RE -> PadsParser ((), Base_md)
 reLit_parseM re = do
   (match, md) <- stringME_parseM re
-  if numErrors md == 0 
-    then return ((), md) 
+  if numErrors md == 0
+    then return ((), md)
     else badReturn ((), md)
 
 reLit_printFL :: RE -> FList
@@ -633,7 +829,7 @@ type EOR = ()
 type EOR_md = Base_md
 
 eor_parseM :: PadsParser (EOR, Base_md)
-eor_parseM = 
+eor_parseM =
    handleEOF () "EOR" $ do
    isEor <- isEORP
    if isEor then doLineEnd
@@ -684,48 +880,48 @@ void_printFL v = nil
 
 
 
-pstrLit_printQ :: String -> FList 
+pstrLit_printQ :: String -> FList
 pstrLit_printQ str = addString str
 
-tuple_printQ :: (String, String, String) -> FList 
+tuple_printQ :: (String, String, String) -> FList
 tuple_printQ (s1,s2,s3) = pstrLit_printQ s1 +++ pstrLit_printQ s2 +++ pstrLit_printQ s3
 
-rtuple_printQ :: (String, String, String) -> FList 
+rtuple_printQ :: (String, String, String) -> FList
 rtuple_printQ ss = tuple_printQ ss +++ (addString ['\n'])
 
-list_printQ :: [(String,String,String)] -> FList 
+list_printQ :: [(String,String,String)] -> FList
 list_printQ [] =  nil
 list_printQ (item:items) = rtuple_printQ item +++ list_printQ items
 
-            
-            
-            
+
+
+
 
 
 
 
 ----------------------------------
 
-handleEOF val str p 
-  = do { isEof <- isEOFP 
+handleEOF val str p
+  = do { isEof <- isEOFP
        ; if isEof then
-           returnError val (E.FoundWhenExpecting "EOF" str) 
+           returnError val (E.FoundWhenExpecting "EOF" str)
          else p}
 
-handleEOR val str p 
-  = do { isEor <- isEORP 
+handleEOR val str p
+  = do { isEor <- isEORP
        ; if isEor then
            returnError val (E.FoundWhenExpecting "EOR" str)
          else p}
 
-checkEOF val str p 
-  = do { isEof <- isEOFP 
+checkEOF val str p
+  = do { isEof <- isEOFP
        ; if isEof then
            returnClean val
          else p}
 
-checkEOR val str p 
-  = do { isEor <- isEORP 
+checkEOR val str p
+  = do { isEor <- isEORP
        ; if isEor then
            returnClean val
          else p}
@@ -743,7 +939,7 @@ bytes_parseM n =
   handleEOF (def1 n) "Bytes" $
   handleEOR (def1 n) "Bytes" $ do
     bytes <- takeBytesP n
-    if B.length bytes == n 
+    if B.length bytes == n
       then returnClean bytes
       else returnError (def1 n) (E.Insufficient (B.length bytes) n)
 
@@ -761,7 +957,39 @@ instance Pads1 Int Bytes Bytes_md where
   printFL1 = bytes_printFL
   def1 i = bytes_def i
 
----- All the others can be derived from this: moved to BaseTypes.hs
+
+type BytesNB = S.RawStream
+type BytesNB_md = Base_md
+
+bytesNB_parseM :: Int -> PadsParser (BytesNB, BytesNB_md)
+bytesNB_parseM n =
+    handleEOF (def1 n) "BytesNB" $
+    handleEOR (def1 n) "BytesNB" $ do
+        bytes <- takeBytesNBP n
+        if B.length bytes == n
+            then returnClean bytes
+            else returnError (def1 n) (E.Insufficient (B.length bytes) n)
+
+bytesNB_printFL :: Int -> PadsPrinter (BytesNB, BytesNB_md)
+bytesNB_printFL = bytes_printFL
+
+bytesNB_def :: Int -> BytesNB
+bytesNB_def = bytes_def
+
+
+-- type instance PadsArg BytesNB = Int
+-- type instance Meta BytesNB = BytesNB_md
+-- instance Pads1 Int BytesNB BytesNB_md where
+--     parsePP1 = bytesNB_parseM
+--     printFL1 = bytesNB_printFL
+--     def1 i = bytesNB_def i
+
+
+
+
+
+
+--- All the others can be derived from this: moved to BaseTypes.hs
 
 
 

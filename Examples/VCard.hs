@@ -27,13 +27,13 @@ import Language.Pads.Padsc
 -- KSF: Added to describe sequence of VCards
 newtype VCards = VCards (partition [Line VCard] terminator EOF using windows)
 
--- KSF: moved IndividualNames and Common Name into VCardPropety because these attributes are not 
+-- KSF: moved IndividualNames and Common Name into VCardPropety because these attributes are not
 --      guaranteed to be in a particular order.
 data VCard = VCard  ("BEGIN:", vcardRE, EOR, [Line Entry] terminator "END:", vcardRE)
 
 data Entry = Entry { prefix   :: Maybe ("item", Int, '.'),
-                     tag      :: Tag, 
-                     sep      :: StringME colonsemiRE, 
+                     tag      :: Tag,
+                     sep      :: StringME colonsemiRE,
                      property :: VCardProperty tag }
 
 data Tag = VERSION | FN | NICKNAME | BDAY | ADR | LABEL
@@ -42,15 +42,15 @@ data Tag = VERSION | FN | NICKNAME | BDAY | ADR | LABEL
          | SOUND | UID | URL | CLASS | KEY
          | EXTENSION ("X-", VCardString)
          | ITEM "item"
-         | PHOTO 
-         | N  
+         | PHOTO
+         | N
 
 
-data VCardProperty (tag :: Tag) = case tag of 
+data VCardProperty (tag :: Tag) = case tag of
     -- | Version number of VCard file format
       VERSION ->  Version (Int, '.', Int)
 
-    -- | A breakdown of the vCard entity's name, as described by IndividualNames 
+    -- | A breakdown of the vCard entity's name, as described by IndividualNames
     | N -> Names IndividualNames
 
     -- | Formated name of the represented person
@@ -115,7 +115,7 @@ data VCardProperty (tag :: Tag) = case tag of
     -- | Represents the time zone of the vCard entity. E.g.,
     --
     -- > TZ (hoursToTimeZone (-6))
-    | TZ -> Tz TZone     
+    | TZ -> Tz TZone
 
     -- | Relates to the global positioning of the vCard entity. The value is
     -- (latitude, longitude) and must be specified as decimal degrees,
@@ -173,9 +173,9 @@ data VCardProperty (tag :: Tag) = case tag of
     -- | Distinguishes the current revision from other renditions. E.g.,
     --
     -- > Revision $ UTCTime (fromGregorian 2011 04 16) (secondsToDiffTime 0)
-    | REV -> Revision { revDate :: DateFSE <|("%Y-%m-%d", RE "T")|> 
+    | REV -> Revision { revDate :: DateFSE <|("%Y-%m-%d", RE "T")|>
                       , revTime :: Maybe ('T', DateFSE <|("%H-%M-%SZ", RE "$")|>)
-                      } 
+                      }
     -- | Provides a locale- or national-language-specific formatting of the
     -- formatted name based on the vCard entity's family or given name. E.g.,
     --
@@ -215,7 +215,7 @@ data VCardProperty (tag :: Tag) = case tag of
     | KEY -> Key { keyType   :: Maybe (TypeS, ';') -- ^ Registered IANA format
                  , keyData   :: VCardData
                  }
-    | EXTENSION s -> Extension VCardString    
+    | EXTENSION s -> Extension VCardString
     | otherwise -> Other StringLn
 
 -- | A breakdown of the vCard entity's name, corresponding, in sequence, to
@@ -277,7 +277,7 @@ data AgentData = AgentURI ("VALUE=uri:", VCardString)
                | AgentVCard VCard
 
 -- | Represents the various types of data that can be included in a vCard.
-data VCardData = VURI    ("VALUE=uri:", VCardString) 
+data VCardData = VURI    ("VALUE=uri:", VCardString)
                | VBinary ("ENCODING=b", Maybe(';', TypeS), ':', WrappedEncoding )
                | VBase64 ("BASE64:", EOR, WrappedEncoding)
 
@@ -314,7 +314,7 @@ vcardRE = REd "VCARD|vCard" "VCARD"
 typeRE = REd "TYPE|type" "TYPE"
 
 
-startsWithSpace s = case s of 
+startsWithSpace s = case s of
    [] -> False
    ' ':s' -> True
    '\t':s' -> True
@@ -325,15 +325,15 @@ vcard_file_small  = "Examples/data/VcardSmall.vcf"
 vcard_file_large  = "Examples/data/VcardSmall.vcf"
 vcard_file = vcard_file_large
 
-result n  = do 
+result n  = do
      { (VCards rep, md) <- parseFile vcard_file
      ; return (Prelude.take n rep, fst md)
-     } 
+     }
 
-test = do 
+test = do
      { (VCards rep, md) <- parseFile vcard_file
      ; return (fst md)
-     } 
+     }
 
 entry_input = "N:Brush;A.J.;;;\r\n"
 entry_result = entry_parseS entry_input

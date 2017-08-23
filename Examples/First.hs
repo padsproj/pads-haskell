@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts, TypeFamilies, TypeSynonymInstances, TemplateHaskell, QuasiQuotes, 
+{-# LANGUAGE FlexibleContexts, TypeFamilies, TypeSynonymInstances, TemplateHaskell, QuasiQuotes,
              MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
              DeriveDataTypeable, ScopedTypeVariables #-}
 
@@ -92,15 +92,15 @@ input_strHex = "12abcds"
 strHex_result = strHex_parseS input_strHex
 
 {- Testing for Phex32FW, which is in Pads.Language.BaseTypes -}
-input_hex32FW = "12bc34"  
-phex32FW_results = phex32FW_parseS 4 input_hex32FW   
+input_hex32FW = "12bc34"
+phex32FW_results = phex32FW_parseS 4 input_hex32FW
 phex32FW_expects = (4796, 0, "34")
 phex32FW_test    = mkTestCase "phex32FW" phex32FW_expects phex32FW_results
 
-input2_hex32FW = "00bc34"  
+input2_hex32FW = "00bc34"
 strhex32FW_result2 = phex32FW_parseS 4 input2_hex32FW    -- ((Phex32FW (188),Errors: 0),"34")
 
-input3_hex32FW = "gbc34"  
+input3_hex32FW = "gbc34"
 strhex32FW_result3 = phex32FW_parseS 4 input3_hex32FW    -- Prints error message
 
 [pads| type  HexPair = (Phex32FW 2, ',', Phex32FW 3) |]
@@ -150,7 +150,7 @@ result_intRangeP24 = intRangeP_parseS (0, 256) intRange24_input
 expect_intRangeP24 = (24,0,"")
 test_intRangeP24 = mkTestCase "IntRangeP24" expect_intRangeP24 result_intRangeP24
 
-result_intRangeP0  = intRangeP_parseS (0, 256) intRange0_input 
+result_intRangeP0  = intRangeP_parseS (0, 256) intRange0_input
 expect_intRangeP0 = (0,0,"")
 test_intRangeP0 = mkTestCase "IntRangeP0" expect_intRangeP0 result_intRangeP0
 
@@ -175,8 +175,8 @@ test_intRangePBad    = mkTestCase "IntRangePBad" expect_intRangePBad result_intR
 
 
 
-[pads| data  Record (bound::Int) = Record 
-                {  i1 :: Int, 
+[pads| data  Record (bound::Int) = Record
+                {  i1 :: Int,
               ',', i2 :: Int where <| i1 + i2 <= bound |>   } |]
 
 input_Record = "24,45"
@@ -185,7 +185,7 @@ expect_Record = (Record {i1 = 24, i2 = 45},0,"")
 test_Record   = mkTestCase "Record" expect_Record result_Record
 
 [pads| data Id =  Numeric Int
-               |  Alpha   (StringC ',')  |] 
+               |  Alpha   (StringC ',')  |]
 
 input_IdInt = "23"
 result_IdInt = id_parseS input_IdInt
@@ -197,9 +197,9 @@ result_IdStr = id_parseS input_IdStr
 expect_IdStr = (Alpha ("hello"),0,"")
 test_IdStr = mkTestCase "IdAlpha" expect_IdStr result_IdStr
 
-[pads| data Id2 (bound::Int) = 
+[pads| data Id2 (bound::Int) =
             Numeric2 (constrain n::Int where <| n <= bound |>)
-          | Alpha2   (StringC ',') |] 
+          | Alpha2   (StringC ',') |]
 input_IdInt2 = "23"
 result_IdInt2 = id2_parseS 10 input_IdInt2
 expect_IdInt2 =  (Alpha2 ("23"),0,"")
@@ -214,7 +214,7 @@ test_IdStr2 = mkTestCase "IdAlpha2" expect_IdStr2 result_IdStr2
 
 [pads| data Id3  = Numeric3  (IntRangeP <|(1,10)|>)
                  | Numeric3a Int
-                 | Lit3     ','               |] 
+                 | Lit3     ','               |]
 input_IdInt3 = "24"
 result_IdInt3 = id3_parseS input_IdInt3
 expect_IdInt3 = (Numeric3a (24),0,"")
@@ -245,22 +245,22 @@ result_AB_test2 = aB_test_parseS input_AB_test2
 expect_AB_test2 = (AB_test {field_AB = AB},1,"")
 test_AB_test2 = mkTestCase "AB_test2" expect_AB_test2 result_AB_test2
 
-[pads| data Method  = GET | PUT | LINK | UNLINK | POST  
-       data Version = Version 
-              {"HTTP/" 
+[pads| data Method  = GET | PUT | LINK | UNLINK | POST
+       data Version = Version
+              {"HTTP/"
               , major :: Int, '.'
-              , minor :: Int} 
+              , minor :: Int}
 |]
 
 checkVersion :: Method -> Version -> Bool
-checkVersion method version = 
+checkVersion method version =
   case method of
     LINK   -> major version == 1 && minor version == 0
     UNLINK -> major version == 1 && minor version == 0
     _ -> True
 
-[pads| data Request = Request 
-             { '"',  method  :: Method       
+[pads| data Request = Request
+             { '"',  method  :: Method
              , ' ',  url     :: StringC ' '
              , ' ',  version :: Version where <| checkVersion method version |>
              , '"'
@@ -354,7 +354,7 @@ expect_entries_nosep_noterm2 = ([],0,"")
 test_entries_nosep_noterm2 = mkTestCase "NoSep_NoTerm2" expect_entries_nosep_noterm2 result_entries_nosep_noterm2
 
 
-[pads| type  EvenInt = constrain x :: Digit where <| x `mod` 2 == 0 |> 
+[pads| type  EvenInt = constrain x :: Digit where <| x `mod` 2 == 0 |>
        type  EvenInts = [EvenInt] |]
 input_evenInts = "2465"
 result_evenInt = evenInt_parseS input_evenInts
@@ -420,7 +420,7 @@ test_digitListTermB   = mkTestCase "DigitListTermB" expect_digitListTermB result
 
 [pads| type DigitListTermSep = [Digit | '|' ] terminator ';' |]
 input_digitListTermSepG = "1|2|3|4|5|6;hello"
-result_digitListTermSepG = digitListTermSep_parseS input_digitListTermSepG 
+result_digitListTermSepG = digitListTermSep_parseS input_digitListTermSepG
 expect_digitListTermSepG = ([1,2,3,4,5,6], 0,"hello")
 test_digitListTermSepG = mkTestCase "digitListTermSepG" expect_digitListTermSepG result_digitListTermSepG
 
@@ -467,7 +467,7 @@ result_WithVoid = withVoid_parseS input_WithVoid
 expect_WithVoid =  ('a',0,"rest")
 test_WithVoid = mkTestCase "WithVoid" expect_WithVoid result_WithVoid
 
-[pads| data VoidOpt   = PDigit Digit | Pcolor "red" | Pnothing Void 
+[pads| data VoidOpt   = PDigit Digit | Pcolor "red" | Pnothing Void
        type VoidEntry = (VoidOpt, StringFW 3)                    |]
 input_voidEntry1 = "9abcdef"
 result_voidEntry1 = voidEntry_parseS input_voidEntry1
@@ -484,11 +484,11 @@ result_voidEntry3 = voidEntry_parseS input_voidEntry3
 expect_voidEntry3 =  ((Pnothing,"abc"),0,"def")
 test_voidEntry3 = mkTestCase "VoidEntry3" expect_voidEntry3 result_voidEntry3
 
-[pads| data Switch (which :: Int) =  
+[pads| data Switch (which :: Int) =
          case <| which |> of
              0 ->         Even Int where <| even `mod` 2 == 0 |>
            | 1 ->         Comma   ','
-           | otherwise -> Missing Void |] 
+           | otherwise -> Missing Void |]
 input_switch0 = "2hello"
 input_switch1 = ",hello"
 input_switchOther = "hello"
@@ -511,16 +511,16 @@ result_stringln = stringLn_parseS "hello\ngoodbye"
 expect_stringln = ("hello",0,"\ngoodbye")
 test_stringln = mkTestCase "stringln" expect_stringln result_stringln
 
-[pads| data MyBody (which::Int) = 
+[pads| data MyBody (which::Int) =
          case <| which |> of
             0         -> First Int
           | 1         -> Second (StringC ',')
           | otherwise -> Other Void
 
-       data MyEntry = MyEntry 
+       data MyEntry = MyEntry
           { header  :: Int, ','
           , body    :: MyBody header, ','
-          , trailer :: Char}  
+          , trailer :: Char}
 
        type MyData = [Line MyEntry] terminator EOF      |]
 
@@ -533,9 +533,9 @@ test_myData = mkTestCase "MyData" expect_myData result_myData
 
 
 
-[pads| data HP = HP { student_num  :: Int, ',', 
+[pads| data HP = HP { student_num  :: Int, ',',
                       student_name :: StringFW student_num }
-       type HP_data = [Line HP] terminator EOF |]   
+       type HP_data = [Line HP] terminator EOF |]
 
 input_hp_data = "8,Hermione\n3,Ron\n5,Harry\n"
 result_hp_data = hP_data_parseS input_hp_data
@@ -549,7 +549,7 @@ test_hp_data = mkTestCase "HP Data" expect_hp_data result_hp_data
 test_file = "Examples/data/test_file"
 result_hp_data_file_parse :: (HP_data, HP_data_md) = unsafePerformIO $ parseFileWith hP_data_parseM test_file
 
-expect_hp_data_file_parse = 
+expect_hp_data_file_parse =
   ( [HP {student_num = 8, student_name = "Hermione"},
      HP {student_num = 3, student_name = "Ron"},
      HP {student_num = 5, student_name = "Harry"}], 0)
@@ -595,7 +595,7 @@ rE_ty_test = mkTestCase "regular expression abbreviation for StringME" rE_ty_exp
 
 
 [pads| type Disc = (Int, EOR, Int, EOR, (partition (Int, EOR, Int, EOR) using windows), Int, EOR) |]
-disc_input = "1\n2\n3\r\n4\r\n5\n"        
+disc_input = "1\n2\n3\r\n4\r\n5\n"
 disc_result = disc_parseS disc_input
 disc_expects = ((1,2,(3,4),5),0,"")
 disc_test = mkTestCase "multiple record disciplines" disc_expects disc_result
@@ -608,7 +608,7 @@ exxy_expects = (Exxy {exxy = 32635, aa = 'd'},0,"ef")
 exxy_test = mkTestCase "label overlap" exxy_expects exxy_result
 
 [pads| type OneLine  = [Char] terminator EOR
-       type Lines    = [OneLine] terminator EOF 
+       type Lines    = [OneLine] terminator EOF
        type LinesFW  = partition Lines using <| bytes 3 |>
 |]
 
@@ -679,114 +679,306 @@ stringPs_result = stringPs_parseS stringPs_input
 stringPs_expects = (["123","","123"],2, "")
 stringPs_test = mkTestCase "stringPs" stringPs_expects stringPs_result
 
+{- Bit-level functionality tests -}
+
+[pads| type BitBools = (partition [BitBool] using none) |]
+bitBools_input = "a" -- binary 01100001
+bitBools_result = bitBools_parseS bitBools_input
+bitBools_expects = ([False,True,True,False,False,False,False,True], 0, "")
+bitBools_test = mkTestCase "bitBools" bitBools_expects bitBools_result
+
+bitBools_input2 = "a\n" -- binary 01100001 00001010
+bitBools_result2 = bitBools_parseS bitBools_input2
+bitBools_expects2 = ([False,True,True,False,False,False,False,True,
+                      False,False,False,False,True,False,True,False], 0, "")
+bitBools_test2 = mkTestCase "bitBools" bitBools_expects2 bitBools_result2
+
+[pads| type IncompleteBitBools = (partition (BitBool,
+                                             BitBool,
+                                             BitBool) using none) |]
+incompleteBitBools_input = "4"
+incompleteBitBools_result = incompleteBitBools_parseS incompleteBitBools_input
+incompleteBitBools_expects = ((False,False,True), 0, "4")
+incompleteBitBools_test = mkTestCase "incompleteBitBools"
+                                     incompleteBitBools_expects
+                                     incompleteBitBools_result
+
+[pads| type ArithPixel = (partition (Bits16 9,
+                                     Bits8 5,
+                                     Bits8 5,
+                                     Bits8 5,
+                                     Bits8 4,
+                                     Bits8 4) using none) |]
+arithPixel_input = map word8ToChr [136,114,32,0]
+arithPixel_result = arithPixel_parseS arithPixel_input
+arithPixel_expects = ((272,28,17,0,0,0), 0, "")
+arithPixel_test = mkTestCase "arithPixel" arithPixel_expects arithPixel_result
+
+[pads| type Mixed = (partition (StringC ' ',
+                                ' ',
+                                Bits8 4,
+                                BitBool,
+                                Bits8 3,
+                                Char) using none) |]
+
+mixed_input = "Hello " ++ (map word8ToChr [74]) ++ "c"
+mixed_result = mixed_parseS mixed_input
+mixed_expects = (("Hello",4,True,2,'c'), 0, "")
+mixed_test = mkTestCase "mixed" mixed_expects mixed_result
+
+[pads| type OddWidths = (partition (Bits32 19,
+                                    Bits64 39,
+                                    Bits8 1,
+                                    Bits8 5) using none) |]
+
+oddWidths_input = map word8ToChr [104,46,174,3,185,8,6,158]
+oddWidths_result = oddWidths_parseS oddWidths_input
+oddWidths_expects = ((213365,240768000026,0,30), 0, "")
+oddWidths_test = mkTestCase "oddWidths" oddWidths_expects oddWidths_result
+
+[pads| type LargeWidths = (partition (Bits8 7,
+                                      BitField 89,
+                                      BitField 65) using none) |]
+
+largeWidths_input = map word8ToChr [1,0,0,0,0,0,0,0,0,0,0,1,128,0,0,0,0,0,0,0,128]
+largeWidths_result = largeWidths_parseS largeWidths_input
+largeWidths_expects = ((0,309485009821345068724781057,18446744073709551617), 0, map word8ToChr [128])
+largeWidths_test = mkTestCase "largeWidths" largeWidths_expects largeWidths_result
+
+[pads| data EnumType (x :: Bits8) = case x of 0 -> ZERO {}
+                                               | 1 -> ONE {}
+                                               | 2 -> TWO {}
+                                               | _ -> OTHER {}
+
+       data Enumerate = Enumerate {x :: Bits8 3,
+                                        Bits8 5,
+                                   y :: EnumType x}
+
+       type Enumerated = (partition Enumerate using none) |]
+
+enumerated_input = map word8ToChr [64]
+enumerated_result = enumerated_parseS enumerated_input
+enumerated_expects = (Enumerate {x = 2, y = TWO}, 0, "")
+enumerated_test = mkTestCase "Enumerated" enumerated_expects enumerated_result
+
+enumerated_input_wc = map word8ToChr [255]
+enumerated_result_wc = enumerated_parseS enumerated_input_wc
+enumerated_expects_wc = (Enumerate {x = 7, y = OTHER}, 0, "")
+enumerated_test_wc = mkTestCase "EnumeratedWC" enumerated_expects_wc enumerated_result_wc
+
+[pads| data EnumTypeBool (x' :: BitBool) = case x' of True  -> ON {}
+                                                    | False -> OFF {}
+
+       data EnumerateBool = EnumerateBool {Bits8 7,
+                                           x' :: BitBool,
+                                           y' :: EnumTypeBool x'}
+
+       type EnumeratedBool = (partition EnumerateBool using none) |]
+
+enumeratedBool_input = map word8ToChr [1]
+enumeratedBool_result = enumeratedBool_parseS enumeratedBool_input
+enumeratedBool_expects = (EnumerateBool {x' = True, y' = ON}, 0, "")
+enumeratedBool_test = mkTestCase "EnumeratedBool" enumeratedBool_expects enumeratedBool_result
+
+[pads| type NBA_char = (partition (Bits8 3, CharNB, Bits8 5) using none) |]
+
+nBA_char_input = map word8ToChr [70,181] -- 01000110 10110101
+nBA_char_result = nBA_char_parseS nBA_char_input
+nBA_char_expects = ((2,'5',21), 0, "") -- 010 00110101 10101
+nBA_char_test = mkTestCase "NBA_char" nBA_char_expects nBA_char_result
+
+[pads| type NBA_char_aligned = (partition (CharNB, CharNB) using none)|]
+
+nBA_char_aligned_input = map word8ToChr [70,181]
+nBA_char_aligned_result = nBA_char_aligned_parseS nBA_char_aligned_input
+nBA_char_aligned_expects = ((word8ToChr 70, word8ToChr 181), 0, "")
+nBA_char_aligned_test = mkTestCase "NBA_char_aligned" nBA_char_aligned_expects nBA_char_aligned_result
+
+[pads| type NBA_BS = (partition (Bits8 6, BytesNB 2, Bits8 2) using none) |]
+
+nBA_BS_input = map word8ToChr [99,234,3] -- 01100011 11101010 0000011
+nBA_BS_result = nBA_BS_parseS nBA_BS_input
+nBA_BS_expects = ((24, B.pack [250,128], 3), 0, "")
+nBA_BS_test = mkTestCase "NBA_BS" nBA_BS_expects nBA_BS_result
+
+[pads| type NBA_BS_aligned = (partition (BytesNB 4) using none) |]
+
+nBA_BS_aligned_input = map word8ToChr [9,8,7,255]
+nBA_BS_aligned_result = nBA_BS_aligned_parseS nBA_BS_aligned_input
+nBA_BS_aligned_expects = ((B.pack [9,8,7,255]), 0, "")
+nBA_BS_aligned_test = mkTestCase "NBA_BS_aligned" nBA_BS_aligned_expects nBA_BS_aligned_result
+
+[pads| type NBA_BS_empty = (partition (BytesNB 1) using none) |]
+
+nBA_BS_empty_input = ""
+nBA_BS_empty_result = nBA_BS_empty_parseS nBA_BS_empty_input
+nBA_BS_empty_expects = ((B.singleton 0), 1, "")
+nBA_BS_empty_test = mkTestCase "NBA_BS_empty" nBA_BS_empty_expects nBA_BS_empty_result
+
+[pads| type NBA_StringFW = (partition (Bits8 4, StringFWNB 3, Bits8 4) using none) |]
+
+nBA_StringFW_input = map word8ToChr [134,22,38,63] --1000 0110 0001 0110 0010 0110 0011 1111
+nBA_StringFW_result = nBA_StringFW_parseS nBA_StringFW_input
+nBA_StringFW_expects = ((8,"abc",15),0,"")
+nBA_StringFW_test = mkTestCase "NBA_StringFW" nBA_StringFW_expects nBA_StringFW_result
+
+[pads| type NBA_StringFW_aligned = (partition (StringFWNB 15) using none) |]
+
+nBA_StringFW_aligned_input = map word8ToChr (replicate 15 97)
+nBA_StringFW_aligned_result = nBA_StringFW_aligned_parseS nBA_StringFW_aligned_input
+nBA_StringFW_aligned_expects = (("aaaaaaaaaaaaaaa"),0,"")
+nBA_StringFW_aligned_test = mkTestCase "NBA_StringFW_aligned" nBA_StringFW_aligned_expects nBA_StringFW_aligned_result
+
+[pads| type NBA_StringFW_err = (partition (StringFWNB 3) using none) |]
+
+nBA_StringFW_err_input = map word8ToChr [99,99]
+nBA_StringFW_err_result = nBA_StringFW_err_parseS nBA_StringFW_err_input
+nBA_StringFW_err_expects = (("XXX"),1,"")
+nBA_StringFW_err_test = mkTestCase "NBA_StringFW_err" nBA_StringFW_err_expects nBA_StringFW_err_result
+
+[pads| type NBA_StringC = (partition (Bits8 2, StringCNB 'z', CharNB, Bits8 6) using none) |]
+
+nBA_StringC_input = map word8ToChr [158,30,94,149] -- 10 011110 00 011110 01 011110 10 010101
+nBA_StringC_result = nBA_StringC_parseS nBA_StringC_input
+nBA_StringC_expects = ((2,"xy",'z',21),0,"")
+nBA_StringC_test = mkTestCase "NBA_StringC" nBA_StringC_expects nBA_StringC_result
+
+[pads| type NBA_StringC_aligned = (partition (StringCNB 'z') using none) |]
+
+nBA_StringC_aligned_input = "xyz"
+nBA_StringC_aligned_result = nBA_StringC_aligned_parseS nBA_StringC_aligned_input
+nBA_StringC_aligned_expects = (("xy"),0,"z")
+nBA_StringC_aligned_test = mkTestCase "NBA_StringC_aligned" nBA_StringC_aligned_expects nBA_StringC_aligned_result
+
 $(make_pads_declarations $ map snd padsExp)
 
 padsExp_ast =
   [ ("Halloween", PadsDeclType "Halloween" [] Nothing
                   ( PList (PApp [PTycon ["StringFW"]] (Just (LitE (IntegerL 4))))
                           (Just (PTycon ["EOR"]))
-                          (Just (LTerm (PTycon ["EOF"])))))] 
+                          (Just (LTerm (PTycon ["EOF"])))))]
 padsExp_input   = "karl\njred\nmatt\nsam_"
 padsExp_result  = halloween_parseS padsExp_input
 padsExp_expects = (["karl", "jred", "matt", "sam_"], 0, "")
 padsExp_test    = TestCase (assertEqual "padsExp" padsExp padsExp_ast) -- mkTestCase "padsExp" padsExp padsExp_ast
 padsExp_test2   = mkTestCase "padsExp" padsExp_expects padsExp_result
 
+
+
 -- Regression expects to be run from the Examples directory.
 test = runTestTT (TestList tests)
 
-tests =         
-  [ TestLabel "MyChar"  myChar_test
-  , TestLabel "IntPair" intPair_test 
-  , TestLabel "Bar"     bar_test 
-  , TestLabel "Bar2"    bar2_test 
-  , TestLabel "Bazr"    bazr_test 
-  , TestLabel "MyInt"   myInt_test 
-  , TestLabel "StrTy"   strTy_test 
-  , TestLabel "StrTy1"  strTy1_test 
-  , TestLabel "Baz"     baz_test 
-  , TestLabel "Phex32FW"  phex32FW_test 
-  , TestLabel "IntRange" test_intRange24
-  , TestLabel "IntRange" test_intRange0
-  , TestLabel "IntRange" test_intRange256
-  , TestLabel "IntRange" test_intRangeLow
-  , TestLabel "IntRange" test_intRangeHigh
-  , TestLabel "IntRange" test_intRangeBad
-  , TestLabel "IntRangeP" test_intRangeP24
-  , TestLabel "IntRangeP" test_intRangeP0
-  , TestLabel "IntRangeP" test_intRangeP256
-  , TestLabel "IntRangeP" test_intRangePLow
-  , TestLabel "IntRangeP" test_intRangePHigh
-  , TestLabel "IntRangeP" test_intRangePBad
-  , TestLabel "Record" test_Record
-  , TestLabel "Id" test_IdInt
-  , TestLabel "Id" test_IdStr
-  , TestLabel "Id" test_IdInt2
-  , TestLabel "Id" test_IdStr2
-  , TestLabel "Id3" test_IdInt3
-  , TestLabel "Id3" test_IdLit3
-  , TestLabel "Ab_or_a" test_Ab_or_a
-  , TestLabel "AB_test" test_AB_test1
-  , TestLabel "AB_test" test_AB_test2
-  , TestLabel "Method" test_method_get
-  , TestLabel "Method" test_method_put
-  , TestLabel "Method" test_method_link
-  , TestLabel "Method" test_method_post
-  , TestLabel "Version" test_version
-  , TestLabel "Request" test_request_G
-  , TestLabel "Request" test_request_B
-  , TestLabel "Eor" test_eor_test
-  , TestLabel "Eof" test_eof_test_G
-  , TestLabel "Eof" test_eof_test_B
-  , TestLabel "Opt" test_opt_test_j
-  , TestLabel "Opt" test_opt_test_n
-  , TestLabel "List" test_entries_nosep_noterm
-  , TestLabel "List" test_entries_nosep_noterm'
-  , TestLabel "List" test_entries_nosep_noterm2
-  , TestLabel "List" test_evenInt
-  , TestLabel "List" test_evenInts
-  , TestLabel "List" test_digitListG
-  , TestLabel "List" test_digitList2G
-  , TestLabel "List" test_digitListB
-  , TestLabel "List" test_digitListLenG
-  , TestLabel "List" test_digitListLenB
-  , TestLabel "List" test_digitListLenSepG
-  , TestLabel "List" test_digitListLenSepB
-  , TestLabel "List" test_digitListTermG
-  , TestLabel "List" test_digitListTermB
-  , TestLabel "List" test_digitListTermSepG
-  , TestLabel "List" test_digitListTermSepB
-  , TestLabel "Try"  test_tryTest
-  , TestLabel "Try"  test_tryTestDG
-  , TestLabel "Try"  test_tryTestDB
-  , TestLabel "Try"  test_ListWithTry
-  , TestLabel "Void" test_WithVoid
-  , TestLabel "Void" test_voidEntry1
-  , TestLabel "Void" test_voidEntry2
-  , TestLabel "Void" test_voidEntry3
-  , TestLabel "Switch" test_switch0
-  , TestLabel "Switch" test_switch1
-  , TestLabel "Switch" test_switchOther
-  , TestLabel "Stringln" test_stringln
-  , TestLabel "Compound" test_myData
-  , TestLabel "Compound" test_hp_data
-  , TestLabel "Doc"  test_hp_data_file_parse
---, TestLabel "Doc"  myDoc_test
-  , TestLabel "Literal"  litRec_test
-  , TestLabel "Literal"  whiteSpace_test
-  , TestLabel "Literal"  whiteSpace2_test
-  , TestLabel "Regular Expression"  rE_ty_test
-  , TestLabel "Discipline" disc_test
-  , TestLabel "Overlap" exxy_test
-  , TestLabel "Discipline" linesFW_test
-  , TestLabel "Values" vals_test
-  , TestLabel "Values" vals2_test
-  , TestLabel "Double" doubles_test
-  , TestLabel "StringSE" stringSEs_test
-  , TestLabel "StringFWs" stringFWs_test
-  , TestLabel "StringESCs" stringESCs_test
-  , TestLabel "StringPs" stringPs_test
-  , TestLabel "PadsExp" padsExp_test
-  , TestLabel "PadsExp2" padsExp_test2
-  ]
 
+tests = [ TestLabel "MyChar"  myChar_test
+        , TestLabel "IntPair" intPair_test
+        , TestLabel "Bar"     bar_test
+        , TestLabel "Bar2"    bar2_test
+        , TestLabel "Bazr"    bazr_test
+        , TestLabel "MyInt"   myInt_test
+        , TestLabel "StrTy"   strTy_test
+        , TestLabel "StrTy1"  strTy1_test
+        , TestLabel "Baz"     baz_test
+        , TestLabel "Phex32FW"  phex32FW_test
+        , TestLabel "IntRange" test_intRange24
+        , TestLabel "IntRange" test_intRange0
+        , TestLabel "IntRange" test_intRange256
+        , TestLabel "IntRange" test_intRangeLow
+        , TestLabel "IntRange" test_intRangeHigh
+        , TestLabel "IntRange" test_intRangeBad
+        , TestLabel "IntRangeP" test_intRangeP24
+        , TestLabel "IntRangeP" test_intRangeP0
+        , TestLabel "IntRangeP" test_intRangeP256
+        , TestLabel "IntRangeP" test_intRangePLow
+        , TestLabel "IntRangeP" test_intRangePHigh
+        , TestLabel "IntRangeP" test_intRangePBad
+        , TestLabel "Record" test_Record
+        , TestLabel "Id" test_IdInt
+        , TestLabel "Id" test_IdStr
+        , TestLabel "Id" test_IdInt2
+        , TestLabel "Id" test_IdStr2
+        , TestLabel "Id3" test_IdInt3
+        , TestLabel "Id3" test_IdLit3
+        , TestLabel "Ab_or_a" test_Ab_or_a
+        , TestLabel "AB_test" test_AB_test1
+        , TestLabel "AB_test" test_AB_test2
+        , TestLabel "Method" test_method_get
+        , TestLabel "Method" test_method_put
+        , TestLabel "Method" test_method_link
+        , TestLabel "Method" test_method_post
+        , TestLabel "Version" test_version
+        , TestLabel "Request" test_request_G
+        , TestLabel "Request" test_request_B
+        , TestLabel "Eor" test_eor_test
+        , TestLabel "Eof" test_eof_test_G
+        , TestLabel "Eof" test_eof_test_B
+        , TestLabel "Opt" test_opt_test_j
+        , TestLabel "Opt" test_opt_test_n
+        , TestLabel "List" test_entries_nosep_noterm
+        , TestLabel "List" test_entries_nosep_noterm'
+        , TestLabel "List" test_entries_nosep_noterm2
+        , TestLabel "List" test_evenInt
+        , TestLabel "List" test_evenInts
+        , TestLabel "List" test_digitListG
+        , TestLabel "List" test_digitList2G
+        , TestLabel "List" test_digitListB
+        , TestLabel "List" test_digitListLenG
+        , TestLabel "List" test_digitListLenB
+        , TestLabel "List" test_digitListLenSepG
+        , TestLabel "List" test_digitListLenSepB
+        , TestLabel "List" test_digitListTermG
+        , TestLabel "List" test_digitListTermB
+        , TestLabel "List" test_digitListTermSepG
+        , TestLabel "List" test_digitListTermSepB
+        , TestLabel "Try"  test_tryTest
+        , TestLabel "Try"  test_tryTestDG
+        , TestLabel "Try"  test_tryTestDB
+        , TestLabel "Try"  test_ListWithTry
+        , TestLabel "Void" test_WithVoid
+        , TestLabel "Void" test_voidEntry1
+        , TestLabel "Void" test_voidEntry2
+        , TestLabel "Void" test_voidEntry3
+        , TestLabel "Switch" test_switch0
+        , TestLabel "Switch" test_switch1
+        , TestLabel "Switch" test_switchOther
+        , TestLabel "Stringln" test_stringln
+        , TestLabel "Compound" test_myData
+        , TestLabel "Compound" test_hp_data
+        , TestLabel "Doc" test_hp_data_file_parse
+        , TestLabel "Doc" myDoc_test
+        , TestLabel "Literal"  litRec_test
+        , TestLabel "Literal"  whiteSpace_test
+        , TestLabel "Literal"  whiteSpace2_test
+        , TestLabel "Regular Expression"  rE_ty_test
+        , TestLabel "Discipline" disc_test
+        , TestLabel "Overlap" exxy_test
+        , TestLabel "Discipline" linesFW_test
+        , TestLabel "Values" vals_test
+        , TestLabel "Values" vals2_test
+        , TestLabel "Double" doubles_test
+        , TestLabel "StringSE" stringSEs_test
+        , TestLabel "StringFWs" stringFWs_test
+        , TestLabel "StringESCs" stringESCs_test
+        , TestLabel "StringPs" stringPs_test
+        , TestLabel "PadsExp" padsExp_test
+        , TestLabel "PadsExp2" padsExp_test2
+        , TestLabel "BitBools" bitBools_test
+        , TestLabel "BitBools" bitBools_test2
+        , TestLabel "ArithPixel" arithPixel_test
+        , TestLabel "IncompleteBitBools" incompleteBitBools_test
+        , TestLabel "Mixed" mixed_test
+        , TestLabel "OddWidths" oddWidths_test
+        , TestLabel "LargeWidths" largeWidths_test
+        , TestLabel "Enumerated" enumerated_test
+        , TestLabel "EnumeratedWC" enumerated_test_wc
+        , TestLabel "EnumeratedBool" enumeratedBool_test
+        , TestLabel "NBA_char" nBA_char_test
+        , TestLabel "NBA_char_aligned" nBA_char_aligned_test
+        , TestLabel "NBA_BS" nBA_BS_test
+        , TestLabel "NBA_BS_aligned" nBA_BS_aligned_test
+        , TestLabel "NBA_BS_empty" nBA_BS_empty_test
+        , TestLabel "NBA_StringFW" nBA_StringFW_test
+        , TestLabel "NBA_StringFW_aligned" nBA_StringFW_aligned_test
+        , TestLabel "NBA_StringFW_err" nBA_StringFW_err_test
+        , TestLabel "NBA_StringC" nBA_StringC_test
+        , TestLabel "NBA_StringC_aligned" nBA_StringC_aligned_test
+        ]

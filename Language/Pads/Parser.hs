@@ -1,4 +1,4 @@
-module Language.Pads.Parser where 
+module Language.Pads.Parser where
 
 {-
 ** *********************************************************************
@@ -21,12 +21,12 @@ import Text.Parsec.Error
 import Text.Parsec.Prim as PP
 import qualified Text.Parsec.Token as PT
 import Text.Parsec.Language
-import Text.ParserCombinators.Parsec.Language 
+import Text.ParserCombinators.Parsec.Language
 import Text.ParserCombinators.Parsec.Pos
 import Text.Parsec.Expr
 import Control.Monad
 
-import qualified Language.Haskell.Meta as LHM 
+import qualified Language.Haskell.Meta as LHM
 import Language.Haskell.TH
 
 import Data.Char
@@ -41,7 +41,7 @@ type Env    = [String]
 
 
 parsePadsDecls :: SourceName -> Line -> Column -> String -> Either ParseError [PadsDecl]
-parsePadsDecls fileName line column input 
+parsePadsDecls fileName line column input
   = PP.parse (do { setPosition (newPos fileName line column)
                  ; whiteSpace
                  ; x <- padsDecls
@@ -50,7 +50,7 @@ parsePadsDecls fileName line column input
                  ; return x
                  }) fileName input
 
-errorParse = do 
+errorParse = do
   { rest <- manyTill anyToken eof
   ; unexpected rest }
 
@@ -63,12 +63,12 @@ padsDecls :: Parser [PadsDecl]
 padsDecls = option [] (many1 topDecl)
 
 topDecl :: Parser PadsDecl
-topDecl 
+topDecl
   =  typeDecl <|> dataDecl <|> newDecl <|> obtainDecl
  <?> "Pads declaration keyword"
 
 typeDecl :: Parser PadsDecl
-typeDecl 
+typeDecl
   = do { reserved "type"
        ; (id,env) <- declLHS; pat <- patLHS
        ; rhs <- ptype env
@@ -76,7 +76,7 @@ typeDecl
        } <?> "Pads type declaration"
 
 dataDecl :: Parser PadsDecl
-dataDecl 
+dataDecl
   = do { reserved "data"
        ; (id,env) <- declLHS; pat <- patLHS
        ; rhs <- dataRHS env; drvs <- option [] derives
@@ -84,7 +84,7 @@ dataDecl
        } <?> "Pads data declaration"
 
 newDecl :: Parser PadsDecl
-newDecl 
+newDecl
   = do { reserved "newtype"
        ; (id,env) <- declLHS; pat <- patLHS
        ; rhs <- newRHS env; drvs <- option [] derives
@@ -96,7 +96,7 @@ obtainDecl
   = do { reserved "obtain"
        ; (id,env) <- declLHS
        ; reservedOp "from"; rhs <- ptype env
-       ; reserved "using"; exp <- expression 
+       ; reserved "using"; exp <- expression
        ; return (PadsDeclObtain id env rhs exp)
        } <?> "Pads transform type"
 
@@ -111,8 +111,8 @@ patLHS
        }
     <|> (reservedOp "=" >> return Nothing)
 
-derives 
-  = reserved "deriving" >> 
+derives
+  = reserved "deriving" >>
     (do { q <- qualUpper; return [q] }
     <|> parens (commaSep1 qualUpper))
 
@@ -122,7 +122,7 @@ derives
 -------------------------
 
 ptype :: Env -> Parser PadsTy
-ptype env 
+ptype env
   =  constrain env
  <|> obtain env
  <|> partition env
@@ -145,14 +145,14 @@ obtain :: Env -> Parser PadsTy
 obtain env
   = do { reserved "obtain"; dst <- ptype env
        ; reservedOp "from"; src <- ptype env
-       ; reserved "using"; exp <- expression 
+       ; reserved "using"; exp <- expression
        ; return (PTransform src dst exp)
        } <?> "Pads transform type"
 
 partition :: Env -> Parser PadsTy
 partition env
   = do { reserved "partition"; ty <- ptype env
-       ; reserved "using"; exp <- expression 
+       ; reserved "using"; exp <- expression
        ; return (PPartition ty exp)
        } <?> "Pads partition type"
 
@@ -161,7 +161,7 @@ listTy env
   = do { (elm,sepM) <- brackets (listInside env)
        ; termM <- listEnd env
        ; return (PList elm sepM termM)
-       } <?> "Pads list type"  
+       } <?> "Pads list type"
 
 listInside env
   = do { elm <- ptype env
@@ -170,12 +170,12 @@ listInside env
        }
 
 listEnd env
-  = optionMaybe 
+  = optionMaybe
     (  do {reservedOp "terminator"; t<-ptype env; return (LTerm t)}
    <|> do {reservedOp "length"; e<-expression; return (LLen e)})
 
 value env
-  = do { reserved "value" 
+  = do { reserved "value"
        ; exp <- expression; reservedOp "::"
        ; ty <- ptype env
        ; return (PValue exp ty)
@@ -184,10 +184,10 @@ value env
 
 btype :: Env -> Parser PadsTy
 btype env
-  = try $ do 
+  = try $ do
        { ty <- etype env; tys <- many (atype env)
        ; expM <- optionMaybe (try expression);
-       ; if length tys==0 && expM == Nothing 
+       ; if length tys==0 && expM == Nothing
          then return ty
          else return (PApp (ty:tys) expM) }
 
@@ -246,11 +246,11 @@ constr env
             ; return (BRecord id args predM)}
      <|> do { args <- option (mkId id) (constrArgs env)
             ; predM <- optionMaybe predic
-            ; return (BConstr id args predM)}}                 
+            ; return (BConstr id args predM)}}
   where
     mkId id = [(NotStrict, PExpression (LitE (StringL id)))]
               -- Provides the expansion e.g.: Tue -> Tue "Tue"
-              
+
 
 constrArgs :: Env -> Parser [ConstrArg]
 constrArgs env
@@ -277,7 +277,7 @@ field env
         ; return (Just id, ty, predM)
         })
  <|> try (do { id <- lower; reservedOp "="
-        ; reserved "value" 
+        ; reserved "value"
         ; exp <- expression; reservedOp "::"
         ; (strict,ty) <- ftype env
         ; predM <- optionMaybe predic
@@ -293,7 +293,7 @@ field env
         }
  <?>  "record field"
 
-ftype env 
+ftype env
   =  do { reservedOp "!"; ty <- atype env; return (IsStrict,ty)}
  <|> do { ty <- ptype env; return (NotStrict,ty)}
 
@@ -322,7 +322,7 @@ record1 env
        ; fld <- field1 env
        ; args2 <- many (reservedOp "," >> ftype env)
        ; reservedOp "}"
-       ; return (map expand args1 ++ [fld] ++ map expand args2) 
+       ; return (map expand args1 ++ [fld] ++ map expand args2)
        } <?> "Pads newtype record"
   where
     expand fty = (Nothing, fty, Nothing)
@@ -356,12 +356,12 @@ haskellParseExp str = case LHM.parseExp str of
                         Right expTH -> return expTH
 
 haskellParseExpTill :: String -> Parser Exp
-haskellParseExpTill op = do { str <- manyTill anyChar (reservedOp op) 
+haskellParseExpTill op = do { str <- manyTill anyChar (reservedOp op)
                             ; haskellParseExp str
                             }
 
 haskellParsePat :: String -> Parser Pat
-haskellParsePat str = case LHM.parsePat str of 
+haskellParsePat str = case LHM.parsePat str of
                         Left err    -> parserZero
                         Right patTH -> return patTH
 
@@ -371,7 +371,7 @@ haskellParsePatTill op = do { str <- manyTill anyChar (reservedOp op)
                             }
 
 
-literal :: Parser Exp 
+literal :: Parser Exp
 literal =  fmap (LitE . CharL) (try charLiteral)
        <|> reLiteral
        <|> fmap (LitE . StringL) stringLiteral
@@ -380,14 +380,14 @@ literal =  fmap (LitE . CharL) (try charLiteral)
        <|> fmap (ConE . mkName . qName) qualUpper
        <?> "Pads literal"
 
-reLiteral :: Parser Exp 
+reLiteral :: Parser Exp
 reLiteral = do { reservedOp reMark
-               ; str <- manyTill anyChar (reservedOp reMark) 
+               ; str <- manyTill anyChar (reservedOp reMark)
                ; return (ConE (mkName "RE") `AppE` LitE (StringL str))
                }
 reMark = "'"
 
-literalPat :: Parser Pat 
+literalPat :: Parser Pat
 literalPat =  fmap (LitP . CharL) (try charLiteral)
        <|> reLiteralPat
        <|> fmap (LitP . StringL) stringLiteral
@@ -396,9 +396,9 @@ literalPat =  fmap (LitP . CharL) (try charLiteral)
        <|> fmap (flip ConP [] . mkName . qName) qualUpper
        <?> "Pads literal"
 
-reLiteralPat :: Parser Pat 
+reLiteralPat :: Parser Pat
 reLiteralPat = do { reservedOp reMark
-               ; str <- manyTill anyChar (reservedOp reMark) 
+               ; str <- manyTill anyChar (reservedOp reMark)
                ; return (ConP (mkName "RE") [LitP (StringL str)])
                }
 
@@ -430,7 +430,7 @@ p << q = do {x<-p;q;return x}
 
 
 lexer :: PT.TokenParser ()
-lexer = PT.makeTokenParser (haskellStyle 
+lexer = PT.makeTokenParser (haskellStyle
   { reservedOpNames = ["=", "=>", "{", "}", "::", "<|", "|>", "|", reMark, "." ],
     reservedNames   = ["data", "type", "newtype", "old", "existing", "deriving",
                        "using", "where", "terminator", "length", "of", "from",
@@ -448,5 +448,3 @@ commaSep1     = PT.commaSep1   lexer
 parens        = PT.parens      lexer
 braces        = PT.braces      lexer
 brackets      = PT.brackets    lexer
-
-

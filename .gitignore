@@ -23,5 +23,6 @@ cabal.sandbox.config
 *.dvi
 .cabal-sandbox
 cabal-sandbox-config
-stack.yaml
-
+.DS_Store
+misc/
+.ghci

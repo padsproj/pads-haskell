@@ -10,8 +10,6 @@ import System.IO.Unsafe (unsafePerformIO)
 [pads| type StrsWindows = partition Strs using windows |]
 
 {- should load with no errors -}
-(rep,md) = unsafePerformIO $ parseFileWithD windows strs_parseM "Examples/data/fig-small.fig"
+(rep,md) = unsafePerformIO $ parseFileWithD windows strs_parseM "data/fig-small.fig"
 
-(rep1,md1) = unsafePerformIO $ parseFileWith strsWindows_parseM "Examples/data/fig-small.fig"
-
-	
+(rep1,md1) = unsafePerformIO $ parseFileWith strsWindows_parseM "data/fig-small.fig"

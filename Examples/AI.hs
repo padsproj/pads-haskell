@@ -2,14 +2,14 @@
            , MultiParamTypeClasses
            , TypeSynonymInstances
            , TemplateHaskell
-           , QuasiQuotes 
+           , QuasiQuotes
            , FlexibleInstances #-}
 
 -- :set -ddump-splices
 
 module Examples.AI where
-import Language.Pads.Padsc 
-import Language.Pads.GenPretty       
+import Language.Pads.Padsc
+import Language.Pads.GenPretty
 
 import System.IO.Unsafe (unsafePerformIO)
 
@@ -18,43 +18,43 @@ import System.IO.Unsafe (unsafePerformIO)
   newtype AI    = AI ([Line Entry] terminator EOF)
 
   data Entry = Entry
-      {     host       :: Src, 
-      ' ',  identdID   :: ID, 
-      ' ',  httpID     :: ID, 
-      ' ',  time       :: TimeStamp, 
+      {     host       :: Src,
+      ' ',  identdID   :: ID,
+      ' ',  httpID     :: ID,
+      ' ',  time       :: TimeStamp,
       ' ',  request    :: Request,
       ' ',  response   :: Response,
       ' ',  contentLen :: ContentLength }
-      
-  data Src = Addr IP_v4 | Name Host  
+
+  data Src = Addr IP_v4 | Name Host
   type IP_v4 = (IPInt, '.', IPInt, '.', IPInt, '.', IPInt)
-  type IPInt = constrain i :: Int where <| 0 <= i && i < 256 |>   
+  type IPInt = constrain i :: Int where <| 0 <= i && i < 256 |>
   type Host = StringC ' '
 
   data ID = Missing '-' | Id (StringC ' ')
 
 
 
-  type TimeStamp = ('[', Date, ']')   
+  type TimeStamp = ('[', Date, ']')
   type Date = DateFC <|("%d/%h/%Y:%H:%M:%S %z", ']')|>
 
-  data Request = Request 
-      { '"',  method  :: Method,       
-        ' ',  url     :: StringC ' ', 
+  data Request = Request
+      { '"',  method  :: Method,
+        ' ',  url     :: StringC ' ',
         ' ',  version :: Version  where <| checkVersion method version |>,  '"'
-      }  
+      }
 
-  data Method  = GET | PUT | POST | HEAD | DELETE 
+  data Method  = GET | PUT | POST | HEAD | DELETE
                | LINK | UNLINK      -- obsolete after http 1.0
   data Version = Version {"HTTP/", major :: Int, '.', minor :: Int}  -- add constriants on major and minor mode
 
-  type Response = constrain r :: Int where <| 100 <= r && r < 600 |> 
+  type Response = constrain r :: Int where <| 100 <= r && r < 600 |>
 
-  data ContentLength = NotAvailable '-' | ContentLength Int 
+  data ContentLength = NotAvailable '-' | ContentLength Int
   |]
 
 checkVersion :: Method -> Version -> Bool
-checkVersion method version = 
+checkVersion method version =
   case method of
     LINK   -> major version == 1 && minor version == 0
     UNLINK -> major version == 1 && minor version == 0
@@ -79,10 +79,7 @@ test = ai_file_take 20
 
 printAI n = putStrLn(pretty 100 (ppr (ai_file_take n)))
 
-result n  = do 
+result n  = do
      { (AI rep, md) <- parseFile ai_file
      ; return (Prelude.take n rep)
-     } 
-
-
-
+     }
