@@ -4,14 +4,15 @@ pads website (www.padsproj.org).
 
 # Building
 
-`pads-haskell` currently requires GHC 7.10.3. This project provides an
-appropriate [Stack][1] configuration file.
+`pads-haskell` currently requires GHC 8.0.2.
 
 ## Setup
 
-To install an appropriate GHC tool chain:
+To generate an appropriate [Stack][1] configuration file and install an
+appropriate GHC tool chain:
 
 ```bash
+$ stack init
 $ stack setup
 ```
 
@@ -41,6 +42,15 @@ stack repl
 Cases: 89  Tried: 89  Errors: 0  Failures: 0
 Counts {cases = 89, tried = 89, errors = 0, failures = 0}
 (0.11 secs, 0 bytes)
+```
+
+# Contributing and Development
+
+In order to build and view the haddock documentation do the following:
+
+```bash
+stack haddock
+firefox `find .stack-work -name index.html | grep "html/pads-haskell"`
 ```
 
 [1]: https://www.stackage.org/

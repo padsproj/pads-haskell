@@ -24,7 +24,8 @@ import Language.Pads.RegExp
 import Language.Pads.PadsPrinter
 import Data.Time
 import System.Locale as Locale
-import Text.PrettyPrint.Mainland
+import Text.PrettyPrint.Mainland (text)
+import Text.PrettyPrint.Mainland.Class
 
 import qualified Data.Char as C
 import qualified Data.List as L

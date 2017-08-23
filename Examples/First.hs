@@ -5,6 +5,8 @@
 module Examples.First where
 import Language.Pads.Padsc
 import Language.Pads.Testing
+import Examples.FirstPads
+import Language.Haskell.TH
 
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Char as Char
@@ -15,124 +17,7 @@ import Data.Word
 
 ws = REd "[\t ]+|$" " "
 
-
 ---- PADS EXAMPLES
-
--- Regression expects to be run from the Examples directory.
-test = runTestTT (TestList tests)
-
-
-tests =         [ TestLabel "MyChar"  myChar_test
-                , TestLabel "IntPair" intPair_test
-                , TestLabel "Bar"     bar_test
-                , TestLabel "Bar2"    bar2_test
-                , TestLabel "Bazr"    bazr_test
-                , TestLabel "MyInt"   myInt_test
-                , TestLabel "StrTy"   strTy_test
-                , TestLabel "StrTy1"  strTy1_test
-                , TestLabel "Baz"     baz_test
-                , TestLabel "Phex32FW"  phex32FW_test
-                , TestLabel "IntRange" test_intRange24
-                , TestLabel "IntRange" test_intRange0
-                , TestLabel "IntRange" test_intRange256
-                , TestLabel "IntRange" test_intRangeLow
-                , TestLabel "IntRange" test_intRangeHigh
-                , TestLabel "IntRange" test_intRangeBad
-                , TestLabel "IntRangeP" test_intRangeP24
-                , TestLabel "IntRangeP" test_intRangeP0
-                , TestLabel "IntRangeP" test_intRangeP256
-                , TestLabel "IntRangeP" test_intRangePLow
-                , TestLabel "IntRangeP" test_intRangePHigh
-                , TestLabel "IntRangeP" test_intRangePBad
-                , TestLabel "Record" test_Record
-                , TestLabel "Id" test_IdInt
-                , TestLabel "Id" test_IdStr
-                , TestLabel "Id" test_IdInt2
-                , TestLabel "Id" test_IdStr2
-                , TestLabel "Id3" test_IdInt3
-                , TestLabel "Id3" test_IdLit3
-                , TestLabel "Ab_or_a" test_Ab_or_a
-                , TestLabel "AB_test" test_AB_test1
-                , TestLabel "AB_test" test_AB_test2
-                , TestLabel "Method" test_method_get
-                , TestLabel "Method" test_method_put
-                , TestLabel "Method" test_method_link
-                , TestLabel "Method" test_method_post
-                , TestLabel "Version" test_version
-                , TestLabel "Request" test_request_G
-                , TestLabel "Request" test_request_B
-                , TestLabel "Eor" test_eor_test
-                , TestLabel "Eof" test_eof_test_G
-                , TestLabel "Eof" test_eof_test_B
-                , TestLabel "Opt" test_opt_test_j
-                , TestLabel "Opt" test_opt_test_n
-                , TestLabel "List" test_entries_nosep_noterm
-                , TestLabel "List" test_entries_nosep_noterm'
-                , TestLabel "List" test_entries_nosep_noterm2
-                , TestLabel "List" test_evenInt
-                , TestLabel "List" test_evenInts
-                , TestLabel "List" test_digitListG
-                , TestLabel "List" test_digitList2G
-                , TestLabel "List" test_digitListB
-                , TestLabel "List" test_digitListLenG
-                , TestLabel "List" test_digitListLenB
-                , TestLabel "List" test_digitListLenSepG
-                , TestLabel "List" test_digitListLenSepB
-                , TestLabel "List" test_digitListTermG
-                , TestLabel "List" test_digitListTermB
-                , TestLabel "List" test_digitListTermSepG
-                , TestLabel "List" test_digitListTermSepB
-                , TestLabel "Try"  test_tryTest
-                , TestLabel "Try"  test_tryTestDG
-                , TestLabel "Try"  test_tryTestDB
-                , TestLabel "Try"  test_ListWithTry
-                , TestLabel "Void" test_WithVoid
-                , TestLabel "Void" test_voidEntry1
-                , TestLabel "Void" test_voidEntry2
-                , TestLabel "Void" test_voidEntry3
-                , TestLabel "Switch" test_switch0
-                , TestLabel "Switch" test_switch1
-                , TestLabel "Switch" test_switchOther
-                , TestLabel "Stringln" test_stringln
-                , TestLabel "Compound" test_myData
-                , TestLabel "Compound" test_hp_data
-                , TestLabel "Doc" test_hp_data_file_parse
-                , TestLabel "Doc" myDoc_test
-                , TestLabel "Literal"  litRec_test
-                , TestLabel "Literal"  whiteSpace_test
-                , TestLabel "Literal"  whiteSpace2_test
-                , TestLabel "Regular Expression"  rE_ty_test
-                , TestLabel "Discipline" disc_test
-                , TestLabel "Overlap" exxy_test
-                , TestLabel "Discipline" linesFW_test
-                , TestLabel "Values" vals_test
-                , TestLabel "Values" vals2_test
-                , TestLabel "Double" doubles_test
-                , TestLabel "StringSE" stringSEs_test
-                , TestLabel "StringFWs" stringFWs_test
-                , TestLabel "StringESCs" stringESCs_test
-                , TestLabel "StringPs" stringPs_test
-                , TestLabel "BitBools" bitBools_test
-                , TestLabel "BitBools" bitBools_test2
-                , TestLabel "ArithPixel" arithPixel_test
-                , TestLabel "IncompleteBitBools" incompleteBitBools_test
-                , TestLabel "Mixed" mixed_test
-                , TestLabel "OddWidths" oddWidths_test
-                , TestLabel "LargeWidths" largeWidths_test
-                , TestLabel "Enumerated" enumerated_test
-                , TestLabel "EnumeratedWC" enumerated_test_wc
-                , TestLabel "EnumeratedBool" enumeratedBool_test
-                , TestLabel "NBA_char" nBA_char_test
-                , TestLabel "NBA_char_aligned" nBA_char_aligned_test
-                , TestLabel "NBA_BS" nBA_BS_test
-                , TestLabel "NBA_BS_aligned" nBA_BS_aligned_test
-                , TestLabel "NBA_BS_empty" nBA_BS_empty_test
-                , TestLabel "NBA_StringFW" nBA_StringFW_test
-                , TestLabel "NBA_StringFW_aligned" nBA_StringFW_aligned_test
-                , TestLabel "NBA_StringFW_err" nBA_StringFW_err_test
-                , TestLabel "NBA_StringC" nBA_StringC_test
-                , TestLabel "NBA_StringC_aligned" nBA_StringC_aligned_test
-                ]
 
 [pads|  |]
 
@@ -794,7 +679,6 @@ stringPs_result = stringPs_parseS stringPs_input
 stringPs_expects = (["123","","123"],2, "")
 stringPs_test = mkTestCase "stringPs" stringPs_expects stringPs_result
 
-
 {- Bit-level functionality tests -}
 
 [pads| type BitBools = (partition [BitBool] using none) |]
@@ -965,3 +849,136 @@ nBA_StringC_aligned_input = "xyz"
 nBA_StringC_aligned_result = nBA_StringC_aligned_parseS nBA_StringC_aligned_input
 nBA_StringC_aligned_expects = (("xy"),0,"z")
 nBA_StringC_aligned_test = mkTestCase "NBA_StringC_aligned" nBA_StringC_aligned_expects nBA_StringC_aligned_result
+
+$(make_pads_declarations $ map snd padsExp)
+
+padsExp_ast =
+  [ ("Halloween", PadsDeclType "Halloween" [] Nothing
+                  ( PList (PApp [PTycon ["StringFW"]] (Just (LitE (IntegerL 4))))
+                          (Just (PTycon ["EOR"]))
+                          (Just (LTerm (PTycon ["EOF"])))))]
+padsExp_input   = "karl\njred\nmatt\nsam_"
+padsExp_result  = halloween_parseS padsExp_input
+padsExp_expects = (["karl", "jred", "matt", "sam_"], 0, "")
+padsExp_test    = TestCase (assertEqual "padsExp" padsExp padsExp_ast) -- mkTestCase "padsExp" padsExp padsExp_ast
+padsExp_test2   = mkTestCase "padsExp" padsExp_expects padsExp_result
+
+
+
+-- Regression expects to be run from the Examples directory.
+test = runTestTT (TestList tests)
+
+
+tests = [ TestLabel "MyChar"  myChar_test
+        , TestLabel "IntPair" intPair_test
+        , TestLabel "Bar"     bar_test
+        , TestLabel "Bar2"    bar2_test
+        , TestLabel "Bazr"    bazr_test
+        , TestLabel "MyInt"   myInt_test
+        , TestLabel "StrTy"   strTy_test
+        , TestLabel "StrTy1"  strTy1_test
+        , TestLabel "Baz"     baz_test
+        , TestLabel "Phex32FW"  phex32FW_test
+        , TestLabel "IntRange" test_intRange24
+        , TestLabel "IntRange" test_intRange0
+        , TestLabel "IntRange" test_intRange256
+        , TestLabel "IntRange" test_intRangeLow
+        , TestLabel "IntRange" test_intRangeHigh
+        , TestLabel "IntRange" test_intRangeBad
+        , TestLabel "IntRangeP" test_intRangeP24
+        , TestLabel "IntRangeP" test_intRangeP0
+        , TestLabel "IntRangeP" test_intRangeP256
+        , TestLabel "IntRangeP" test_intRangePLow
+        , TestLabel "IntRangeP" test_intRangePHigh
+        , TestLabel "IntRangeP" test_intRangePBad
+        , TestLabel "Record" test_Record
+        , TestLabel "Id" test_IdInt
+        , TestLabel "Id" test_IdStr
+        , TestLabel "Id" test_IdInt2
+        , TestLabel "Id" test_IdStr2
+        , TestLabel "Id3" test_IdInt3
+        , TestLabel "Id3" test_IdLit3
+        , TestLabel "Ab_or_a" test_Ab_or_a
+        , TestLabel "AB_test" test_AB_test1
+        , TestLabel "AB_test" test_AB_test2
+        , TestLabel "Method" test_method_get
+        , TestLabel "Method" test_method_put
+        , TestLabel "Method" test_method_link
+        , TestLabel "Method" test_method_post
+        , TestLabel "Version" test_version
+        , TestLabel "Request" test_request_G
+        , TestLabel "Request" test_request_B
+        , TestLabel "Eor" test_eor_test
+        , TestLabel "Eof" test_eof_test_G
+        , TestLabel "Eof" test_eof_test_B
+        , TestLabel "Opt" test_opt_test_j
+        , TestLabel "Opt" test_opt_test_n
+        , TestLabel "List" test_entries_nosep_noterm
+        , TestLabel "List" test_entries_nosep_noterm'
+        , TestLabel "List" test_entries_nosep_noterm2
+        , TestLabel "List" test_evenInt
+        , TestLabel "List" test_evenInts
+        , TestLabel "List" test_digitListG
+        , TestLabel "List" test_digitList2G
+        , TestLabel "List" test_digitListB
+        , TestLabel "List" test_digitListLenG
+        , TestLabel "List" test_digitListLenB
+        , TestLabel "List" test_digitListLenSepG
+        , TestLabel "List" test_digitListLenSepB
+        , TestLabel "List" test_digitListTermG
+        , TestLabel "List" test_digitListTermB
+        , TestLabel "List" test_digitListTermSepG
+        , TestLabel "List" test_digitListTermSepB
+        , TestLabel "Try"  test_tryTest
+        , TestLabel "Try"  test_tryTestDG
+        , TestLabel "Try"  test_tryTestDB
+        , TestLabel "Try"  test_ListWithTry
+        , TestLabel "Void" test_WithVoid
+        , TestLabel "Void" test_voidEntry1
+        , TestLabel "Void" test_voidEntry2
+        , TestLabel "Void" test_voidEntry3
+        , TestLabel "Switch" test_switch0
+        , TestLabel "Switch" test_switch1
+        , TestLabel "Switch" test_switchOther
+        , TestLabel "Stringln" test_stringln
+        , TestLabel "Compound" test_myData
+        , TestLabel "Compound" test_hp_data
+        , TestLabel "Doc" test_hp_data_file_parse
+        , TestLabel "Doc" myDoc_test
+        , TestLabel "Literal"  litRec_test
+        , TestLabel "Literal"  whiteSpace_test
+        , TestLabel "Literal"  whiteSpace2_test
+        , TestLabel "Regular Expression"  rE_ty_test
+        , TestLabel "Discipline" disc_test
+        , TestLabel "Overlap" exxy_test
+        , TestLabel "Discipline" linesFW_test
+        , TestLabel "Values" vals_test
+        , TestLabel "Values" vals2_test
+        , TestLabel "Double" doubles_test
+        , TestLabel "StringSE" stringSEs_test
+        , TestLabel "StringFWs" stringFWs_test
+        , TestLabel "StringESCs" stringESCs_test
+        , TestLabel "StringPs" stringPs_test
+        , TestLabel "PadsExp" padsExp_test
+        , TestLabel "PadsExp2" padsExp_test2
+        , TestLabel "BitBools" bitBools_test
+        , TestLabel "BitBools" bitBools_test2
+        , TestLabel "ArithPixel" arithPixel_test
+        , TestLabel "IncompleteBitBools" incompleteBitBools_test
+        , TestLabel "Mixed" mixed_test
+        , TestLabel "OddWidths" oddWidths_test
+        , TestLabel "LargeWidths" largeWidths_test
+        , TestLabel "Enumerated" enumerated_test
+        , TestLabel "EnumeratedWC" enumerated_test_wc
+        , TestLabel "EnumeratedBool" enumeratedBool_test
+        , TestLabel "NBA_char" nBA_char_test
+        , TestLabel "NBA_char_aligned" nBA_char_aligned_test
+        , TestLabel "NBA_BS" nBA_BS_test
+        , TestLabel "NBA_BS_aligned" nBA_BS_aligned_test
+        , TestLabel "NBA_BS_empty" nBA_BS_empty_test
+        , TestLabel "NBA_StringFW" nBA_StringFW_test
+        , TestLabel "NBA_StringFW_aligned" nBA_StringFW_aligned_test
+        , TestLabel "NBA_StringFW_err" nBA_StringFW_err_test
+        , TestLabel "NBA_StringC" nBA_StringC_test
+        , TestLabel "NBA_StringC_aligned" nBA_StringC_aligned_test
+        ]

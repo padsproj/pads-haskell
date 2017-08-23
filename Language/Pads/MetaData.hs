@@ -15,6 +15,7 @@ module Language.Pads.MetaData where
 import qualified Language.Pads.Errors as E
 import qualified Language.Pads.Source as S
 import Text.PrettyPrint.Mainland as PP
+import Text.PrettyPrint.Mainland.Class
 
 import System.Posix.Types
 
@@ -71,10 +72,10 @@ instance Pretty Base_md where
   ppr = pprBaseMD
 
 pprBaseMD Base_md {numErrors=num, errInfo = info} 
-  = text "Errors:" <+> PP.ppr num <+> 
+  = text "Errors:" <+> ppr num <+> 
     case info of
       Nothing -> PP.empty
-      Just e -> PP.ppr e
+      Just e -> ppr e
 
 type family Meta (rep :: *) :: *
 

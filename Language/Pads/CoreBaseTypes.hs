@@ -40,17 +40,14 @@ import Data.Int
 import Data.Bits
 
 import Text.PrettyPrint.Mainland as PP
+import Text.PrettyPrint.Mainland.Class
 
 import Control.Monad
 
-
-
-
------------------------------------------------------------------
-
---type Char
+-- | Metadata type for a PADS Char
 type Char_md = Base_md
 
+-- | Monadic parser for a PADS Char
 char_parseM :: PadsParser (Char, Base_md)
 char_parseM  =
   handleEOF def "Char" $
@@ -58,6 +55,7 @@ char_parseM  =
     c <- takeHeadP
     returnClean c
 
+-- | Default value inserted by the parser for a PADS Char
 char_def :: Char
 char_def = 'X'
 
@@ -219,6 +217,7 @@ bits64_printFL _ (x, xmd) = fshow x
 --type Int
 type Int_md = Base_md
 
+-- | Monadic parser for a PADS Int
 int_parseM :: PadsParser (Int,Base_md)
 int_parseM =
   handleEOF def "Int" $
@@ -231,6 +230,7 @@ int_parseM =
       then returnClean (digitListToInt isNeg digits)
       else returnError def (E.FoundWhenExpecting (mkStr c) "Int")
 
+-- | Default value inserted by the parser for a PADS Int
 int_def :: Int
 int_def = 0
 
@@ -249,6 +249,7 @@ int_printFL (i, bmd) = fshow i
 --type Integer
 type Integer_md = Base_md
 
+-- | Monadic parser for a PADS Integer
 integer_parseM :: PadsParser (Integer,Base_md)
 integer_parseM =
   handleEOF def "Integer" $
@@ -261,6 +262,7 @@ integer_parseM =
       then returnClean (toEnum $ digitListToInt isNeg digits)
       else returnError def (E.FoundWhenExpecting (mkStr c) "Integer")
 
+-- | Default value inserted by the parser for a PADS Integer
 integer_def :: Integer
 integer_def = 0
 
@@ -279,6 +281,7 @@ integer_printFL (i, bmd) = fshow i
 --type Float
 type Float_md = Base_md
 
+-- | Monadic parser for a PADS Float, e.g. "-3.1415"
 float_parseM :: PadsParser (Float,Base_md)
 float_parseM =
   handleEOF def "Float" $
@@ -314,6 +317,7 @@ float_parseM =
       then returnClean (read (sign ++digits1++dec++digits2++exp++expSign++digits3))
       else returnError def (E.FoundWhenExpecting (mkStr c) "Float")
 
+-- | Default value inserted by the parser for a PADS Float
 float_def :: Float
 float_def = 0
 
@@ -332,6 +336,7 @@ float_printFL (d, bmd) = fshow d
 --type Double
 type Double_md = Base_md
 
+-- | Monadic parser for a textual PADS Double, e.g. "-3.1415"
 double_parseM :: PadsParser (Double,Base_md)
 double_parseM =
   handleEOF def "Double" $
@@ -367,6 +372,7 @@ double_parseM =
       then returnClean (read (sign ++digits1++dec++digits2++exp++expSign++digits3))
       else returnError def (E.FoundWhenExpecting (mkStr c) "Double")
 
+-- | Default value inserted by the parser for a PADS Float
 double_def :: Double
 double_def = 0
 
@@ -401,6 +407,7 @@ try_def d = d
 type Digit = Int
 type Digit_md = Base_md
 
+-- | Monadic parser for a PADS Digit according to @'isDigit'@
 digit_parseM :: PadsParser (Digit, Base_md)
 digit_parseM  =
   handleEOF def "Pdigit" $
@@ -410,6 +417,7 @@ digit_parseM  =
       then returnClean (digitToInt c)
       else returnError def (E.FoundWhenExpecting [c] "Digit")
 
+-- | Default value inserted by the parser for a PADS Digit
 digit_def :: Digit
 digit_def = 0
 
@@ -427,6 +435,7 @@ string_parseM = do
   document <- getAllBinP
   returnClean $ C.unpack document
 
+-- | Default value inserted by the parser for a PADS String
 string_def = ""
 
 type instance PadsArg String = ()
