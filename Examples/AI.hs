@@ -66,8 +66,8 @@ mkPrettyInstance ''AI
 mkPrettyInstance ''AI_md
 
 ai_file = ai_big
-ai_3000 = "data/ai.3000"
-ai_big  = "data/ai.big"
+ai_3000 = "Examples/data/ai.3000"
+ai_big  = "Examples/data/ai.big"
 
 -- (ai_rep, ai_md) = let (AI rep, md) = unsafePerformIO $ parseFile ai_file in (rep,md)
 (AI ai_rep, ai_md) =  unsafePerformIO $ parseFileWith aI_parseM ai_file
