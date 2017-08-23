@@ -126,6 +126,7 @@ tests =         [ TestLabel "MyChar"  myChar_test
                 , TestLabel "NBA_char_aligned" nBA_char_aligned_test
                 , TestLabel "NBA_BS" nBA_BS_test
                 , TestLabel "NBA_BS_aligned" nBA_BS_aligned_test
+                , TestLabel "NBA_BS_empty" nBA_BS_empty_test
                 , TestLabel "NBA_StringFW" nBA_StringFW_test
                 , TestLabel "NBA_StringFW_aligned" nBA_StringFW_aligned_test
                 , TestLabel "NBA_StringFW_err" nBA_StringFW_err_test
@@ -922,6 +923,13 @@ nBA_BS_aligned_input = map word8ToChr [9,8,7,255]
 nBA_BS_aligned_result = nBA_BS_aligned_parseS nBA_BS_aligned_input
 nBA_BS_aligned_expects = ((B.pack [9,8,7,255]), 0, "")
 nBA_BS_aligned_test = mkTestCase "NBA_BS_aligned" nBA_BS_aligned_expects nBA_BS_aligned_result
+
+[pads| type NBA_BS_empty = (partition (BytesNB 1) using none) |]
+
+nBA_BS_empty_input = ""
+nBA_BS_empty_result = nBA_BS_empty_parseS nBA_BS_empty_input
+nBA_BS_empty_expects = ((B.singleton 0), 1, "")
+nBA_BS_empty_test = mkTestCase "NBA_BS_empty" nBA_BS_empty_expects nBA_BS_empty_result
 
 [pads| type NBA_StringFW = (partition (Bits8 4, StringFWNB 3, Bits8 4) using none) |]
 

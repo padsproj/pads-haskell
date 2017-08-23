@@ -78,11 +78,12 @@ type CharNB_md = Base_md
 
 charNB_parseM :: PadsParser (CharNB, Base_md)
 charNB_parseM =
-    handleEOF 'X' "CharNB" $
-    handleEOR 'X' "CharNB" $ do
+    handleEOF def "CharNB" $
+    handleEOR def "CharNB" $ do
         c <- takeBitsP 8
         returnClean (S.word8ToChr (fromIntegral c :: Word8))
 
+charNB_def :: Char
 charNB_def = char_def
 
 charNB_printFL :: PadsPrinter (CharNB, md)
@@ -151,7 +152,7 @@ bits8_parseM x =
     else handleEOF 0 "Bits8" $
          handleEOR 0 "Bits8" $ do
              b <- takeBits8P x
-             returnClean b--(fromIntegral b :: Word8)
+             returnClean b
 
 
 type Bits16 = Word16
@@ -164,7 +165,7 @@ bits16_parseM x =
     else handleEOF 0 "Bits16" $
          handleEOR 0 "Bits16" $ do
              b <- takeBits16P x
-             returnClean b--(fromIntegral b :: Word16)
+             returnClean b
 
 
 type Bits32 = Word32
@@ -177,7 +178,7 @@ bits32_parseM x =
     else handleEOF 0 "Bits32" $
          handleEOR 0 "Bits32" $ do
              b <- takeBits32P x
-             returnClean b--(fromIntegral b :: Word32)
+             returnClean b
 
 
 type Bits64 = Word64
@@ -190,7 +191,7 @@ bits64_parseM x =
     else handleEOF 0 "Bits64" $
          handleEOR 0 "Bits64" $ do
              b <- takeBits64P x
-             returnClean b--(fromIntegral b :: Word64)
+             returnClean b
 
 
 bits8_def  :: a -> Bits8

@@ -252,33 +252,6 @@ takeHead :: Source -> (Char, Source)
 takeHead (s @ Source{current,loc, ..}) =
     (word8ToChr $ B.head current, s{current = B.tail current, loc = incOffset loc})
 
--- takeBits :: Int -> Source -> (Integer, Source)
--- takeBits b (s @ Source{current,loc,bit, ..}) =
---     let bitsincludinghead = ((zeroBit - bit) + b)
---         partialbyteread = bitsincludinghead `mod` 8 /= 0
---         bytestoread = if   partialbyteread
---                       then bitsincludinghead `div` 8 + 1
---                       else bitsincludinghead `div` 8
---         head = B.take bytestoread current
---         tail = if   partialbyteread
---                then B.drop (bytestoread - 1) current
---                else B.drop bytestoread current
---         newbit = zeroBit - (bitsincludinghead `mod` 8)
---         bytes = byteStringToNum head
---         bits = (shiftR bytes (8 * bytestoread - bitsincludinghead)) .&. onesMask b
---     in (bits, s{current = tail,
---               loc = incOffsetBy loc (B.length head - if partialbyteread then 1 else 0),
---               Language.Pads.Source.bit = newbit})
---
--- byteStringToNum :: B.ByteString -> Integer
--- byteStringToNum bs =
---     shiftR (foldl (\bits byte ->
---                       shiftL (bits + (fromIntegral byte)) 8) 0 (B.unpack bs)) 8
-
-bs = B.pack [70,181,9,1]
-bs2 = B.pack [1,127]
-bs3 = B.pack [181,9,1]
-
 partitionBS :: B.ByteString -> Int -> Int -> (B.ByteString, B.ByteString, Bool)
 partitionBS bS bitIndex bits =
     let part b bs = if bs > b + 1 then 1 + part zeroBit (bs - (b + 1)) else 1
@@ -328,16 +301,6 @@ takeBits64 :: Int -> Source -> (Word64, Source)
 takeBits64 b s = let (bits, s') = takeBits b s
                  in (fromIntegral bits, s')
 
--- takeBits64 b (s @ Source{current,loc,bit, ..}) =
---     let (hd, tl, partial) = partitionBS current bit b
---         bS    = map fromIntegral (B.unpack $ B.take 9 hd)
---         bytes = fst $ foldr accumulate (0,0) bS
---         mask  = (2 ^ b) - 1
---         bits  = fromIntegral $ mask .&. shiftR bytes ((B.length hd * 8) - b - (zeroBit - bit))
---     in  (bits, s{current = tl,
---                  loc = incOffsetBy loc (B.length hd - if partial then 1 else 0),
---                  bit = zeroBit - (((zeroBit - bit) + b) `mod` 8)})
-
 tobinary :: Integer -> Integer
 tobinary x
     | (div x 2) == 0 = x
@@ -354,12 +317,6 @@ takeBits b (s @ Source{current,loc,bit, ..}) =
     in  (bits, s{current = tl,
                  loc = incOffsetBy loc (B.length hd - if partial then 1 else 0),
                  bit = zeroBit - (((zeroBit - bit) + b) `mod` 8)})
-
--- byteStringToInteger :: B.ByteString -> Integer
--- byteStringToInteger bs =
---     let bs' = map fromIntegral (B.unpack bs)
---         func byte (num, pow) = ((shiftL byte pow) + num, pow + 8)
---     in  fst $ foldr func (0,0) bs'
 
 takeHeadM :: Source -> (Maybe Char, Source)
 takeHeadM (s @ Source{current,loc, ..}) =
@@ -429,14 +386,6 @@ satisfyNB p s =
     in  if   p c'
         then (c' : (fst $ satisfyNB p s'), snd $ satisfyNB p s')
         else ([], s)
-
--- testStr = "abcd"
--- testP = \c -> c /= 'c'
--- testS = padsSourceFromByteString $ B.pack $ map chrToWord8 testStr
---
--- fun str p =
---     let c = Prelude.head str
---     in if p c then c : (fun (Prelude.tail str) p) else []
 
 takeBytes :: Int -> Source -> (B.ByteString, Source)
 takeBytes n (s @ Source{current,loc, ..}) =
