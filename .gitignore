@@ -26,4 +26,3 @@ cabal-sandbox-config
 .DS_Store
 misc/
 .ghci
-stack.yaml
