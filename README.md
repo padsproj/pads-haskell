@@ -12,8 +12,8 @@ To generate an appropriate [Stack][1] configuration file and install an
 appropriate GHC tool chain:
 
 ```bash
-$ stack init
-$ stack setup
+$ stack solver    # Updates stack.yaml if necessary
+$ stack setup     # Installs ghc in a sandbox for you
 ```
 
 ## Build
@@ -29,13 +29,13 @@ $ stack build
 To run the automated testing infrastructure:
 
 ```bash
-stack test pads-haskell:examples
+$ stack test pads-haskell:examples
 ```
 
 Or to run individual tests:
 
 ```bash
-stack repl
+$ stack repl
 λ> :l Examples.First
 ...
 λ> test

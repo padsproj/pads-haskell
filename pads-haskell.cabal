@@ -59,8 +59,6 @@ Extra-source-files:  Examples/First.hs, Examples/AI.hs, Examples/Binary.hs,
                      Documentation/Info/PADS-Index.txt
                      Documentation/Info/PackagesUsedInPads.txt
                      Documentation/Info/Pads-grammar.tex
-                     Documentation/Info/Pads-grammar.pdf
-
 
 -- Constraint on the version of Cabal needed to build this package.
 Cabal-version:       >=1.10
