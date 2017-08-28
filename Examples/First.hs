@@ -865,7 +865,9 @@ padsExp_test2   = mkTestCase "padsExp" padsExp_expects padsExp_result
 
 
 
--- Regression expects to be run from the Examples directory.
+-- | Regression tests need to be run from the root directory of the pads-haskell
+-- package because the data file paths in these test cases use paths relative to
+-- the root.
 test = runTestTT (TestList tests)
 
 
