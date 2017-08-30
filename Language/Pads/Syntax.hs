@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveDataTypeable,DeriveLift, DeriveAnyClass, DeriveGeneric #-}
 {-|
   Module      : Language.Pads.Syntax
-  Description : Short description
+  Description : The concrete syntax of Pads in Haskell
   Copyright   : (c) 2011
                 Kathleen Fisher <kathleen.fisher@gmail.com>
                 John Launchbury <john.launchbury@gmail.com>
@@ -9,7 +9,8 @@
   Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
   Stability   : experimental
 
-  Haskell data types and instances for the syntax of Pads.
+  Haskell data types, instances, and helper functions over these types for the
+  syntax of Pads.
 
 -}
 module Language.Pads.Syntax where
