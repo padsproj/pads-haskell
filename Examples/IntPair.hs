@@ -9,7 +9,6 @@ import Language.Pads.MetaData
 import Language.Pads.CoreBaseTypes
 import Language.Pads.Quote
 import Language.Pads.RegExp
-import Language.Pads.LazyList
 import qualified Language.Pads.BaseTypes as BT
 
 

@@ -81,9 +81,7 @@ Library
                        Language.Pads.Errors,
                        Language.Pads.MetaData,
                        Language.Pads.PadsParser,
-                       Language.Pads.PadsPrinter,
-                       Language.Pads.LazyList
-
+                       Language.Pads.PadsPrinter
 
   -- Packages needed in order to build this package.
   build-depends:    base >= 4.7 && < 5,

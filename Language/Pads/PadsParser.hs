@@ -108,15 +108,20 @@ badReturn r = PadsParser $ \bs -> ((r,bs), False)
 mdReturn (rep,md) = PadsParser $
     \bs -> (((rep,md),bs), numErrors (get_md_header md) == 0)
 
+-- | Construct a Pads parser which always returns the given value and metadata
+-- reporting no errors.
 returnClean :: t -> PadsParser (t, Base_md)
 returnClean x = return (x, cleanBasePD)
 
+-- | Construct a Pads parser which always reports the given error message along
+-- with returning a (likely default) value given to us.
 returnError :: t -> ErrMsg -> PadsParser (t, Base_md)
 returnError x err = do loc <- getLoc
                        badReturn (x, mkErrBasePDfromLoc err loc)
 
 infixl 5 =@=, =@
 
+-- | 
 p =@= q = do {(f,g) <- p; (rep,md) <- q; return (f rep, g md) }
 p =@  q = do {(f,g) <- p; (rep,md) <- q; return (f, g md) }
 
@@ -151,31 +156,42 @@ replaceSource bs ((v,_),b) = ((v,bs),b)
 
 -- The monad is non-backtracking. The only choice point is at ChoiceP
 
+-- | One-by-one try a list of parsers in order until you find the one that works
+-- and return that one. If none of them work, return the last one that failed.
 choiceP :: [PadsParser a] -> PadsParser a
 choiceP ps = foldr1 (<||>) ps
 
+-- | Try the first parser and if it fails, try the second parser
 (<||>) :: PadsParser a -> PadsParser a -> PadsParser a
 p <||> q = PadsParser $ \bs -> (p # bs) <++> (q # bs)
 
+-- | Grab the first result if it succeeded, otherwise use the second one
 (<++>) :: Result a -> Result a -> Result a
 (r, True)    <++> _  = (r, True)
 (r1, False)  <++> r2 = r2 -- A number of functions rely on this being r2
 
 -------------------------------------------------------------------------------
 
+-- | Run the given Pads parser on the current input, but after running it
+-- replace the (now possibly mutated input) with the original input while
+-- returning the result parsed.
 parseTry :: PadsParser a -> PadsParser a
 parseTry p = PadsParser $ \bs -> replaceSource bs (p # bs)
 
 -------------------------------------------------------------------------------
 -- * Parsers for Pads language features
 
--- | 
+-- | This is where constraint predicates get run and converted into error
+-- messages upon predicate failure.
 parseConstraint :: PadsMD md =>
     PadsParser(rep,md) -> (rep -> md -> Bool) -> PadsParser(rep, md)
 parseConstraint p pred = do
   (rep,md) <- p
   mdReturn (rep, replace_md_header md (constraintReport (pred rep md) md))
 
+-- | Convert the result of running a Pads constraint predicate into an error
+-- message.
+constraintReport :: PadsMD md => Bool -> md -> Base_md
 constraintReport isGood md = Base_md {numErrors = totErrors, errInfo = errors}
   where
     Base_md {numErrors, errInfo} = get_md_header md
@@ -187,56 +203,80 @@ constraintReport isGood md = Base_md {numErrors = totErrors, errInfo = errors}
 
 -------------------------------------------------------------------------------
 
+-- | Run the given parser and transform the result using the given Haskell
+-- function, which originally looked like this in Pads syntax:
+--
+-- > type Foo = transform Bar => Baz using <|(bar2baz, baz2bar)|>
+--
+-- The first function in the antiquoted tuple (bar2baz) is run here, whereas the
+-- second function in the tuple (baz2bar) is used during pretty printing.
 parseTransform :: PadsMD dmd =>
     PadsParser (sr,smd) -> (S.Pos->(sr,smd)->(dr,dmd)) -> PadsParser (dr,dmd)
 parseTransform sParser transform = do
-  { begin_loc <- getLoc
-  ; src_result <- sParser
-  ; end_loc <- getLoc
-  ; let src_pos = S.locsToPos begin_loc end_loc
-  ; return (transform src_pos src_result)
-  }
+  begin_loc <- getLoc
+  src_result <- sParser
+  end_loc <- getLoc
+  let src_pos = S.locsToPos begin_loc end_loc
+  return (transform src_pos src_result)
 
 -------------------------------------------------------------------------------
 
+-- | Run a parser with the appropriate record discipline enabled in the parsing
+-- monad. See the 'RecordDiscipline' data type for the available disciplines
+-- along with appropriate Haskell functions that can be referenced from a Pads
+-- partition expression, e.g.:
+--
+-- > type Foo = partition Bar using none
+--
+-- Note that the record discipline specified in a partition expression remains
+-- active until the parsing monad encounters another partition expression. This
+-- effectively means that record disciplines form a stack that get popped off as
+-- parsers complete. This stack however is implemented as scoped variables in
+-- nested calls of this function rather than as a Haskell stack stored in the
+-- monad.
 parsePartition :: PadsMD md =>
     PadsParser(rep,md) -> S.RecordDiscipline -> PadsParser(rep, md)
 parsePartition p newDisc = do
-  { oldDisc <- queryP S.getRecordDiscipline
-  ; primPads (S.setRecordDiscipline newDisc)
-  ; x <- p
-  ; primPads (S.setRecordDiscipline oldDisc)
-  ; return x
-  }
+  oldDisc <- queryP S.getRecordDiscipline
+  primPads (S.setRecordDiscipline newDisc)
+  x <- p
+  primPads (S.setRecordDiscipline oldDisc)
+  return x
 
 -------------------------------------------------------------------------------
 
+-- | 
 parseListNoSepNoTerm :: PadsMD md =>
     PadsParser (rep,md) -> PadsParser ([rep], (Base_md, [md]))
 parseListNoSepNoTerm p = listReport (parseMany p)
 
+-- | 
 parseListSepNoTerm :: (PadsMD md, PadsMD mdSep) =>
     PadsParser (repSep,mdSep) -> PadsParser(rep, md) -> PadsParser ([rep], (Base_md, [md]))
 parseListSepNoTerm sep p = listReport (parseManySep sep p)
 
+-- | 
 parseListNoSepLength :: (PadsMD md) =>
     Int -> PadsParser(rep, md) -> PadsParser ([rep], (Base_md, [md]))
 parseListNoSepLength i p = listReport (parseCount i p)
 
+-- | 
 parseListSepLength :: (PadsMD md, PadsMD mdSep) =>
     PadsParser (repSep,mdSep) -> Int -> PadsParser(rep, md) -> PadsParser ([rep], (Base_md, [md]))
 parseListSepLength sep n p = listReport (parseCountSep n sep p)
 
+-- | 
 parseListNoSepTerm :: (PadsMD md, PadsMD mdTerm) =>
     PadsParser (repTerm,mdTerm) -> PadsParser(rep, md) -> PadsParser ([rep], (Base_md, [md]))
 parseListNoSepTerm term p = listReport (parseManyTerm term p)
 
+-- | 
 parseListSepTerm :: (PadsMD md, PadsMD mdSep, PadsMD mdTerm) =>
     PadsParser (repSep,mdSep) -> PadsParser (repTerm,mdTerm) ->
     PadsParser(rep, md) -> PadsParser ([rep], (Base_md, [md]))
 parseListSepTerm sep term p = listReport (parseManySepTerm sep term p)
 
-
+-- | 
 listReport  :: PadsMD b => PadsParser [(a, b)] -> PadsParser ([a], (Base_md, [b]))
 listReport p = do
   listElems <- p
@@ -244,9 +284,12 @@ listReport p = do
   let hmds = map get_md_header mds
   return (reps, (mergeBaseMDs hmds, mds))
 
+-------------------------------------------------------------------------------
 
------------------------------------
-
+-- | Parse zero or more instances of the given parser. Stop parsing when the
+-- parser encounters something it is unable to parse properly. This means,
+-- during a valid parse, we attempt to parse more of the input than we really
+-- should and only given up when there isn't a single valid parse.
 parseMany :: PadsMD md => PadsParser (rep,md) -> PadsParser [(rep,md)]
 parseMany p = do (r,m) <- p
                  if (numErrors (get_md_header m) == 0)
@@ -256,13 +299,15 @@ parseMany p = do (r,m) <- p
 
               <||> return []
 
-
+-- | Parse one or more instances of the given parser.
 parseManySep :: (PadsMD md, PadsMD mdSep) => PadsParser (repSep,mdSep) -> PadsParser(rep, md) -> PadsParser [(rep,md)]
 parseManySep sep p = do { rm <- p
                         ; rms <- parseManySep1 sep p
                         ; return (rm : rms)
                         }
 
+-- | Parse zero or more instances of the given parser. TODO: The name of this
+-- and 'parseManySep' are misleading / should be swapped?
 parseManySep1 :: (PadsMD md, PadsMD mdSep) => PadsParser (repSep,mdSep) -> PadsParser(rep, md) -> PadsParser [(rep,md)]
 parseManySep1 sep p = do (r,m) <- sep
                          if (numErrors (get_md_header m) == 0)
@@ -270,13 +315,15 @@ parseManySep1 sep p = do (r,m) <- sep
                            else badReturn []
                       <||> return []
 
------------------------------------
+-------------------------------------------------------------------------------
 
-
+-- | Parse n instances of the given parser.
 parseCount :: (PadsMD md) => Int -> PadsParser(rep, md) -> PadsParser [(rep,md)]
 parseCount n p = sequence (replicate n p)
 
-
+-- | Parse n instances of the given parser with another parser acting as the
+-- separator between instances of the first parser. Note that this properly
+-- intersperses the separator 
 parseCountSep :: (PadsMD md) =>
     Int -> PadsParser rmdSep -> PadsParser(rep, md) -> PadsParser [(rep,md)]
 parseCountSep n sep p  | n <= 0 = return []
@@ -285,12 +332,16 @@ parseCountSep n sep p = do
    rms <- sequence $ replicate (n-1) (sep >> p)
    return (rm:rms)
 
+-------------------------------------------------------------------------------
 
-
------------------------------------
-
-
-
+-- | Parse many instances of the given parser until we see an instance of the
+-- terminator parser. Parsing satisfies the following rules in decreasing order
+-- of precedence:
+-- * If we see the terminator, parse it and stop parsing (even if the terminator
+-- is ambiguous with the given parser).
+-- * If we see the end of file, stop parsing and return what we've parsed thus
+-- far.
+-- * Parse an instance of the given parser and recurse.
 parseManyTerm :: (PadsMD md, PadsMD mdTerm) =>
     PadsParser (repTerm,mdTerm) -> PadsParser(rep, md) -> PadsParser [(rep,md)]
 parseManyTerm term p = (term >> return [])
@@ -299,8 +350,8 @@ parseManyTerm term p = (term >> return [])
                           ; rms <- parseManyTerm term p
                           ; return (rm:rms) }
 
-
-
+-- | Like 'parseManyTerm' but with a separator in-between instances of the given
+-- parser.
 parseManySepTerm :: (PadsMD md, PadsMD mdSep, PadsMD mdTerm) =>
     PadsParser (repSep,mdSep) -> PadsParser (repTerm,mdTerm) -> PadsParser(rep, md) -> PadsParser [(rep,md)]
 parseManySepTerm sep term p = (term >> return [])
@@ -321,7 +372,17 @@ parseManySepTerm sep term p = (term >> return [])
                            rms <- scan
                            badReturn ((rep,report) : rms)
 
-
+-- | Consume input until we find the terminator, separator, end-of-file, or
+-- end-of-record. If we find (in decreasing order of precedence):
+-- * The terminator, then report that we successfully terminated
+-- * The end-of-file, report successful termination.
+-- * The separator, report that we successfully seeked until a separator was
+-- consumed from the input.
+-- * An end-of-record symbol, report a bad parse
+--
+-- Note that the fact that we report successful termination upon end-of-file is
+-- probably a bug, because it means we report a successful parse even though we
+-- didn't find the terminator to the list being parsed.
 seekSep sep term = (term >> return (True, []))
               <||> (ifEOFP >> return (True, []))
               <||> (sep >> return (False, []))
@@ -333,16 +394,13 @@ seekSep sep term = (term >> return (True, []))
                            }
                          }
 
+-- | 
 junkReport md loc junk = replace_md_header md mergeMD
   where
     mdSep   = mkErrBasePDfromLoc (ExtraStuffBeforeTy junk "seperator" ) loc
     mergeMD = mergeBaseMDs [get_md_header md, mdSep]
 
-
-
--------------------------------------------------
-
-
+-------------------------------------------------------------------------------
 
 getLoc :: PadsParser S.Loc
 getLoc = queryP S.getSrcLoc
@@ -383,11 +441,7 @@ takeBits64P b = primPads (S.takeBits64 (fromInt b))
 fromInt :: (Integral a1, Num a) => a1 -> a
 fromInt n = fromInteger $ toInteger n
 
-
-
--------------------------------------------------
-
-
+-------------------------------------------------------------------------------
 
 peekHeadP :: PadsParser Char
 peekHeadP = queryP S.head
@@ -438,8 +492,7 @@ digitListToInt isNeg digits = if isNeg then negate raw else raw
   where
     raw = foldl (\a d ->10*a + digitToInt d) 0 digits
 
--------------------------
-
+-------------------------------------------------------------------------------
 
 doLineBegin :: PadsParser ((), Base_md)
 doLineBegin = do

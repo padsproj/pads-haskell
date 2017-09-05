@@ -45,7 +45,7 @@ data RecordDiscipline = Single Word8
 newline = Single (chrToWord8 '\n')
 windows = Multi  (B.pack (strToWord8s "\r\n"))
 bytes n = Bytes n
-none = NoPartition
+none    = NoPartition
 
 {- SOURCE LOCATIONS -}
 data Loc = Loc { lineNumber :: Int64,
