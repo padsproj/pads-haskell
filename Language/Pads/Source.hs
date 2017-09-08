@@ -324,7 +324,10 @@ takeHeadM (s @ Source{current,loc, ..}) =
   if B.null current then (Nothing, s)
   else (Just $ word8ToChr $ B.head current, s{current = B.tail current, loc = incOffset loc})
 
-
+-- | If the front of the current source input matches the given string then
+-- remove it and return the modified source. Otherwise return the original
+-- source and a boolean flag indicating that we failed to take the given string
+-- off the front of the source input.
 takeHeadStr :: String -> Source -> (Bool, Source)
 takeHeadStr str s =
    let pstr = strToByteString str
@@ -356,11 +359,13 @@ breakSubstring pat src = search 0 src
         | pat `B.isPrefixOf` s = (B.take n src,s)
         | otherwise            = search (n+1) (B.tail s)
 
-
-{-
-  Nothing  = didn't find string; source is unaffected
-  Maybe [] = matched immediately; source advanced over matched string
-  Maybe junk = matched after finding str; source advanced over junk and str
+{-|
+  Scan the current source input until we find the given string:
+  - If we don't find the string return Nothing and leave source unmodified
+  - If we return (Maybe []), then we found the string at the beginning of the
+    source and removed it.
+  - If we return (Maybe junk), then we found the string somewhere after the
+    first character in the source and we consumed / removed (junk:str).
 -}
 scanStr :: String -> Source -> (Maybe String, Source)
 scanStr str (s @ Source{current,loc, ..}) =
@@ -409,6 +414,8 @@ take :: Int -> Source -> (String, Source)
 take n s = let (bs, s') = takeBytes n s
            in (byteStringToStr bs, s')
 
+-- | Match the beginning of the source input with a regex, returning a tuple of
+-- the matched string and the modified source with that string removed.
 regexMatch :: RE -> Source -> (Maybe String, Source)
 regexMatch (RE re_str_raw) (s @ Source{current,loc,..}) =
      let (before, match, after) = current TRP.=~ (strToByteString('^' : re_str_raw))
@@ -416,6 +423,11 @@ regexMatch (RE re_str_raw) (s @ Source{current,loc,..}) =
         else  (Just (byteStringToStr match), s{current=after, loc=incOffsetBy loc (fromIntegral (B.length match))})
 regexMatch (REd re_str_raw def ) s = regexMatch (RE re_str_raw) s
 
+-- | Find the first match of a regex in the source input, returning the contents
+-- of the source input *before* the match.
+-- * If there's no match return Nothing and leave the source unmodified.
+-- * If there's a match, return the string before the match and remove *just*
+-- the string before from the source input.
 regexStop :: RE -> Source -> (Maybe String, Source)
 regexStop (RE re_str_raw) (s @ Source{current,loc,..}) =
      let packed = strToByteString re_str_raw
@@ -426,23 +438,33 @@ regexStop (RE re_str_raw) (s @ Source{current,loc,..}) =
          else (Just (byteStringToStr before),
                 s{current= B.append match after,loc=incOffsetBy loc (fromIntegral (B.length before))})
 
+-- | See 'regexStop'
 regexStop (REd re_str_raw def) s = regexStop (RE re_str_raw) s
 
-
+-- | Remove and return the longest prefix of the source input satisfying the
+-- given predicate.
 span p (s @ Source{current,loc,..}) =
      let (head, tail) = B.span p current
          incOffset    = B.length head
      in (B.unpack head, s{current=tail, loc = incOffsetBy loc incOffset})
 
+-- | Same as 'span' but for predicates over type 'Char'.
 whileS :: (Char -> Bool) -> Source -> Maybe (String,Source)
 whileS p (s @ Source{current,loc,..}) =
      let (head, tail) = B.span (p . word8ToChr) current
          incOffset    = B.length head
      in Just (byteStringToStr head, s{current=tail, loc=incOffsetBy loc incOffset})
 
+-- | Remove the first byte of the input source.
 tail  (s @ Source{current,loc,..}) =
        (s{current=B.tail current,loc=incOffset loc})
 
+-- | Scan the input source until we find the given character. If we don't find
+-- the character indicate as such with the boolean (False) and remove all source
+-- input from the current record. If we do find the character, return True and
+-- consume input up to and including the matched character. The 'Pos' in the
+-- returned tuple indicates the region in the input that got scanned and removed
+-- by this function (whether or not we failed to find the character).
 scanTo :: Char -> Source -> (Bool, Source, Pos)
 scanTo chr (src @ Source{current,loc, ..}) =
      let begin = getSrcLoc src

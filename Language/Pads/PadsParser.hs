@@ -397,11 +397,13 @@ seekSep sep term = (term >> return (True, []))
 -- | 
 junkReport md loc junk = replace_md_header md mergeMD
   where
-    mdSep   = mkErrBasePDfromLoc (ExtraStuffBeforeTy junk "seperator" ) loc
+    mdSep   = mkErrBasePDfromLoc (ExtraStuffBeforeTy junk "separator" ) loc
     mergeMD = mergeBaseMDs [get_md_header md, mdSep]
 
 -------------------------------------------------------------------------------
 
+-- | Get the current source location offset into the data we're currently
+-- parsing.
 getLoc :: PadsParser S.Loc
 getLoc = queryP S.getSrcLoc
 
@@ -413,10 +415,11 @@ ifEOFP, ifEORP :: PadsParser ()
 ifEOFP = do { b <- isEOFP; if b then return () else badReturn ()}
 ifEORP = do { b <- isEORP; if b then return () else badReturn ()}
 
-
+-- | Remove and return the first n characters from the input source
 takeP :: Integral a => a -> PadsParser String
 takeP n = primPads (S.take (fromInt n))
 
+-- | Remove and return the first n bytes from the input source
 takeBytesP :: Integral a => a -> PadsParser S.RawStream
 takeBytesP n = primPads (S.takeBytes (fromInt n))
 
@@ -443,12 +446,17 @@ fromInt n = fromInteger $ toInteger n
 
 -------------------------------------------------------------------------------
 
+-- | Query the current symbol (character) of input
 peekHeadP :: PadsParser Char
 peekHeadP = queryP S.head
 
+-- | Remove and return the current symbol (character) of input
 takeHeadP :: PadsParser Char
 takeHeadP = primPads S.takeHead
 
+-- | See 'takeHeadStr' - returns false in the PadsParser monad iff the front of
+-- current source matches the given string with the side effect of removing that
+-- string from the front of the source if it does.
 takeHeadStrP :: String -> PadsParser Bool
 takeHeadStrP str = primPads (S.takeHeadStr str)
 
