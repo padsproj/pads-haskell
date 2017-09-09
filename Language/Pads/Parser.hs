@@ -1,16 +1,17 @@
 module Language.Pads.Parser where
+{-|
+  Module      : Language.Pads.Parser
+  Description : Parser for the syntax of Pads
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : BSD3
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
+  This module implements the parser for the PADS syntax in Haskell using parser
+  combinators.
 -}
-
-
--- This is the parser for the PADS syntax in Haskell
 
 import Language.Pads.Syntax
 

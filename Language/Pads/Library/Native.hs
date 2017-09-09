@@ -1,15 +1,15 @@
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
     FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
-
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
+{-|
+  Module      : Language.Pads.Library.Native
+  Description : Support for parsing of native byte order data
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : BSD3
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 -}
-
 
 module Language.Pads.Library.Native where
 

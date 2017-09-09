@@ -1,12 +1,13 @@
 {-# LANGUAGE NamedFieldPuns, RecordWildCards, DeriveDataTypeable #-}
-
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
+{-|
+  Module      : Language.Pads.Source
+  Description : Host language representation of data input
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : BSD3
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 -}
 
 module Language.Pads.Source where
@@ -39,7 +40,7 @@ data Source = Source
 
 -- | A record discipline specifies the manner by which pads should partition the
 -- input into records. Note that the record character gets consumed internally
--- by the parsing monad. 
+-- by the parsing monad.
 data RecordDiscipline =
     Single Word8          -- ^ Split input based on a single 8-bit unsigned integer (character)
   | Multi B.ByteString    -- ^ Split input based on more than one character

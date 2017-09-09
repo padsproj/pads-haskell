@@ -1,13 +1,14 @@
 {-# LANGUAGE TupleSections, ViewPatterns, TemplateHaskell, NamedFieldPuns, ScopedTypeVariables,
              RecordWildCards, UndecidableInstances #-}
-
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
+{-|
+  Module      : Language.Pads.CodeGen
+  Description : Template Haskell based code generator
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : BSD3
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 -}
 
 module Language.Pads.CodeGen where

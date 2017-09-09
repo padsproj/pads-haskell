@@ -1,16 +1,19 @@
 {-# LANGUAGE FlexibleContexts, TypeFamilies, TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
     FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
+{-|
+  Module      : Language.Pads.BaseTypes
+  Description : Base types provided by Pads
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : BSD3
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 
+	Some useful Pads types (parsers) implemented by the code generator in lieu of
+	writing them by hand.
 
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
 -}
-
 
 module Language.Pads.BaseTypes where
 

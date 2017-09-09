@@ -1,16 +1,15 @@
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
     FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
-
-
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
+{-|
+  Module      : Language.Pads.Library.BigEndian
+  Description : Support for parsing of big endian data
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : BSD3
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 -}
-
 
 module Language.Pads.Library.BigEndian where
 

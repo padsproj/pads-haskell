@@ -1,14 +1,14 @@
 {-# LANGUAGE NamedFieldPuns, DeriveDataTypeable #-}
-
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
+{-|
+  Module      : Language.Pads.Errors
+  Description : Parse error reporting support
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : BSD3
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 -}
-
 
 module Language.Pads.Errors where
 import Text.PrettyPrint.Mainland as PP
