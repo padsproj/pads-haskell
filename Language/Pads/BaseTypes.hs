@@ -48,7 +48,7 @@ obtain Maybe a from PMaybe a using <|(pm2m,m2pm)|>
 
 |]
 
-pm2m :: Pos -> (PMaybe a, PMaybe_md a_md) -> (Maybe a, Maybe_md a_md)
+pm2m :: Span -> (PMaybe a, PMaybe_md a_md) -> (Maybe a, Maybe_md a_md)
 pm2m p (PJust x, md) = (Just x, md)
 pm2m p (PNothing,md) = (Nothing,md)
 
@@ -63,7 +63,7 @@ type LitRE (x::RE)     = (Void, x)
 |]
 
 [pads| obtain Bool from Bytes 1 using <|(bTobl,blTob)|> |]
-bTobl :: Pos -> (Bytes,Bytes_md) -> (Bool,Bool_md)
+bTobl :: Span -> (Bytes,Bytes_md) -> (Bool,Bool_md)
 bTobl p (bytes,md) = (fromIntegral (bytes `B.index` 0)==(1::Int), md)
 blTob :: (Bool,Bool_md) -> (Bytes,Bytes_md)
 blTob (b,md) = (B.singleton (if b then 1 else 0), md)
@@ -77,7 +77,7 @@ instance Pretty UTCTime where
   ppr utc = text (show utc)
 
 
-strToUTC :: String -> Pos -> (StringSE, Base_md) -> (UTCTime, Base_md)
+strToUTC :: String -> Span -> (StringSE, Base_md) -> (UTCTime, Base_md)
 strToUTC fmt pos (input, input_bmd) = 
   case parseTimeM True Data.Time.defaultTimeLocale fmt input of 
        Nothing -> (gdef, mergeBaseMDs [errPD, input_bmd])
@@ -98,7 +98,7 @@ type TimeZone_md = Base_md
 instance Pretty TimeZone where
   ppr tz = text (show tz)
 
-strToTz :: Pos -> (StringSE, Base_md) -> (TimeZone, Base_md)
+strToTz :: Span -> (StringSE, Base_md) -> (TimeZone, Base_md)
 strToTz pos (input, input_bmd) = 
   case parseTimeM True Data.Time.defaultTimeLocale "%z" input of 
        Nothing -> (gdef,  mergeBaseMDs [mkErrBasePD (TransformToDstFail "TimeZoneSE" input " (conversion failed)") (Just pos), input_bmd])
@@ -112,7 +112,7 @@ timeZone_def = utc
 
 [pads| type Phex32FW (size :: Int) = obtain Int from StringFW size using <| (hexStr2Int,int2HexStr size) |> |]  
 
-hexStr2Int :: Pos -> (StringFW, Base_md) -> (Int, Base_md)
+hexStr2Int :: Span -> (StringFW, Base_md) -> (Int, Base_md)
 hexStr2Int src_pos (s,md) = if good then (intList2Int ints 0, md)
                                       else (0, mkErrBasePD  (TransformToDstFail "StrHex" s " (non-hex digit)") (Just src_pos))
   where

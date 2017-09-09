@@ -49,7 +49,7 @@ instance Pretty ErrMsg where
   ppr (BitWidthError x y) = text ("Bad field width: " ++ (show y) ++ " cannot fit in " ++ (show x) ++ ".")
 
 data ErrInfo = ErrInfo { msg      :: ErrMsg,
-                         position :: Maybe S.Pos }
+                         position :: Maybe S.Span }
    deriving (Typeable, Data, Eq, Ord, Show)
 
 instance Pretty ErrInfo where

@@ -211,12 +211,12 @@ constraintReport isGood md = Base_md {numErrors = totErrors, errInfo = errors}
 -- The first function in the antiquoted tuple (bar2baz) is run here, whereas the
 -- second function in the tuple (baz2bar) is used during pretty printing.
 parseTransform :: PadsMD dmd =>
-    PadsParser (sr,smd) -> (S.Pos->(sr,smd)->(dr,dmd)) -> PadsParser (dr,dmd)
+    PadsParser (sr,smd) -> (S.Span->(sr,smd)->(dr,dmd)) -> PadsParser (dr,dmd)
 parseTransform sParser transform = do
   begin_loc <- getLoc
   src_result <- sParser
   end_loc <- getLoc
-  let src_pos = S.locsToPos begin_loc end_loc
+  let src_pos = S.locsToSpan begin_loc end_loc
   return (transform src_pos src_result)
 
 -------------------------------------------------------------------------------

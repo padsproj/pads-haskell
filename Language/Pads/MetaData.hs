@@ -71,9 +71,9 @@ mergeBaseMDs mds = foldl addInfo cleanBasePD mds
 -- | Metadata for a single parse error occuring at some location 'Loc'.
 mkErrBasePDfromLoc msg loc
   = Base_md {numErrors = 1,
-      errInfo = Just (E.ErrInfo{msg=msg,position= Just (S.locToPos loc)}) }
+      errInfo = Just (E.ErrInfo{msg=msg,position= Just (S.locToSpan loc)}) }
 
--- | Metadata for a single parse error occuring at some position 'Pos'.
+-- | Metadata for a single parse error occuring at some position 'Span'.
 mkErrBasePD msg pos
   = Base_md {numErrors = 1,
       errInfo = Just (E.ErrInfo{msg=msg,position= pos}) }

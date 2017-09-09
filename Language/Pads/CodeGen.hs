@@ -858,7 +858,7 @@ genDefTy :: PadsTy -> Q Exp
 genDefTy (PConstrain pat ty exp)   = genDefTy ty  -- XXX: doesn't check the constraint; ideally we should change @printFL@ to account for possible printing errors
 genDefTy (PTransform src dest exp) = do
   defSrc <- genDefTy src
-  srcToDest <- [| \rep -> fst $ (fst $(return exp)) S.zeroPos (rep,(error "TODO defaultMd")) |] -- XXX: fix this undefined, it kind of requires defaultMd to be defined inductively over Pads types as well...
+  srcToDest <- [| \rep -> fst $ (fst $(return exp)) S.zeroSpan (rep,(error "TODO defaultMd")) |] -- XXX: fix this undefined, it kind of requires defaultMd to be defined inductively over Pads types as well...
   return $ AppE srcToDest defSrc
 genDefTy (PList ty sepM termM)     = [| [] |]
 genDefTy (PPartition ty exp)       = genDefTy ty

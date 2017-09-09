@@ -25,7 +25,7 @@ import Data.ByteString as B
 -- type Int8 : 8-bit, signed integers
 type Int8 = Data.Int.Int8
 [pads| obtain Int8 from Bytes 1 using <|(bToi8sbh,i8Tobsbh)|> |]
-bToi8sbh :: Pos -> (Bytes, Base_md) -> (Data.Int.Int8, Base_md)
+bToi8sbh :: Span -> (Bytes, Base_md) -> (Data.Int.Int8, Base_md)
 bToi8sbh p (bytes,md) = (fromIntegral (bytes `B.index` 0), md)
 i8Tobsbh (i,md) = (B.singleton (fromIntegral i), md)
 

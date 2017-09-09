@@ -26,59 +26,74 @@ import qualified Data.ByteString.Char8 as Char8
 
 type RawStream = B.ByteString   -- This is the type that should be used in other files!!!
 
-{- Input source abstraction -}
-data Source = Source { current  :: B.ByteString
-                     , rest     :: B.ByteString
-                     , loc      :: Loc
-                     , bit      :: Int
-                     , disc     :: RecordDiscipline
-                     , eorAtEOF :: Bool  -- Relevant for seperator-based record disciplines: Single, Multi
-                                         -- Set when current record is last record and separtor appeared at end.
-                     }
+{-| Input source abstraction -}
+data Source = Source
+  { current  :: B.ByteString      -- ^ The current input before EOR
+  , rest     :: B.ByteString      -- ^ The rest of the input after the next EOR
+  , loc      :: Loc               -- ^ The current location 'Loc' in the input
+  , bit      :: Int               -- ^ Bit offset into the current input being parsed
+  , disc     :: RecordDiscipline  -- ^ The record discipline of this input source
+  , eorAtEOF :: Bool  -- ^ Relevant for seperator-based record disciplines: Single, Multi
+                      -- Set when current record is last record and separtor appeared at end.
+  }
 
-data RecordDiscipline = Single Word8
-                      | Multi B.ByteString
-                      | Bytes Int
-                      | NoPartition
-                      | NoDiscipline  -- No discipline is currently installed; all input data is in 'rest' field
+-- | A record discipline specifies the manner by which pads should partition the
+-- input into records. Note that the record character gets consumed internally
+-- by the parsing monad. 
+data RecordDiscipline =
+    Single Word8          -- ^ Split input based on a single 8-bit unsigned integer (character)
+  | Multi B.ByteString    -- ^ Split input based on more than one character
+  | Bytes Int             -- ^ Split the input into records every 'Int' characters
+  | NoPartition           -- ^ No partitioning of the input - all input data is in the 'current' field
+  | NoDiscipline          -- ^ No discipline is currently installed; all input data is in 'rest' field
 
-newline = Single (chrToWord8 '\n')
-windows = Multi  (B.pack (strToWord8s "\r\n"))
-bytes n = Bytes n
-none    = NoPartition
+newline = Single (chrToWord8 '\n')              -- ^ Record discipline for Unix newlines
+windows = Multi  (B.pack (strToWord8s "\r\n"))  -- ^ Record discipline for Windows CRLF newlines
+bytes n = Bytes n                               -- ^ Record discipline for every n characters
+none    = NoPartition                           -- ^ No record discipline
 
-{- SOURCE LOCATIONS -}
-data Loc = Loc { lineNumber :: Int64,
-                 byteOffset :: Int64 }
-     deriving (Typeable, Data,Eq, Ord, Show)
+{-| Source location information. -}
+data Loc = Loc
+  { recordNumber  :: Int64 -- ^ Number of records parsed so far (i.e. record index)
+  , byteOffset    :: Int64 -- ^ Total number of bytes parsed into the source input so far
+  } deriving (Typeable, Data,Eq, Ord, Show)
 
-data Pos = Pos { begin      :: Loc,
-                 end        :: Maybe Loc}
-  deriving (Typeable, Data, Eq, Ord, Show)
+-- | A span in the source input, covering a contiguous range of the 'Source'
+-- input. AFAIK there's no distinction between the states where @begin == end@
+-- and where @end == Nothing@.
+data Span = Span
+  { begin      :: Loc       -- ^ Start location of the 'Span'
+  , end        :: Maybe Loc -- ^ End location of the 'Span', inclusive
+  } deriving (Typeable, Data, Eq, Ord, Show)
 
-zeroLoc   = Loc {lineNumber = 0,  byteOffset = 0}
+-- | Initial instance of a 'Loc'
+zeroLoc   = Loc {recordNumber = 0,  byteOffset = 0}
 
-zeroPos = locToPos zeroLoc
+-- | A span starting at the beginning of the file and containing nothing.
+zeroSpan = locToSpan zeroLoc
 
-zeroBit = 7
+zeroBit = 7 -- ^ Parse the most significant bit in a byte first
 
-incLineNumber :: Loc -> Loc
-incLineNumber Loc{lineNumber, ..} = Loc{ lineNumber = lineNumber+1
+-- | Increment how many records have been seen in the given 'Loc'
+incRecordNumber :: Loc -> Loc
+incRecordNumber Loc{recordNumber, ..} = Loc{ recordNumber = recordNumber+1
                                        , byteOffset = 0}
+
+-- | Decrement how many records have been seen in the given 'Loc'
 decLineNumber :: Loc -> Loc
-decLineNumber Loc{lineNumber, ..} = Loc{lineNumber=lineNumber-1, byteOffset=0}
+decLineNumber Loc{recordNumber, ..} = Loc{recordNumber=recordNumber-1, byteOffset=0}
 
+-- | Increment the offset of the 'Loc' by one
 incOffset :: Loc -> Loc
-incOffset Loc{lineNumber, byteOffset} = Loc{ lineNumber = lineNumber
-                                           , byteOffset = byteOffset + 1 }
+incOffset l@Loc{byteOffset} = l { byteOffset = byteOffset + 1 }
 
+-- | Increment the offset of the given 'Loc' by some number
 incOffsetBy :: Loc -> Int -> Loc
-incOffsetBy Loc{lineNumber, byteOffset} n = Loc{ lineNumber = lineNumber
-                                               , byteOffset = byteOffset + (fromIntegral n) }
+incOffsetBy l@Loc{byteOffset} n = l { byteOffset = byteOffset + fromIntegral n }
 
+-- | Decrement the offset of the given 'Loc' by one
 decOffset :: Loc -> Loc
-decOffset Loc{lineNumber, byteOffset} = Loc{ lineNumber = lineNumber
-                                           , byteOffset = byteOffset - 1 }
+decOffset l@Loc{byteOffset} = l { byteOffset = byteOffset - 1 }
 
 getSrcLoc :: Source -> Loc
 getSrcLoc = loc
@@ -87,28 +102,42 @@ getRecordDiscipline :: Source -> RecordDiscipline
 getRecordDiscipline = disc
 
 
+-------------------------------------------------------------------------------
+-- * Source Creation
 
-{- SOURCE CREATION -}
-emptySource = Source {current = B.empty, rest = B.empty, loc = zeroLoc, bit = zeroBit, eorAtEOF = False, disc = newline}
+-- | An empty Source with reasonable defaults for everything.
+emptySource = Source
+  { current   = B.empty
+  , rest      = B.empty
+  , loc       = zeroLoc
+  , bit       = zeroBit
+  , eorAtEOF  = False
+  , disc      = newline
+  }
 
+-- | Stuff the given 'String' into a 'Source' with a newline discipline by
+-- default (see 'padsSourceFromByteString')
 padsSourceFromString :: String -> Source
 padsSourceFromString str = padsSourceFromByteString (strToByteString str)
 
+-- | Stuff the given 'String' into a 'Source' with the given record discipline
 padsSourceFromStringWithDisc :: RecordDiscipline -> String -> Source
 padsSourceFromStringWithDisc d str = padsSourceFromByteStringWithDisc d (strToByteString str)
 
+-- | Read a 'Source' from disk
 padsSourceFromFile :: FilePath -> IO Source
 padsSourceFromFile file = do
-  { bs <- B.readFile file
-  ; return (padsSourceFromByteString bs)
-  }
+  bs <- B.readFile file
+  return (padsSourceFromByteString bs)
 
+-- | Read a 'Source' from disk using the given record discipline
 padsSourceFromFileWithDisc :: RecordDiscipline -> FilePath -> IO Source
 padsSourceFromFileWithDisc d file = do
-  { bs <- B.readFile file
-  ; return (padsSourceFromByteStringWithDisc d bs)
-  }
+  bs <- B.readFile file
+  return (padsSourceFromByteStringWithDisc d bs)
 
+-- | Construct a 'Source' from the given 'ByteString', preparing the first
+-- record immediately.
 padsSourceFromByteString :: B.ByteString -> Source
 padsSourceFromByteString bs =
     let rawSource = Source{ current  = B.empty
@@ -118,8 +147,9 @@ padsSourceFromByteString bs =
                           , disc     = newline
                           , eorAtEOF = False
                           }
-    in getNextLine rawSource
+    in getNextRecord rawSource
 
+-- | Same as 'padsSourceFromByteString' but with a record discipline
 padsSourceFromByteStringWithDisc :: RecordDiscipline -> B.ByteString -> Source
 padsSourceFromByteStringWithDisc d bs =
     let rawSource = Source{ current  = B.empty
@@ -129,24 +159,26 @@ padsSourceFromByteStringWithDisc d bs =
                           , disc     = d
                           , eorAtEOF = False
                           }
-    in getNextLine rawSource
+    in getNextRecord rawSource
 
+-- | Whether or not the 'Source' has consumed all available input
 isEOF :: Source -> Bool
 isEOF (s @ Source{current, rest, eorAtEOF, ..}) = B.null current && B.null rest && not eorAtEOF
 
+-- | Whether or not the 'Source' has consumed all input in the current record
 isEOR :: Source -> Bool
 isEOR = B.null . current
 
-
-{- RECORD MANIPULATING FUNCTIONS -}
+-------------------------------------------------------------------------------
+-- * Record Manipulating Functions
 {- Called when current is empty to get the next record, where the disc field defines what constitutes a record.
    NOOP when isEOF is already true. -}
-getNextLine :: Source -> Source
-getNextLine (s @ Source {current, rest, loc, bit, disc, eorAtEOF}) =
+getNextRecord :: Source -> Source
+getNextRecord (s @ Source {current, rest, loc, bit, disc, eorAtEOF}) =
       if isEOF s then s
       else if eorAtEOF || B.null rest then
-            (Source {current = B.empty, rest = B.empty, loc = incLineNumber loc, bit = zeroBit, disc, eorAtEOF = False})
-      else  (Source {current = nextLine, rest=residual, loc = incLineNumber loc, bit = zeroBit, disc, eorAtEOF = eorAtEOF'}) --TODO: is this bit positioning sound?
+            (Source {current = B.empty, rest = B.empty, loc = incRecordNumber loc, bit = zeroBit, disc, eorAtEOF = False})
+      else  (Source {current = nextLine, rest=residual, loc = incRecordNumber loc, bit = zeroBit, disc, eorAtEOF = eorAtEOF'}) --TODO: is this bit positioning sound?
         where (nextLine, residual, eorAtEOF') = breakUsingDisc rest disc
 
 srcLineBegin :: Source -> (Maybe String, Source)
@@ -155,7 +187,7 @@ srcLineBegin s = (Nothing, s)
 srcLineEnd :: Source -> (Maybe String, Source)
 srcLineEnd s = if isEOF s
      then (Just "Found EOF when looking for EOR", s)
-     else (Nothing, getNextLine s)
+     else (Nothing, getNextRecord s)
 
 {- External code should not set discipline to NoDiscipline; that is an internal state only to
    mark state between two legal external disciplines. -}
@@ -163,7 +195,7 @@ setRecordDiscipline :: RecordDiscipline -> Source -> ((),Source)
 setRecordDiscipline r s =
   let s'   = unputCurrentLine s
       s'' = s'{disc = r}
-  in ((),getNextLine s'')
+  in ((),getNextRecord s'')
 
 {- Merge current record back on to rest according to current record discipline.
    Resulting source will be in NoDiscipline state.
@@ -207,12 +239,9 @@ breakUsingDisc bs rd = case rd of
   NoPartition -> (bs, B.empty, False)
   NoDiscipline -> error "Pads Source: Attempt to partition source using internal discipline 'NoDiscipline'"
 
-
-
-
-
-
-{- CONVERTING SOURCES TO STRINGS -}
+-------------------------------------------------------------------------------
+-- * Converting Sources to Strings
+--
 padsSourceToString :: Source -> String
 padsSourceToString = (map word8ToChr) . B.unpack . padsSourceToByteString
 
@@ -237,9 +266,8 @@ rawSource s = (padsSourceToByteString s, emptySource)
 restRec :: Source -> String
 restRec = byteStringToStr . current
 
-
-
-{- OPERATIONS WITHIN A SINGLE RECORD -}
+-------------------------------------------------------------------------------
+-- * Operations within a single record
 head :: Source -> Char
 head = word8ToChr . headOrZero . current
 
@@ -462,10 +490,10 @@ tail  (s @ Source{current,loc,..}) =
 -- | Scan the input source until we find the given character. If we don't find
 -- the character indicate as such with the boolean (False) and remove all source
 -- input from the current record. If we do find the character, return True and
--- consume input up to and including the matched character. The 'Pos' in the
+-- consume input up to and including the matched character. The 'Span' in the
 -- returned tuple indicates the region in the input that got scanned and removed
 -- by this function (whether or not we failed to find the character).
-scanTo :: Char -> Source -> (Bool, Source, Pos)
+scanTo :: Char -> Source -> (Bool, Source, Span)
 scanTo chr (src @ Source{current,loc, ..}) =
      let begin = getSrcLoc src
          (skipped, residual) = B.break (\c->c== (chrToWord8 chr)) current
@@ -477,7 +505,7 @@ scanTo chr (src @ Source{current,loc, ..}) =
          endErrLoc = incOffsetBy loc (B.length skipped)
       in (found,
           src {current = remaining, loc=newLoc},
-          Pos    {begin, end=Just endErrLoc})
+          Span   {begin, end=Just endErrLoc})
 
 
 lift :: (String -> [(a, String)]) -> (Source -> (Maybe a, Source))
@@ -511,21 +539,21 @@ strToByteString = Char8.pack
 
 
 
-locToPos :: Loc -> Pos
-locToPos loc = Pos { begin = loc, end = Nothing }
+locToSpan :: Loc -> Span
+locToSpan loc = Span { begin = loc, end = Nothing }
 
-locsToPos :: Loc -> Loc -> Pos
-locsToPos b e = Pos {begin = b, end = Just e}
+locsToSpan :: Loc -> Loc -> Span
+locsToSpan b e = Span {begin = b, end = Just e}
 
-
-{- Pretty print sources -}
+-------------------------------------------------------------------------------
+-- * Pretty print sources
 instance Pretty Source where
     ppr (Source{current, rest, ..}) = text "Current:" <+> text (show current)
 
 instance Pretty Loc where
- ppr (Loc{lineNumber,byteOffset}) = text "Line:" <+> ppr lineNumber <> text ", Offset:" <+> ppr byteOffset
+ ppr (Loc{recordNumber,byteOffset}) = text "Line:" <+> ppr recordNumber <> text ", Offset:" <+> ppr byteOffset
 
-instance Pretty Pos where
-  ppr (Pos{begin,end}) = case end of
+instance Pretty Span where
+  ppr (Span{begin,end}) = case end of
                                 Nothing -> ppr begin
                                 Just end_loc ->  text "from:" <+> ppr begin <+> text "to:" <+> ppr end_loc
