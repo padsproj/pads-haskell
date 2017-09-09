@@ -48,10 +48,14 @@ data RecordDiscipline =
   | NoPartition           -- ^ No partitioning of the input - all input data is in the 'current' field
   | NoDiscipline          -- ^ No discipline is currently installed; all input data is in 'rest' field
 
-newline = Single (chrToWord8 '\n')              -- ^ Record discipline for Unix newlines
-windows = Multi  (B.pack (strToWord8s "\r\n"))  -- ^ Record discipline for Windows CRLF newlines
-bytes n = Bytes n                               -- ^ Record discipline for every n characters
-none    = NoPartition                           -- ^ No record discipline
+-- | Record discipline for Unix newlines
+newline = Single (chrToWord8 '\n')
+-- | Record discipline for Windows CRLF newlines
+windows = Multi  (B.pack (strToWord8s "\r\n"))
+-- | Record discipline for every n characters
+bytes n = Bytes n
+-- | No record discipline
+none    = NoPartition
 
 {-| Source location information. -}
 data Loc = Loc
@@ -73,7 +77,8 @@ zeroLoc   = Loc {recordNumber = 0,  byteOffset = 0}
 -- | A span starting at the beginning of the file and containing nothing.
 zeroSpan = locToSpan zeroLoc
 
-zeroBit = 7 -- ^ Parse the most significant bit in a byte first
+-- | Parse the most significant bit in a byte first
+zeroBit = 7
 
 -- | Increment how many records have been seen in the given 'Loc'
 incRecordNumber :: Loc -> Loc
