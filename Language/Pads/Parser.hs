@@ -1,4 +1,3 @@
-module Language.Pads.Parser where
 {-|
   Module      : Language.Pads.Parser
   Description : Parser for the syntax of Pads
@@ -12,6 +11,7 @@ module Language.Pads.Parser where
   This module implements the parser for the PADS syntax in Haskell using parser
   combinators.
 -}
+module Language.Pads.Parser where
 
 import Language.Pads.Syntax
 
