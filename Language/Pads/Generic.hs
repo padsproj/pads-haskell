@@ -1,15 +1,15 @@
 {-# LANGUAGE TypeFamilies, ConstraintKinds, MultiParamTypeClasses, FunctionalDependencies, ScopedTypeVariables, FlexibleContexts, Rank2Types, FlexibleInstances #-}
+{-|
+  Module      : Language.Pads.Generic
+  Description : Default parse values using GHC Generics
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : MIT
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
 -}
-
-
 module Language.Pads.Generic where
 
 import Language.Pads.MetaData
@@ -47,11 +47,11 @@ defaultRepMd = defaultRepMd1 ()
 parseRep :: Pads rep md => String -> rep
 parseRep cs = fst $ fst $ parseStringInput parsePP cs
 
-parseS   :: Pads rep md => String -> ((rep, md), String) 
-parseS cs = parseStringInput parsePP cs 
+parseS   :: Pads rep md => String -> ((rep, md), String)
+parseS cs = parseStringInput parsePP cs
 
-parseBS   :: Pads rep md => B.ByteString -> ((rep, md), B.ByteString) 
-parseBS cs = parseByteStringInput parsePP cs 
+parseBS   :: Pads rep md => B.ByteString -> ((rep, md), B.ByteString)
+parseBS cs = parseByteStringInput parsePP cs
 
 parseFile :: Pads rep md => FilePath -> IO (rep, md)
 parseFile file = parseFileWith parsePP file
@@ -93,10 +93,10 @@ class (Data rep, PadsMD md, PadsMD (Meta rep)) => Pads1 arg rep md | rep -> md, 
 parseRep1 :: Pads1 arg rep md => arg -> String -> rep
 parseRep1 arg cs = fst $ fst $ parseStringInput (parsePP1 arg) cs
 
-parseS1 :: Pads1 arg rep md => arg -> String -> ((rep, md), String) 
+parseS1 :: Pads1 arg rep md => arg -> String -> ((rep, md), String)
 parseS1 arg cs = parseStringInput (parsePP1 arg) cs
 
-parseBS1 :: Pads1 arg rep md => arg -> B.ByteString -> ((rep, md), B.ByteString) 
+parseBS1 :: Pads1 arg rep md => arg -> B.ByteString -> ((rep, md), B.ByteString)
 parseBS1 arg cs = parseByteStringInput (parsePP1 arg) cs
 
 
@@ -121,7 +121,7 @@ printFile1 :: Pads1 arg rep md => arg -> FilePath -> (rep,md) -> IO ()
 printFile1 arg filepath r = do
   let str = printBS1 arg r
   B.writeFile filepath str
-  
+
 printFileRep1 :: Pads1 arg rep md => arg -> FilePath -> rep -> IO ()
 printFileRep1 arg filepath r = printFile1 arg filepath (r,defaultMd1 arg r)
 
@@ -146,21 +146,21 @@ parseFileWithD d p file = do
 
 {- Generic function for computing the default for any type supporting Data a interface -}
 getConstr :: DataType -> Constr
-getConstr ty = 
+getConstr ty =
    case dataTypeRep ty of
         AlgRep cons -> head cons
         IntRep      -> mkIntegralConstr ty 0
-        FloatRep    -> mkRealConstr ty 0.0 
+        FloatRep    -> mkRealConstr ty 0.0
         CharRep     -> mkCharConstr ty '\NUL'
         NoRep       -> error "PADSC: Unexpected NoRep in PADS type"
 
 gdef :: Data a => a
-gdef = def_help 
+gdef = def_help
   where
     def_help
      =   let ty = dataTypeOf (def_help)
              constr = getConstr ty
-         in fromConstrB gdef constr 
+         in fromConstrB gdef constr
 
 ext2 :: (Data a, Typeable t)
      => c a

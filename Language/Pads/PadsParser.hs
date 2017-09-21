@@ -5,7 +5,7 @@
   Copyright   : (c) 2011
                 Kathleen Fisher <kathleen.fisher@gmail.com>
                 John Launchbury <john.launchbury@gmail.com>
-  License     : BSD3
+  License     : MIT
   Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
   Stability   : experimental
 

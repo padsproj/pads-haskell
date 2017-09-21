@@ -1,14 +1,15 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-|
+  Module      : Language.Pads.RegExp
+  Description : Pads regular expressions
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : MIT
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
 -}
-
 module Language.Pads.RegExp where
 import Data.Data
 

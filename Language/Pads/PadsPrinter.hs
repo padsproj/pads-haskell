@@ -1,14 +1,18 @@
 {-# LANGUAGE FlexibleContexts, DeriveDataTypeable #-}
+{-|
+  Module      : Language.Pads.PadsPrinter
+  Description : Lazy Pads printing monad
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : MIT
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
+	This module provides a way to lazily append to a ByteString for the purpose
+	of printing said ByteString.
+
 -}
-
 module Language.Pads.PadsPrinter where
 
 import qualified Data.ByteString as B
@@ -24,14 +28,14 @@ import Data.Data
 
 type PadsPrinter a = a -> FList
 
--- Lazy append-lists 
+-- Lazy append-lists
 
 type FList = B.ByteString -> B.ByteString
 
-(+++) :: FList -> FList -> FList 
+(+++) :: FList -> FList -> FList
 p +++ q = \ws -> p (q ws)
 
-nil :: FList 
+nil :: FList
 nil = \ws -> ws
 
 concatFL :: [FList] -> FList
@@ -41,13 +45,13 @@ concatFL [] = nil
 printNothing :: FList
 printNothing ws = ws
 
-addBString :: B.ByteString -> FList 
+addBString :: B.ByteString -> FList
 addBString bs = \ws -> B.append bs  ws
 
-addString :: String -> FList 
+addString :: String -> FList
 addString s = \ws -> B.append (S.strToByteString s)  ws
 
-fshow :: Show a => a -> FList 
+fshow :: Show a => a -> FList
 fshow x = \ws -> B.append (S.strToByteString (show x)) ws
 
 
@@ -71,7 +75,7 @@ printF q = Prelude.print (B.unpack (q B.empty))
 printList' (reps, (_,mds)) printItem printSep printTerm = (concatFL (List.intersperse printSep (map printItem (zip reps $ mds ++ repeat myempty))) ) +++ printTerm
 
 printList :: (Data r,Data m) => (PadsPrinter (r,m)) -> FList -> FList -> ([r], (Base_md,[m])) -> FList
-printList printItem printSep printTerm (reps, (_,mds)) = 
+printList printItem printSep printTerm (reps, (_,mds)) =
    (concatFL (List.intersperse printSep (map printItem (zip reps $ mds ++ repeat myempty))) )
    +++ printTerm
 
@@ -91,7 +95,7 @@ intPair_parseM
            f_rep x1 x3 = (x1, x3)
            f_md x1 x2 x3
              = (mergeBaseMDs
-                  [get_md_header x1, get_md_header x2, get_md_header x3], 
+                  [get_md_header x1, get_md_header x2, get_md_header x3],
                 (x1, x3))
          in
            (((return (f_rep, f_md) =@= int_parseM) =@ strLit_parseM "|")

@@ -1,19 +1,17 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables,
              MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances,
              FlexibleInstances #-}
+{-|
+  Module      : Language.Pads.CoreBaseTypes
+  Description : Core Pads base types with parsers
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : MIT
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
 -}
-
-
-
-
 module Language.Pads.CoreBaseTypes where
 
 import Language.Pads.Generic

@@ -1,16 +1,16 @@
 {-# LANGUAGE TemplateHaskell, MagicHash #-}
 {-# OPTIONS_GHC -Wall #-}
+{-|
+  Module      : Language.Pads.TH
+  Description : Template Haskell utilities
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : MIT
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
 -}
-
-
 module Language.Pads.TH where
 
 import Language.Haskell.TH as TH
@@ -92,7 +92,7 @@ doGenPE str = do {
   }
 
 doGenPEs :: Int -> String -> Q([TH.Exp], [TH.Pat])
-doGenPEs n str = do 
+doGenPEs n str = do
   { varpats <- replicateM n (doGenPE str)
   ; return (unzip varpats)
   }

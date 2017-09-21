@@ -6,7 +6,7 @@
   Copyright   : (c) 2011
                 Kathleen Fisher <kathleen.fisher@gmail.com>
                 John Launchbury <john.launchbury@gmail.com>
-  License     : BSD3
+  License     : MIT
   Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
   Stability   : experimental
 
@@ -19,7 +19,6 @@
   syntactic forms into Haskell code for parsing them.
 
 -}
-
 module Language.Pads.CodeGen where
 
 import Language.Pads.Syntax as PS
@@ -998,31 +997,32 @@ genPrintSwitch exp pbs rm = genPrintUnion (map snd pbs) rm
 -------------------------------------------------------------------------------
 -- * Generating Default Function from a Declaration
 
--- | 
+-- | Generate the Pads default value for a 'PadsDeclType'
 genPadsDef :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
 genPadsDef name args patM padsTy = do 
   body  <- genDefTy padsTy
   return [mkDefFunction name args patM body]
 
--- | 
+-- | Generate the Pads default value for a Pads data declaration.
 genPadsDataDef :: UString -> [LString] -> Maybe Pat -> PadsData -> Q [Dec] 
 genPadsDataDef name args patM padsData = do
   body  <- genDefData padsData
   return [mkDefFunction name args patM body]
 
--- | 
+-- | Generate the Pads default value for a Pads newtype declaration.
 genPadsNewDef :: UString -> [LString] -> Maybe Pat -> BranchInfo -> Q [Dec] 
 genPadsNewDef name args patM branch = do 
   body <- genDefBranchInfo branch
   return [mkDefFunction name args patM body]
 
--- | 
+-- | Generate the Pads default value for a Pads obtain declaration.
 genPadsObtainDef :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
 genPadsObtainDef name args padsTy exp = do
   body  <- genDefTy (PTransform padsTy (PTycon [name]) exp)
   return [mkDefFunction name args Nothing body]
 
--- | 
+-- | Generate the Pads default value as a function declaration of the form
+-- "foo_def" for a Pads parser named "Foo".
 mkDefFunction :: UString -> [LString] -> Maybe Pat -> Exp -> Dec
 mkDefFunction name args patM body =
   FunD defName [Clause (defArgs) (NormalB body) []]
@@ -1033,7 +1033,7 @@ mkDefFunction name args patM body =
 -------------------------------------------------------------------------------
 -- * Generate Default Function from a Type
 
--- | 
+-- | Generate the default Haskell value for some Pads type.
 genDefTy :: PadsTy -> Q Exp
 genDefTy (PConstrain pat ty exp)   = genDefTy ty  -- XXX: doesn't check the constraint; ideally we should change @printFL@ to account for possible printing errors
 genDefTy (PTransform src dest exp) = do
@@ -1042,24 +1042,16 @@ genDefTy (PTransform src dest exp) = do
   return $ AppE srcToDest defSrc
 genDefTy (PList ty sepM termM)     = [| [] |]
 genDefTy (PPartition ty exp)       = genDefTy ty
-genDefTy (PApp tys expM)           = genDefTyApp tys expM
-genDefTy (PTuple tys)              = genDefTuple tys
-genDefTy (PExpression exp)         = genDefExp exp
-genDefTy (PTycon c)                = genDefTycon c
-genDefTy (PTyvar v)                = genDefTyVar v
-genDefTy (PValue exp ty)           = genDefTy ty
-
--- | 
-genDefValue :: Exp -> Q Exp
-genDefValue exp = return exp
-
--- | 
-genDefTyApp :: [PadsTy] -> Maybe Exp -> Q Exp
-genDefTyApp tys expM = do
+genDefTy (PApp tys expM)           = do
   prtys <- mapM genDefTy tys
   foldl1M (\e1 e2 -> return $ AppE e1 e2) (prtys ++ Maybe.maybeToList expM)
+genDefTy (PTuple tys)              = genDefTuple tys
+genDefTy (PExpression exp)         = return exp
+genDefTy (PTycon c)                = return $ VarE (mkTyDefQName c)
+genDefTy (PTyvar v)                = return $ VarE (mkTyDefVarName v)
+genDefTy (PValue exp ty)           = genDefTy ty
 
--- | 
+-- | Generate the default Haskell value for a Pads tuple type.
 genDefTuple :: [PadsTy] -> Q Exp
 genDefTuple tys = case reps of
   [] -> [| () |]
@@ -1070,27 +1062,18 @@ genDefTuple tys = case reps of
   where
   reps = [ty | ty <- tys, hasRep ty]
 
--- | 
-genDefExp :: Exp -> Q Exp
-genDefExp e = return e
-
--- | 
-genDefTycon :: QString -> Q Exp
-genDefTycon c = return $ VarE (mkTyDefQName c)
-
--- | 
-genDefTyVar :: LString -> Q Exp
-genDefTyVar v = return $ VarE (mkTyDefVarName v)
-
 -------------------------------------------------------------------------------
 -- Generate Default Function from a Datatype
 
--- | 
+-- | Generate the default Haskell value for a Pads data type 'PadsData'.
 genDefData :: PadsData -> Q Exp
-genDefData (PUnion bs) = genDefBranchInfo (head bs)
-genDefData (PSwitch exp pbs) = genDefBranchInfo (snd $ head pbs)
+genDefData (PUnion (b:bs))        = genDefBranchInfo b
+genDefData (PSwitch exp (pb:pbs)) = genDefBranchInfo (snd pb)
+genDefData (PUnion [])            = error "genDefData: empty PUnion."
+genDefData (PSwitch exp [])       = error "genDefData: empty PSwitch."
 
--- | 
+-- | Generate the default Haskell value for a single branch of a Pads type,
+-- namely either a Pads constructor or record.
 genDefBranchInfo :: BranchInfo -> Q Exp
 genDefBranchInfo (BConstr c args pred) = do
   reps <- sequence $ [genDefTy ty | (strict,ty) <- args, hasRep ty]
@@ -1188,6 +1171,4 @@ foldr1M f (x:xs) = f x =<< foldr1M f xs
 appT2 f x y = AppT (AppT f x) y
 
 appE3 f x y z = AppE (AppE (AppE f x) y) z
-appE4 f x y z w = AppE (AppE (AppE (AppE f x) y) z) w
-
 

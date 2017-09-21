@@ -1,21 +1,23 @@
-{-# LANGUAGE TypeSynonymInstances, GeneralizedNewtypeDeriving, QuasiQuotes, TemplateHaskell, DeriveDataTypeable, 
+{-# LANGUAGE TypeSynonymInstances, GeneralizedNewtypeDeriving, QuasiQuotes, TemplateHaskell, DeriveDataTypeable,
              ScopedTypeVariables, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances,
              UndecidableInstances, NamedFieldPuns, RecordWildCards, StandaloneDeriving   #-}
+{-|
+  Module      : Language.Pads.Padsc
+  Description : Pads compiler
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : MIT
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
+  This module re-exports all the modules necessary to make use of the Pads
+  quasiquoter and compilation infrastructure.
+
 -}
-
-
-
 module Language.Pads.Padsc (
-     {- FIX: Languages.Pads.Source exports "take", which clashes with 
-        the function of the same name in Prelude -} 
+     {- FIX: Languages.Pads.Source exports "take", which clashes with
+        the function of the same name in Prelude -}
      module Language.Pads.Source,
      module Language.Pads.RegExp,
      module Language.Pads.Errors,
@@ -30,11 +32,10 @@ module Language.Pads.Padsc (
      module Language.Pads.PadsPrinter,
      module Data.Data,
      ppr, pretty
-  ) 
+  )
   where
 
-
-import Language.Pads.Source 
+import Language.Pads.Source
 import Language.Pads.RegExp
 import Language.Pads.Errors  hiding (msg)
 import Language.Pads.PadsParser
@@ -51,18 +52,7 @@ import Data.Data
 import Text.PrettyPrint.Mainland hiding (line,  dot)
 import Text.PrettyPrint.Mainland.Class
 
-
-
 {- Fix these should be reexported -}
 -- parseAllS = Language.Pads.PadsParser.parseAllS
 numErrors = Language.Pads.MetaData.numErrors
-
-
-
-
-  
-
-
-
-
 

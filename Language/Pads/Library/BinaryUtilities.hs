@@ -1,17 +1,16 @@
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
     FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
+{-|
+  Module      : Language.Pads.Library.BinaryUtilities
+  Description : Utilities for transforming binary data
+  Copyright   : (c) 2011
+                Kathleen Fisher <kathleen.fisher@gmail.com>
+                John Launchbury <john.launchbury@gmail.com>
+  License     : MIT
+  Maintainer  : Karl Cronburg <karl@cs.tufts.edu>
+  Stability   : experimental
 
-
-{-
-** *********************************************************************
-*                                                                      *
-*         (c)  Kathleen Fisher <kathleen.fisher@gmail.com>             *
-*              John Launchbury <john.launchbury@gmail.com>             *
-*                                                                      *
-************************************************************************
 -}
-
-
 module Language.Pads.Library.BinaryUtilities where
 
 import Data.Int
@@ -44,7 +43,7 @@ int32ToBytes endian = (word32ToBytes endian) . fromIntegral
 
 
 bytesToWord16 :: Endian -> B.ByteString -> Word16
-bytesToWord16 endian b = 
+bytesToWord16 endian b =
   let  b0 :: Word16 = fromIntegral (b `B.index` 0)
        b1 :: Word16 = fromIntegral (b `B.index` 1)
   in
@@ -57,10 +56,10 @@ bytesToWord16 endian b =
      (Native, LittleEndian)  ->   assembleWord16 (b1, b0)
 
 
-word16ToBytes :: Endian -> Word16 -> B.ByteString 
-word16ToBytes endian word16 = 
+word16ToBytes :: Endian -> Word16 -> B.ByteString
+word16ToBytes endian word16 =
   let w0 :: Word8 = fromIntegral (shiftR (word16 .&. 0xFF00)  8)
-      w1 :: Word8 = fromIntegral         (word16 .&. 0x00FF)  
+      w1 :: Word8 = fromIntegral         (word16 .&. 0x00FF)
   in case (endian, byteOrder) of
      (SBH, BigEndian)    ->   B.pack [w1,w0]
      (SBH, LittleEndian) ->   B.pack [w0,w1]
@@ -68,7 +67,7 @@ word16ToBytes endian word16 =
      (SBL, LittleEndian) ->   B.pack [w1,w0]
      (Native, BigEndian) ->   B.pack [w0,w1]
      (Native, LittleEndian) ->   B.pack [w1,w0]
-      
+
 
 assembleWord16 :: (Word16, Word16) -> Word16
 assembleWord16 (b0, b1) = shift b0 8 .|. b1
@@ -76,7 +75,7 @@ assembleWord16 (b0, b1) = shift b0 8 .|. b1
 
 
 bytesToWord32 :: Endian -> B.ByteString -> Word32
-bytesToWord32 endian b = 
+bytesToWord32 endian b =
   let  b0 :: Word32 = fromIntegral (b `B.index` 0)
        b1 :: Word32 = fromIntegral (b `B.index` 1)
        b2 :: Word32 = fromIntegral (b `B.index` 2)
@@ -91,12 +90,12 @@ bytesToWord32 endian b =
      (Native, LittleEndian)  ->   assembleWord32 (b3, b2, b1, b0)
 
 
-word32ToBytes :: Endian -> Word32 -> B.ByteString 
-word32ToBytes endian word32 = 
+word32ToBytes :: Endian -> Word32 -> B.ByteString
+word32ToBytes endian word32 =
   let w0 :: Word8 = fromIntegral (shiftR (word32 .&. 0xFF000000) 24)
       w1 :: Word8 = fromIntegral (shiftR (word32 .&. 0x00FF0000) 16)
       w2 :: Word8 = fromIntegral (shiftR (word32 .&. 0x0000FF00)  8)
-      w3 :: Word8 = fromIntegral         (word32 .&. 0x000000FF)  
+      w3 :: Word8 = fromIntegral         (word32 .&. 0x000000FF)
   in case (endian, byteOrder) of
      (SBH, BigEndian)    ->   B.pack [w3,w2,w1,w0]
      (SBH, LittleEndian) ->   B.pack [w0,w1,w2,w3]
@@ -104,10 +103,10 @@ word32ToBytes endian word32 =
      (SBL, LittleEndian) ->   B.pack [w3,w2,w1,w0]
      (Native, BigEndian) ->   B.pack [w0,w1,w2,w3]
      (Native, LittleEndian) ->   B.pack [w3,w2,w1,w0]
-      
+
 
 assembleWord32 :: (Word32, Word32, Word32, Word32) -> Word32
-assembleWord32 (b0, b1, b2, b3) = 
+assembleWord32 (b0, b1, b2, b3) =
   shift b0 24 .|. shift b1 16 .|. shift b2 8 .|. b3
 
 -------------------------------------------
