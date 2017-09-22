@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts, DeriveDataTypeable #-}
+{-# OPTIONS_HADDOCK hide, prune #-}
 {-|
   Module      : Language.Pads.PadsPrinter
   Description : Lazy Pads printing monad
@@ -25,50 +26,57 @@ import Data.Data
 
 {- Printing Monad -}
 
-
+-- | 
 type PadsPrinter a = a -> FList
 
 -- Lazy append-lists
 
+-- | 
 type FList = B.ByteString -> B.ByteString
 
+-- | 
 (+++) :: FList -> FList -> FList
-p +++ q = \ws -> p (q ws)
+p +++ q = p . q
 
+-- | 
 nil :: FList
-nil = \ws -> ws
+nil = id
 
+-- | 
 concatFL :: [FList] -> FList
-concatFL (f:fs) = f +++ (concatFL fs)
-concatFL [] = nil
+concatFL (f:fs) = foldr (+++) nil fs
 
+-- | 
 printNothing :: FList
 printNothing ws = ws
 
+-- | 
 addBString :: B.ByteString -> FList
-addBString bs = \ws -> B.append bs  ws
+addBString bs = B.append bs
 
+-- | 
 addString :: String -> FList
-addString s = \ws -> B.append (S.strToByteString s)  ws
+addString s = B.append (S.strToByteString s)
 
+-- | 
 fshow :: Show a => a -> FList
-fshow x = \ws -> B.append (S.strToByteString (show x)) ws
+fshow x = B.append (S.strToByteString (show x))
 
-
+-- | 
 printEOR :: FList
 printEOR = addString ['\n']
 
+-- | 
 printEOF :: FList
 printEOF = addString []
 
+-- | 
 endRecord :: FList -> FList
 endRecord fst = fst +++ printEOR
 
-
+-- | 
 printF :: FList -> IO ()
 printF q = Prelude.print (B.unpack (q B.empty))
-
-
 
 --------------------------------------------------
 

@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
 {-|
   Module      : Language.Pads.Testing
   Description : Pads testing utilities
@@ -10,7 +11,7 @@
 
 -}
 module Language.Pads.Testing (
-    module Test.HUnit ,
+    module Test.HUnit,
     mkTestCase,
     mkFileTestCase,
     mdToError,
@@ -27,6 +28,6 @@ mkTestCase s expected seen = TestCase(assertEqual s expected  (mdToError seen))
 mdFileToError (rep,md) = (rep, getTotalErrors md)
 mkFileTestCase s expected seen = TestCase(assertEqual s expected (mdFileToError seen))
 
-
 getTotalErrors :: PadsMD md => md -> Int
 getTotalErrors md = numErrors $ get_md_header md
+

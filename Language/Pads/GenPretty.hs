@@ -1,5 +1,6 @@
 {-# LANGUAGE  TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses
             , FlexibleInstances, DeriveDataTypeable, NamedFieldPuns, ScopedTypeVariables #-}
+{-# OPTIONS_HADDOCK hide, prune #-}
 {-|
   Module      : Language.Pads.GenPretty
   Description : Template haskell based pretty printing instances
@@ -41,8 +42,7 @@ pprCon2E argE = AppE (VarE 'pprCon2) argE
 pprCon1 arg = ppr (toList1 arg)
 pprCon2 arg = ppr (toList2 arg)
 
-
-
+-- | 
 getTyNames :: TH.Type ->  S.Set TH.Name
 getTyNames ty  = case ty of
     ForallT tvb cxt ty' -> getTyNames ty'
@@ -54,6 +54,7 @@ getTyNames ty  = case ty of
     AppT t1 t2 -> (getTyNames t1) `S.union` (getTyNames t2)
     SigT ty kind -> getTyNames ty
 
+-- | 
 getTyNamesFromCon :: TH.Con -> S.Set TH.Name
 getTyNamesFromCon con = case con of
   (NormalC name stys) -> S.unions (map (\(_,ty)   -> getTyNames ty) stys)
@@ -61,14 +62,13 @@ getTyNamesFromCon con = case con of
   (InfixC st1 name st2) -> (getTyNames(snd st1)) `S.union` (getTyNames(snd st2))
   (ForallC tvb cxt con) -> getTyNamesFromCon con
 
-
-
+-- | 
 getNamedTys :: TH.Name -> Q [TH.Name]
 getNamedTys ty_name = do
    result <- getNamedTys' S.empty (S.singleton ty_name)
    return (S.toList result)
 
-
+-- | 
 getNamedTys' :: S.Set TH.Name -> S.Set TH.Name -> Q (S.Set TH.Name)
 getNamedTys' answers worklist =
  if S.null worklist then return answers
@@ -95,14 +95,17 @@ getNamedTys' answers worklist =
         otherwise -> do {reportError ("getTyNames: pattern didn't match for " ++ (nameBase ty_name)); return answers'}
    }
 
+-- | 
 baseTypeNames = S.fromList [ ''Int, ''Char, ''Digit, ''Text, ''String, ''StringFW, ''StringME
                            , ''StringSE, ''COff, ''EpochTime, ''FileMode, ''Int, ''Word, ''Int64
                            , ''Language.Pads.Errors.ErrInfo, ''Bool, ''Binary, ''Base_md, ''UTCTime, ''TimeZone
                            ]
 
+-- | 
 mkPrettyInstance :: TH.Name -> Q [TH.Dec]
 mkPrettyInstance ty_name = mkPrettyInstance' (S.singleton ty_name) baseTypeNames []
 
+-- | 
 mkPrettyInstance' :: S.Set TH.Name -> S.Set TH.Name -> [TH.Dec] -> Q [TH.Dec]
 mkPrettyInstance' worklist done decls =
   if S.null worklist then return decls
@@ -193,20 +196,24 @@ mkPrettyInstance' worklist done decls =
          let newDecls = decls'++decls
          mkPrettyInstance' newWorklist newDone newDecls
 
+-- | 
 isTuple ty = case ty of
   TupleT n -> True
   (AppT ty arg_ty) -> isTuple ty
 
+-- | 
 isDataType cons = case cons of
   [] -> False
   (NormalC _ _ ) : rest -> True
   otherwise -> False
 
+-- | 
 isRecordType cons = case cons of
   [] -> False
   (RecC _ _ ) : rest -> True
   otherwise -> False
 
+-- | 
 mkPatBody core_name_str pprE = do
   { (exp,pat) <- doGenPE "arg"
   ; let bodyE = AppE (AppE (VarE 'namedty_ppr) (LitE (StringL core_name_str)))  (pprE exp)
@@ -214,12 +221,14 @@ mkPatBody core_name_str pprE = do
   ; return (argP, (NormalB bodyE))
   }
 
+-- | 
 mkPatBodyNoArg core_name_str = do
   { let bodyE = AppE (VarE 'text) (LitE (StringL core_name_str))
   ; let argP = ConP (mkName core_name_str) []
   ; return (argP, (NormalB bodyE))
   }
 
+-- | 
 mkClause con = case con of
      NormalC name [] -> do
         { (argP, body) <- mkPatBodyNoArg (nameBase name)
@@ -231,6 +240,7 @@ mkClause con = case con of
         }
      otherwise -> error "mkClause not implemented for this kind of constructor."
 
+-- | 
 mkRecord (RecC rec_name fields) = do
   { fieldInfo <- mapM mkField fields
   ; let (recPs, recEs) = unzip fieldInfo
@@ -239,6 +249,7 @@ mkRecord (RecC rec_name fields) = do
   ; return (Clause [recP] (NormalB bodyE) [])
   }
 
+-- | 
 mkField (field_name, _, ty) = do
   { (expE, pat) <- doGenPE (nameBase field_name)
   ; let fieldE = AppE (AppE (VarE 'field_ppr) (nameToStrLit field_name)) (pprE expE)

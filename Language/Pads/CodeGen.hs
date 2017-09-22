@@ -1,5 +1,6 @@
 {-# LANGUAGE TupleSections, ViewPatterns, TemplateHaskell, NamedFieldPuns, ScopedTypeVariables,
              RecordWildCards, UndecidableInstances #-}
+{-# OPTIONS_HADDOCK hide, prune #-}
 {-|
   Module      : Language.Pads.CodeGen
   Description : Template Haskell based code generator
@@ -44,8 +45,10 @@ import Language.Haskell.TH.Syntax (lift)
 
 import Debug.Trace
 
+-- | 
 type BString = S.RawStream
 
+-- | 
 type Derivation = Dec -> Q [Dec]
 
 -- | Top level code gen function from Pads decls to Haskell decls

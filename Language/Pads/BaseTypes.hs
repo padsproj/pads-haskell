@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts, TypeFamilies, TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
     FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
+{-# OPTIONS_HADDOCK hide, prune #-}
 {-|
   Module      : Language.Pads.BaseTypes
   Description : Base types provided by Pads
@@ -35,7 +36,6 @@ import qualified Data.List as L
 import Data.Data
 import qualified Data.ByteString as B  
 
-
 [pads|
 -- string that stops in a newline
 type StringEOR = [Char] terminator EOR
@@ -51,10 +51,12 @@ obtain Maybe a from PMaybe a using <|(pm2m,m2pm)|>
 
 |]
 
+-- | 
 pm2m :: Span -> (PMaybe a, PMaybe_md a_md) -> (Maybe a, Maybe_md a_md)
 pm2m p (PJust x, md) = (Just x, md)
 pm2m p (PNothing,md) = (Nothing,md)
 
+-- | 
 m2pm :: (Maybe a, Maybe_md a_md) -> (PMaybe a, PMaybe_md a_md)
 m2pm (Just x, md) = (PJust x, md)
 m2pm (Nothing,md) = (PNothing,md)
@@ -75,11 +77,12 @@ blTob (b,md) = (B.singleton (if b then 1 else 0), md)
 [pads| type DateFSE (fmt :: String, se :: RE) = obtain UTCTime from StringSE se using <| (strToUTC fmt, utcToStr fmt) |> 
        type DateFC (fmt::String, c::Char) = DateFSE <|(fmt, RE ("[" ++ [c] ++  "]")) |> |]  
 
+-- | 
 type UTCTime_md = Base_md
 instance Pretty UTCTime where
   ppr utc = text (show utc)
 
-
+-- | 
 strToUTC :: String -> Span -> (StringSE, Base_md) -> (UTCTime, Base_md)
 strToUTC fmt pos (input, input_bmd) = 
   case parseTimeM True Data.Time.defaultTimeLocale fmt input of 
@@ -90,6 +93,7 @@ strToUTC fmt pos (input, input_bmd) =
 
 uTCTime_def = UTCTime (ModifiedJulianDay 0) (secondsToDiffTime 0)
 
+-- | 
 utcToStr :: String -> (UTCTime, Base_md) -> (StringSE, Base_md) 
 utcToStr fmt (utcTime, bmd) = (formatTime Data.Time.defaultTimeLocale fmt utcTime, bmd)
 
@@ -101,12 +105,14 @@ type TimeZone_md = Base_md
 instance Pretty TimeZone where
   ppr tz = text (show tz)
 
+-- | 
 strToTz :: Span -> (StringSE, Base_md) -> (TimeZone, Base_md)
 strToTz pos (input, input_bmd) = 
   case parseTimeM True Data.Time.defaultTimeLocale "%z" input of 
        Nothing -> (gdef,  mergeBaseMDs [mkErrBasePD (TransformToDstFail "TimeZoneSE" input " (conversion failed)") (Just pos), input_bmd])
        Just t  -> (t, input_bmd)
 
+-- | 
 tzToStr ::  (TimeZone, Base_md) -> (StringSE, Base_md) 
 tzToStr (tz, bmd) = (h ++ ":" ++ m, bmd)
            where (h,m) = splitAt 3 (show tz)
@@ -115,6 +121,7 @@ timeZone_def = utc
 
 [pads| type Phex32FW (size :: Int) = obtain Int from StringFW size using <| (hexStr2Int,int2HexStr size) |> |]  
 
+-- | 
 hexStr2Int :: Span -> (StringFW, Base_md) -> (Int, Base_md)
 hexStr2Int src_pos (s,md) = if good then (intList2Int ints 0, md)
                                       else (0, mkErrBasePD  (TransformToDstFail "StrHex" s " (non-hex digit)") (Just src_pos))
@@ -126,6 +133,7 @@ hexStr2Int src_pos (s,md) = if good then (intList2Int ints 0, md)
         []     -> a
         (d:ds) -> intList2Int ds ((16 * a) + d)
 
+-- | 
 int2HexStr :: Int -> (Int, Base_md) -> (StringFW, Base_md)
 int2HexStr size (x,md)
   | length result == size && wasPos = (result, md)       
@@ -141,12 +149,4 @@ int2HexStr size (x,md)
    padding = size - (length temp)
    stutter c n = if n <= 0 then [] else c : (stutter c (n-1))
    result = (stutter '0' padding) ++ temp
-
-
-
-
-
-
-
-
 

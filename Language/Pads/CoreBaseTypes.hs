@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables,
              MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances,
              FlexibleInstances #-}
+{-# OPTIONS_HADDOCK hide, prune #-}
 {-|
   Module      : Language.Pads.CoreBaseTypes
   Description : Core Pads base types with parsers
@@ -973,25 +974,6 @@ bytesNB_printFL = bytes_printFL
 
 bytesNB_def :: Int -> BytesNB
 bytesNB_def = bytes_def
-
-
--- type instance PadsArg BytesNB = Int
--- type instance Meta BytesNB = BytesNB_md
--- instance Pads1 Int BytesNB BytesNB_md where
---     parsePP1 = bytesNB_parseM
---     printFL1 = bytesNB_printFL
---     def1 i = bytesNB_def i
-
-
-
-
-
-
---- All the others can be derived from this: moved to BaseTypes.hs
-
-
-
-
 
 {- Helper functions -}
 mkStr c = "'" ++ [c] ++ "'"
