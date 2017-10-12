@@ -1,6 +1,6 @@
 {- LANGUAGE FlexibleContexts #-}
 
-module Rand where
+module Examples.Rand where
 
 import Language.Pads.Padsc
 import System.Random
