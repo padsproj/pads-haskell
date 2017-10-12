@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeSynonymInstances, GeneralizedNewtypeDeriving, QuasiQuotes, TemplateHaskell, DeriveDataTypeable,
              ScopedTypeVariables, MultiParamTypeClasses, FunctionalDependencies, FlexibleInstances,
              UndecidableInstances, NamedFieldPuns, RecordWildCards, StandaloneDeriving   #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.Padsc
   Description : Pads compiler

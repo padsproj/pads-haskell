@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.Parser
   Description : Parser for the syntax of Pads
@@ -38,9 +39,7 @@ import System.FilePath.Glob
 type Parser = PS.Parser
 type Env    = [String]
 
--- The main entry point for the QuasiQuoter is parsePadsDecls.
-
-
+-- | The main entry point for the Pads QuasiQuoter
 parsePadsDecls :: SourceName -> Line -> Column -> String -> Either ParseError [PadsDecl]
 parsePadsDecls fileName line column input
   = PP.parse (do { setPosition (newPos fileName line column)
@@ -55,10 +54,8 @@ errorParse = do
   { rest <- manyTill anyToken eof
   ; unexpected rest }
 
-
--------------------------
--- PADS DECLARATIONS
--------------------------
+-------------------------------------------------------------------------------
+-- * PADS DECLARATIONS
 
 padsDecls :: Parser [PadsDecl]
 padsDecls = option [] (many1 topDecl)
@@ -117,10 +114,8 @@ derives
     (do { q <- qualUpper; return [q] }
     <|> parens (commaSep1 qualUpper))
 
-
--------------------------
--- PADS TYPES
--------------------------
+-------------------------------------------------------------------------------
+-- * PADS TYPES
 
 ptype :: Env -> Parser PadsTy
 ptype env
@@ -213,10 +208,8 @@ tuple env
        }
   <?> "Pads tuple type"
 
-
-------------------------------
--- PADS DATA DECLARATIONS
-------------------------------
+-------------------------------------------------------------------------------
+-- * PADS DATA DECLARATIONS
 
 dataRHS :: Env -> Parser PadsData
 dataRHS env
@@ -298,11 +291,8 @@ ftype env
   =  do { reservedOp "!"; ty <- atype env; return (IsStrict,ty)}
  <|> do { ty <- ptype env; return (NotStrict,ty)}
 
-
-
--------------------------------
--- PADS NEW TYPE DECLARATIONS
--------------------------------
+-------------------------------------------------------------------------------
+-- * PADS NEW TYPE DECLARATIONS
 
 newRHS :: Env -> Parser BranchInfo
 newRHS env
@@ -335,16 +325,14 @@ field1 env
        ; return (Just id, (NotStrict,ty), predM)
        }
 
-
------------------------------------
--- HASKELL IN PADS DECLARATIONS
------------------------------------
+-------------------------------------------------------------------------------
+-- * HASKELL IN PADS DECLARATIONS
 
 expression :: Parser Exp
 expression =  haskellExp
           <|> literal
 
-haskellExp :: Parser (Exp)
+haskellExp :: Parser Exp
 haskellExp = do { reservedOp "<|"
                 ; haskellParseExpTill "|>"
                 }
@@ -424,8 +412,8 @@ tyvar env = try $ do { v <- lower
                      ; guard (v `elem` env)
                      ; return v }
 
-
----------------
+-------------------------------------------------------------------------------
+-- * LEXER
 
 p << q = do {x<-p;q;return x}
 

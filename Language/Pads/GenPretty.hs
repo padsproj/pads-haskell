@@ -1,6 +1,6 @@
 {-# LANGUAGE  TypeSynonymInstances, TemplateHaskell, QuasiQuotes, MultiParamTypeClasses
             , FlexibleInstances, DeriveDataTypeable, NamedFieldPuns, ScopedTypeVariables #-}
-{-# OPTIONS_HADDOCK hide, prune #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.GenPretty
   Description : Template haskell based pretty printing instances
@@ -32,7 +32,7 @@ import System.Posix.Types
 import Data.Word
 import Data.Int
 import Data.Time
-
+import Debug.Trace as D
 
 pprE argE = AppE (VarE 'ppr) argE
 pprListEs argEs = ListE (map pprE argEs)
@@ -42,33 +42,32 @@ pprCon2E argE = AppE (VarE 'pprCon2) argE
 pprCon1 arg = ppr (toList1 arg)
 pprCon2 arg = ppr (toList2 arg)
 
--- | 
+-- | Get all the names of types referenced within the given 'TH.Type'
 getTyNames :: TH.Type ->  S.Set TH.Name
 getTyNames ty  = case ty of
     ForallT tvb cxt ty' -> getTyNames ty'
-    VarT name -> S.empty
-    ConT name -> S.singleton name
-    TupleT i -> S.empty
-    ArrowT -> S.empty
-    ListT -> S.empty
-    AppT t1 t2 -> (getTyNames t1) `S.union` (getTyNames t2)
-    SigT ty kind -> getTyNames ty
+    VarT name           -> S.empty
+    ConT name           -> S.singleton name
+    TupleT i            -> S.empty
+    ArrowT              -> S.empty
+    ListT               -> S.empty
+    AppT t1 t2          -> getTyNames t1 `S.union` getTyNames t2
+    SigT ty kind        -> getTyNames ty
 
--- | 
+-- | Get all the types referenced within the given Haskell constructor.
 getTyNamesFromCon :: TH.Con -> S.Set TH.Name
 getTyNamesFromCon con = case con of
-  (NormalC name stys) -> S.unions (map (\(_,ty)   -> getTyNames ty) stys)
-  (RecC name vstys)   -> S.unions (map (\(_,_,ty) -> getTyNames ty) vstys)
-  (InfixC st1 name st2) -> (getTyNames(snd st1)) `S.union` (getTyNames(snd st2))
+  (NormalC name stys)   -> S.unions (map (\(_,ty)   -> getTyNames ty) stys)
+  (RecC name vstys)     -> S.unions (map (\(_,_,ty) -> getTyNames ty) vstys)
+  (InfixC st1 name st2) -> getTyNames (snd st1) `S.union` getTyNames (snd st2)
   (ForallC tvb cxt con) -> getTyNamesFromCon con
 
--- | 
+-- | Recursively reify types to get all the named types referenced by the given
+-- name
 getNamedTys :: TH.Name -> Q [TH.Name]
-getNamedTys ty_name = do
-   result <- getNamedTys' S.empty (S.singleton ty_name)
-   return (S.toList result)
+getNamedTys ty_name = S.toList <$> getNamedTys' S.empty (S.singleton ty_name)
 
--- | 
+-- | Helper for 'getNamedTys'
 getNamedTys' :: S.Set TH.Name -> S.Set TH.Name -> Q (S.Set TH.Name)
 getNamedTys' answers worklist =
  if S.null worklist then return answers
@@ -95,17 +94,23 @@ getNamedTys' answers worklist =
         otherwise -> do {reportError ("getTyNames: pattern didn't match for " ++ (nameBase ty_name)); return answers'}
    }
 
--- | 
+-- | All the base types supported by Pads
 baseTypeNames = S.fromList [ ''Int, ''Char, ''Digit, ''Text, ''String, ''StringFW, ''StringME
                            , ''StringSE, ''COff, ''EpochTime, ''FileMode, ''Int, ''Word, ''Int64
                            , ''Language.Pads.Errors.ErrInfo, ''Bool, ''Binary, ''Base_md, ''UTCTime, ''TimeZone
                            ]
 
--- | 
+-- | Recursively make the pretty printing instance for a given named type by
+-- also making instances for all nested types.
 mkPrettyInstance :: TH.Name -> Q [TH.Dec]
 mkPrettyInstance ty_name = mkPrettyInstance' (S.singleton ty_name) baseTypeNames []
 
--- | 
+mkMe :: TH.Name -> Q [TH.Dec]
+mkMe n = do
+  D.traceM "HELLOOOOOOOOOO"
+  return []
+
+-- | Helper for 'mkPrettyInstance'
 mkPrettyInstance' :: S.Set TH.Name -> S.Set TH.Name -> [TH.Dec] -> Q [TH.Dec]
 mkPrettyInstance' worklist done decls =
   if S.null worklist then return decls
@@ -196,39 +201,36 @@ mkPrettyInstance' worklist done decls =
          let newDecls = decls'++decls
          mkPrettyInstance' newWorklist newDone newDecls
 
--- | 
-isTuple ty = case ty of
-  TupleT n -> True
-  (AppT ty arg_ty) -> isTuple ty
+-- | Is the given type a TupleT?
+isTuple (TupleT n) = True
+isTuple (AppT ty _) = isTuple ty
 
--- | 
-isDataType cons = case cons of
-  [] -> False
-  (NormalC _ _ ) : rest -> True
-  otherwise -> False
+-- | Is the given constructor a normal Haskell constructor?
+isDataType [] = False
+isDataType (NormalC _ _ : rest) = True
+isDataType _ = False
 
--- | 
-isRecordType cons = case cons of
-  [] -> False
-  (RecC _ _ ) : rest -> True
-  otherwise -> False
+-- | Is the given constructor a Haskell record constructor?
+isRecordType [] = False
+isRecordType (RecC _ _ : rest) = True
+isRecordType _ = False
 
--- | 
+-- | Make the pattern body of a pretty printer expression for a named Pads type
 mkPatBody core_name_str pprE = do
-  { (exp,pat) <- doGenPE "arg"
-  ; let bodyE = AppE (AppE (VarE 'namedty_ppr) (LitE (StringL core_name_str)))  (pprE exp)
-  ; let argP = ConP (mkName core_name_str) [pat]
-  ; return (argP, (NormalB bodyE))
-  }
+  (exp,pat) <- doGenPE "arg"
+  bodyE <- [| namedty_ppr $(litE $ stringL core_name_str) $(return $ pprE exp) |]
+  argP  <- conP (mkName core_name_str) [return pat]
+  return (argP, NormalB bodyE)
 
--- | 
+-- | Make the pattern body of a pretty printer expression for a Pads type /
+-- data constructor without arguments.
 mkPatBodyNoArg core_name_str = do
-  { let bodyE = AppE (VarE 'text) (LitE (StringL core_name_str))
-  ; let argP = ConP (mkName core_name_str) []
-  ; return (argP, (NormalB bodyE))
-  }
+  bodyE <- [| text $(litE $ stringL core_name_str) |]
+  argP <- conP (mkName core_name_str) []
+  return (argP, NormalB bodyE)
 
--- | 
+-- | Make the clause for the data constructor of a data type based on whether or
+-- not it has any arguments.
 mkClause con = case con of
      NormalC name [] -> do
         { (argP, body) <- mkPatBodyNoArg (nameBase name)
@@ -240,21 +242,19 @@ mkClause con = case con of
         }
      otherwise -> error "mkClause not implemented for this kind of constructor."
 
--- | 
+-- | Make the Haskell clause for a Pads record.
 mkRecord (RecC rec_name fields) = do
-  { fieldInfo <- mapM mkField fields
-  ; let (recPs, recEs) = unzip fieldInfo
-  ; let recP = RecP rec_name recPs
-  ; let bodyE = AppE (AppE (VarE 'record_ppr) (nameToStrLit rec_name)) (ListE recEs)
-  ; return (Clause [recP] (NormalB bodyE) [])
-  }
+  fieldInfo <- mapM mkField fields
+  let (recPs, recEs) = unzip fieldInfo
+  let recP = RecP rec_name recPs
+  let bodyE = AppE (AppE (VarE 'record_ppr) (nameToStrLit rec_name)) (ListE recEs)
+  return (Clause [recP] (NormalB bodyE) [])
 
--- | 
+-- | Make the field pretty printer case.
 mkField (field_name, _, ty) = do
-  { (expE, pat) <- doGenPE (nameBase field_name)
-  ; let fieldE = AppE (AppE (VarE 'field_ppr) (nameToStrLit field_name)) (pprE expE)
-  ; return ((field_name, pat), fieldE)
-  }
+  (expE, pat) <- doGenPE (nameBase field_name)
+  fieldE <- [| field_ppr $(return $ nameToStrLit field_name) $(return $ pprE expE) |]
+  return ((field_name, pat), fieldE)
 
 nameToStrLit name = LitE (StringL (nameBase name))
 

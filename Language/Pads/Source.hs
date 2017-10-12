@@ -1,4 +1,5 @@
 {-# LANGUAGE NamedFieldPuns, RecordWildCards, DeriveDataTypeable #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.Source
   Description : Host language representation of data input

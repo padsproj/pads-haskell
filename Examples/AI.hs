@@ -26,8 +26,14 @@ import System.IO.Unsafe (unsafePerformIO)
       ' ',  response   :: Response,
       ' ',  contentLen :: ContentLength }
 
-  data Src = Addr IP_v4 | Name Host
-  type IP_v4 = (IPInt, '.', IPInt, '.', IPInt, '.', IPInt)
+  data Src = Addr
+      { a :: IPInt, '.'
+      , b :: IPInt, '.'
+      , c :: IPInt, '.'
+      , d :: IPInt
+      }
+    | Name Host
+  --type IP_v4 = (IPInt, '.', IPInt, '.', IPInt, '.', IPInt)
   type IPInt = constrain i :: Int where <| 0 <= i && i < 256 |>
   type Host = StringC ' '
 

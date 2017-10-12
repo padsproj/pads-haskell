@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts, DeriveDataTypeable #-}
-{-# OPTIONS_HADDOCK hide, prune #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.PadsPrinter
   Description : Lazy Pads printing monad

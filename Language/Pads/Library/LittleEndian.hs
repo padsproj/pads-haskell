@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
     FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
-{-# OPTIONS_HADDOCK hide, prune #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.Library.LittleEndian
   Description : Support for parsing of little endian data

@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell, MagicHash #-}
 {-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.TH
   Description : Template Haskell utilities

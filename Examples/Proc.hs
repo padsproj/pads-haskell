@@ -7,7 +7,6 @@
 -- :set -ddump-splices
 module Examples.Proc where
 import Language.Pads.Padsc
-import Language.Pads.GenPretty
 
 ws = RE "[ \t]+"
 

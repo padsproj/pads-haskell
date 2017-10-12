@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections, ViewPatterns, TemplateHaskell, NamedFieldPuns, ScopedTypeVariables,
              RecordWildCards, UndecidableInstances #-}
-{-# OPTIONS_HADDOCK hide, prune #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.CodeGen
   Description : Template Haskell based code generator
@@ -43,12 +43,14 @@ import qualified Data.Maybe as Maybe
 import Control.Monad
 import Language.Haskell.TH.Syntax (lift)
 
-import Debug.Trace
+import qualified Debug.Trace as D
 
 -- | 
 type BString = S.RawStream
 
--- | 
+-- | A function passed into the code generator which gets called on data type
+-- declarations and returns a list of standalone-deriving declarations.
+-- Presently this is unused by Pads.
 type Derivation = Dec -> Q [Dec]
 
 -- | Top level code gen function from Pads decls to Haskell decls
@@ -346,7 +348,10 @@ buildInst mb str args pads =
   md_ty   = applyT (ConT (mkMDName str) : map snd argpairs)
   meta_ty   = applyT (ConT (mkMDName str) : metas)
   parsePP_method = FunD 'parsePP1 [Clause mbarg (NormalB (applyE (VarE (mkTyParserName str) : [VarE 'parsePP | a <- args]))) []]
-  printFL_method = FunD 'printFL1 [Clause mbarg (NormalB (applyE (VarE (mkTyPrinterName str) : [VarE 'printFL | a <- args]))) []]
+  printFL_method = 
+    if str == "Entry"
+      then FunD 'printFL1 [Clause mbarg (NormalB $ VarE $ mkName "undefined") []]
+      else FunD 'printFL1 [Clause mbarg (NormalB (applyE (VarE (mkTyPrinterName str) : [VarE 'printFL | a <- args]))) []]
   def_method = FunD 'def1 [Clause mbarg (NormalB (applyE (VarE (mkTyDefName str) : [VarE 'def | a <- args]))) []]
   argpair n = (VarT (mkName n),VarT (mkName $ n++"_md"))
   meta n = AppT (ConT ''Meta) (VarT $ mkName n)
@@ -377,7 +382,10 @@ mkPadsSignature str args mb@(Just ety)
   = buildSignature mb str args (ConT ''Pads1 `AppT` ety)
 
 -- | See 'mkPadsSignature' above.
-buildSignature mb str args pads = [printFL_signature,def_signature]
+buildSignature mb str args pads =
+  if str == "Entry"
+    then [def_signature]
+    else [printFL_signature,def_signature]
   where
   mbarg = case mb of
     Nothing -> [TupP []]
@@ -415,36 +423,38 @@ buildSignature mb str args pads = [printFL_signature,def_signature]
 -- function for a given 'PadsTy' type declaration.
 genPadsParseM :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
 genPadsParseM name args patM padsTy = do 
-  body  <- genParseTy padsTy
-  return [mkParserFunction name args patM body]
+  let body = genParseTy padsTy
+  mkParserFunction name args patM body
 
 -- | 'PadsData' data declaration flavour of the "_parseM" function.
 genPadsDataParseM :: UString -> [LString] -> (Maybe Pat) -> PadsData -> Q [Dec] 
 genPadsDataParseM name args patM padsData = do 
-  body  <- genParseData padsData
-  return [mkParserFunction name args patM body]
+  let body = genParseData padsData
+  mkParserFunction name args patM body
 
 -- | 'BranchInfo' new type declaration flavour of the "_parseM" function.
 genPadsNewParseM :: UString -> [LString] -> (Maybe Pat) -> BranchInfo -> Q [Dec] 
 genPadsNewParseM name args patM branch = do 
   (dec,exp) <- genParseBranchInfo branch
-  let body = LetE [dec] exp
-  return [mkParserFunction name args patM body]
+  let body = letE [return dec] (return exp)
+  mkParserFunction name args patM body
 
 -- | Pads Obtain declaration flavour of the "_parseM" function.
 genPadsObtainParseM :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
 genPadsObtainParseM name args padsTy exp = do
-  body  <- genParseTy (PTransform padsTy (PTycon [name]) exp)
-  return [mkParserFunction name args Nothing body]
+  let body = genParseTy (PTransform padsTy (PTycon [name]) exp)
+  mkParserFunction name args Nothing body
 
 -- | Construct the declaration for a function which monadically parses a Pads
 -- type given the body of the function as input.
-mkParserFunction :: UString -> [LString] -> Maybe Pat -> Exp -> Dec
+mkParserFunction :: UString -> [LString] -> Maybe Pat -> Q Exp -> Q [Dec]
 mkParserFunction name args patM body
-  = FunD parserName [Clause parserArgs (NormalB body) []]
+  = sequence $ if name == "Entry" then [sig,fun] else [fun]
   where
-    parserName = mkTyParserName name    
-    parserArgs = map (VarP . mkVarParserName) args ++ Maybe.maybeToList patM
+    fun        = funD parserName [clause parserArgs (normalB body) []]
+    sig        = sigD parserName [t| PadsParser ($(conT $ mkConstrName name), (Base_md, $(conT $ mkConstrIMDName name))) |]
+    parserName = mkTyParserName name
+    parserArgs = map (varP . mkVarParserName) args ++ Maybe.maybeToList (return <$> patM)
 
 -------------------------------------------------------------------------------
 -- * Generating String-Parser Declaration
@@ -542,13 +552,17 @@ genParseValue exp = [| return ($(return exp), cleanBasePD) |]
 genParseTuple :: [PadsTy] -> Q Exp
 genParseTuple []  = [| return ((), cleanBasePD) |]
 genParseTuple tys = do
-  { let f_rep = buildF_rep vars_frep
-  ; let f_md  = buildF_md vars_fmd vars_frep 
-  ; body  <- foldl parseNext [| return ($(dyn "f_rep"),$(dyn "f_md")) |] tys
-  ; return (LetE [f_rep,f_md] body)
-  }
+  f_rep_name <- newName "f_rep"
+  f_md_name  <- newName "f_md"
+  let f_rep     = buildF_rep      f_rep_name vars_frep
+      f_rep_sig = buildF_rep_sig  f_rep_name sigs_frep
+      f_md      = buildF_md       f_md_name  vars_fmd
+  f_md_sig     <- buildF_md_sig   f_md_name  tys
+  body  <- foldl parseNext [| return ($(dyn "f_rep"),$(dyn "f_md")) |] tys
+  return (LetE [f_rep_sig,f_rep,f_md_sig,f_md] body)
   where
     vars_frep = [v | (v,t) <- zip vars_fmd tys, hasRep t]
+    sigs_frep = [t | t <- tys, hasRep t]
     vars_fmd  = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
 
 -- | Glom the generated parser for the given 'PadsTy' onto the given parser
@@ -563,22 +577,49 @@ parseNext prog t
 -- "f_rep" function generated by *this* function gets passed into the '=@=' and
 -- '=@' runtime system operators which call f_rep on the result of parsing each
 -- of the members of the tuple.
-buildF_rep :: [Name] -> Dec
-buildF_rep vars_frep
-  = FunD (mkName "f_rep") [Clause
+buildF_rep :: Name -> [Name] -> Dec
+buildF_rep name vars_frep
+  = FunD name [Clause
          (map VarP vars_frep) (NormalB (TupE (map VarE vars_frep))) [] ]
+
+isVarT (VarT _) = True
+isVarT _        = False
+
+buildF_md_sig :: Name -> [PadsTy] -> Q Dec
+buildF_md_sig name ptys = do
+  let tys   = map (mkMDTy False) ptys
+      mdRet = foldl AppT (TupleT $ length tys) tys
+  retTy <- [t| (Base_md, $(return mdRet)) |]
+  let sigTy = foldr1 (appT2 ArrowT) (tys ++ [retTy])
+      varTs = filter isVarT tys
+      varTNames = map (\(VarT t) -> PlainTV t) varTs
+      sigT' = ForallT varTNames (map (AppT (ConT ''PadsMD)) varTs) sigTy
+  return (case tys of
+            []     -> SigD name $ TupleT 0
+            (t:[]) -> SigD name $ appT2 ArrowT t t
+            _      -> SigD name $ sigT')
 
 -- | Same as 'buildF_rep' above but for the metadata instead of the parse
 -- representation. In this case we need to pull off just the 'Base_md' from the
 -- metadata resulting from whatever the parser returned to us for each of the
 -- tuple results using the 'get_md_header' type class function provided by the
 -- runtime system.
-buildF_md :: [Name] -> [Name] -> Dec
-buildF_md vars_fmd vars_frep 
-  = FunD (mkName "f_md") [Clause (map VarP vars_fmd) (NormalB body) []]
+buildF_md :: Name -> [Name] -> Dec
+buildF_md f_md_name vars_fmd
+  = FunD f_md_name [Clause (map VarP vars_fmd) (NormalB body) []]
   where
     mdHeaders = [ VarE 'get_md_header `AppE` VarE xi | xi <- vars_fmd ]
-    body = TupE [mkMergeBaseMDs mdHeaders, TupE (map VarE vars_fmd)] --vars_frep)]
+    body = TupE [mkMergeBaseMDs mdHeaders, TupE (map VarE vars_fmd)]
+
+buildF_rep_sig :: Name -> [PadsTy] -> Dec
+buildF_rep_sig name ptys = let
+    tys   = map mkRepTy ptys
+    retTy = foldl  AppT (TupleT $ length tys) tys
+    sigTy = foldr1 (appT2 ArrowT) (tys ++ [retTy])
+  in (case tys of
+        []     -> SigD name $ TupleT 0
+        (t:[]) -> SigD name $ appT2 ArrowT t t
+        _      -> SigD name $ sigTy)
 
 -- | Generate a call to 'mergeBaseMDs'
 mkMergeBaseMDs :: [Exp] -> Exp
@@ -675,18 +716,16 @@ buildConstr_md fnMD conMD tys
 -- | Generate the template haskell code for parsing a Pads record.
 genParseRecord :: UString -> [FieldInfo] -> (Maybe Exp) -> Q (Dec,Exp)
 genParseRecord c fields pred = do
-  { c_md <- newName (strToLower c)
-  ; let con_md = buildConstr_md c_md (ConE (mkConstrIMDName c))
-                       [ty | (_,(_,ty),_) <- fields]
-  ; labMDs  <- sequence [genLabMDName "x" l | (l,(_,_),_) <- fields] 
-  ; let fnMDLabs  = applyE $ map VarE (c_md : labMDs)
-  ; doStmts <- sequence [genParseField f xn | (f,xn) <- zip fields labMDs]
-  ; let labs = [mkName lab | (Just lab,(_,ty),_) <- fields, hasRep ty]
-  ; let conLabs = applyE (ConE (mkConstrName c) : map VarE labs)
-  ; returnStmt <- [| return ($(return conLabs),$(return fnMDLabs)) |]
-  ; return (con_md, DoE (doStmts ++ [NoBindS returnStmt]))
-  }
-  where
+  c_md <- newName (strToLower c)
+  let con_md = buildConstr_md c_md (ConE (mkConstrIMDName c))
+                     [ty | (_,(_,ty),_) <- fields]
+  labMDs  <- sequence [genLabMDName "x" l | (l,(_,_),_) <- fields] 
+  let fnMDLabs  = applyE $ map VarE (c_md : labMDs)
+  doStmts <- sequence $ [genParseField f xn | (f,xn) <- zip fields labMDs]
+  let labs = [mkName lab | (Just lab,(_,ty),_) <- fields, hasRep ty]
+  let conLabs = applyE (ConE (mkConstrName c) : map VarE labs)
+  returnStmt <- [| return ($(return conLabs),$(return fnMDLabs)) |]
+  return (con_md, DoE (concat doStmts ++ [NoBindS returnStmt]))
 
 -- | Generate the name (label?) for the metadata of a field in a record.
 genLabMDName :: String -> Maybe String -> Q Name
@@ -694,23 +733,24 @@ genLabMDName s (Just lab) = return (mkFieldMDName lab)
 genLabMDName s Nothing    = liftM mangleName (newName s)
 
 -- | Generate the parser for a field of a Pads record.
-genParseField :: FieldInfo -> Name -> Q Stmt
+genParseField :: FieldInfo -> Name -> Q [Stmt]
 genParseField (labM, (strict, ty), expM) xn = do
-  { parseTy <- case expM of 
-                Nothing  -> genParseTy ty
-                Just exp -> genParseRecConstrain labP (VarP xn) ty exp
-  ; return (BindS (TupP [labP, VarP xn]) parseTy)
-  }
+  let parseTy = (case expM of 
+                    Nothing  -> genParseTy ty
+                    Just exp -> genParseRecConstrain labP (varP xn) ty (return exp))
+  sequence $
+    [ bindS (tupP [labP, varP xn]) parseTy
+    ]
   where
     labP = case labM of
-              Just lab -> VarP (mkName lab)
-              Nothing  -> WildP
+              Just lab -> varP (mkName lab)
+              Nothing  -> wildP
 
 -- | Generate the parser for a constrained field on a record.
-genParseRecConstrain :: Pat -> Pat -> PadsTy -> Exp -> Q Exp
+genParseRecConstrain :: Q Pat -> Q Pat -> PadsTy -> Q Exp -> Q Exp
 genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred |]
   where
-    pred = return (LamE [labP, xnP] exp)
+    pred = lamE [labP, xnP] exp
 
 -------------------------------------------------------------------------------
 -- Generating Printing Function from a Declaration
@@ -1117,12 +1157,14 @@ mkMDVarName name = mkName (name ++ "_md")
 
 -- ** Naming fields and constructors
 
-
+-- | Convert Pads source (record) field name into a 'Q' monad name
 mkFieldName str   = mkName str
+
+-- | Convert Pads source (record) field name into its metadata name in the 'Q'
+-- monad.
 mkFieldMDName str = mkName (str ++ "_md")
 
-
-
+-- | Pads constructor 
 mkConstrName   str  = mkName str
 mkConstrIMDName str = mkName (str ++ "_imd")
 mkfnMDName str      = mkName (strToLower str ++ "_md")

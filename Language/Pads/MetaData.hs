@@ -1,6 +1,7 @@
 {-# LANGUAGE Rank2Types, TypeFamilies, KindSignatures, NamedFieldPuns, DisambiguateRecordFields
            , FlexibleInstances, DeriveDataTypeable, ConstraintKinds, MultiParamTypeClasses
            , ScopedTypeVariables, FlexibleContexts #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.MetaData
   Description : Metadata produced by a Pads parser
@@ -30,12 +31,12 @@ import Data.Set (Set(..))
 import qualified Data.Set as Set
 import Data.List
 
-{- Base type library support -}
+-- | Base type library support for internal (to Pads) metadata
 data Base_md = Base_md { numErrors :: Int
                        , errInfo   :: Maybe E.ErrInfo
                         -- Need to add location information, etc.
                        }
-   deriving (Typeable, Data, Eq, Ord, Show)
+  deriving (Typeable, Data, Eq, Ord, Show)
 
 
 -- | Meta data type class

@@ -441,15 +441,21 @@ result_tryTestDG = tryTestD_parseS input_tryTestDG
 expect_tryTestDG = ((1,"123"),0,"abc")
 test_tryTestDG = mkTestCase "tryTestDG" expect_tryTestDG result_tryTestDG
 
+-- Note that 'try_parseM' does not return an error when it fails to parse a
+-- digit (and therefore uses the default value of "0") because a "try" parser
+-- should fail silently, similar to how the 'try' combinator works in parsec.
 input_tryTestDB = "abc123"
 result_tryTestDB = tryTestD_parseS input_tryTestDB
-expect_tryTestDB = ((0,"abc"),1, "123")
+expect_tryTestDB = ((0,"abc"),0,"123")
 test_tryTestDB = mkTestCase "tryTestDB" expect_tryTestDB result_tryTestDB
 
 {- ((TryTestD (0,"abc"),
-    (Errors: 1 Encountered a when expecting Digit. at: Line: 0, Offset: 0,(Errors: 1 Encountered a when expecting Digit. at: Line: 0, Offset: 0,Errors: 0))),"123")
+    (Errors: 1 Encountered a when expecting Digit. at: Line: 0, Offset:
+    0,(Errors: 1 Encountered a when expecting Digit. at: Line: 0, Offset:
+    0,Errors: 0))),"123")
 
-  XXX: we are getting a repeat error message because of change ot how errors are propogated.  Need to work on cleaning up error reporting.
+  XXX: we are getting a repeat error message because of change to how errors are
+  propagated. Need to work on cleaning up error reporting.
 -}
 
 

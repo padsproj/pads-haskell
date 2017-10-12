@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, ConstraintKinds, MultiParamTypeClasses
            , FunctionalDependencies, ScopedTypeVariables, FlexibleContexts
            , Rank2Types, FlexibleInstances #-}
-{-# OPTIONS_HADDOCK hide, prune #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.Generic
   Description : Default parse values using GHC Generics

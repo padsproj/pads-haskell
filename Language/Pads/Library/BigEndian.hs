@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
     FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
-{-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
+{-# OPTIONS_HADDOCK prune, ignore-exports #-}
 {-|
   Module      : Language.Pads.Library.BigEndian
   Description : Support for parsing of big endian data

@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
     FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.Library.BinaryUtilities
   Description : Utilities for transforming binary data
@@ -19,9 +20,9 @@ import Data.ByteString as B
 import Data.Bits
 import System.ByteOrder
 
-----------------------------------
+-------------------------------------------------------------------------------
 
--- SIGNED-BYTE-HIGH FUNCTIONS --
+-- | * Signed-Byte-High Functions
 -- The most significant digit is on the left (lowest address).
 -- These functions manage the case where the wire representation
 -- is signed-byte high, regardless of the endianness of the host
@@ -109,5 +110,5 @@ assembleWord32 :: (Word32, Word32, Word32, Word32) -> Word32
 assembleWord32 (b0, b1, b2, b3) =
   shift b0 24 .|. shift b1 16 .|. shift b2 8 .|. b3
 
--------------------------------------------
+-------------------------------------------------------------------------------
 

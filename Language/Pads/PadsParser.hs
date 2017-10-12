@@ -1,4 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.PadsParser
   Description : The parsing monad for Pads
@@ -122,8 +123,21 @@ returnError x err = do loc <- getLoc
 infixl 5 =@=, =@
 
 -- | 
-p =@= q = do {(f,g) <- p; (rep,md) <- q; return (f rep, g md) }
-p =@  q = do {(f,g) <- p; (rep,md) <- q; return (f, g md) }
+(=@=) :: PadsParser (t3 -> t2, t1 -> t)
+      -> PadsParser (t3, t1)
+      -> PadsParser (t2, t)
+p =@= q = do 
+  (f,g)     <- p
+  (rep,md)  <- q
+  return (f rep, g md)
+
+(=@)  :: PadsParser (t3, t2 -> t1)
+      -> PadsParser (t, t2)
+      -> PadsParser (t3, t1)
+p =@  q = do
+  (f,g)     <- p
+  (rep,md)  <- q
+  return (f, g md)
 
 -------------------------------------------------------------------------------
 -- * Source manipulation functions
@@ -175,8 +189,10 @@ p <||> q = PadsParser $ \bs -> (p # bs) <++> (q # bs)
 -- | Run the given Pads parser on the current input, but after running it
 -- replace the (now possibly mutated input) with the original input while
 -- returning the result parsed.
-parseTry :: PadsParser a -> PadsParser a
-parseTry p = PadsParser $ \bs -> replaceSource bs (p # bs)
+parseTry :: PadsMD md => PadsParser (rep,md) -> PadsParser (rep,md)
+parseTry p = do
+  (rep, md) <- PadsParser $ \bs -> replaceSource bs (p # bs)
+  mdReturn (rep, md)
 
 -------------------------------------------------------------------------------
 -- * Parsers for Pads language features

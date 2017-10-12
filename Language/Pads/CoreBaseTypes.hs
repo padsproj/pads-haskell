@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables,
              MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances,
              FlexibleInstances #-}
-{-# OPTIONS_HADDOCK hide, prune #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.CoreBaseTypes
   Description : Core Pads base types with parsers
@@ -393,7 +393,11 @@ double_printFL (d, bmd) = fshow d
 type Try a = a
 type Try_md a_md = (Base_md, a_md)
 
-try_parseM p = parseTry p
+try_parseM :: PadsMD md => PadsParser (rep,md) -> PadsParser (Try rep, Try_md md)
+try_parseM p = do
+  (rep,md) <- parseTry p
+  return (rep, (cleanBasePD, md))
+
 try_printFL :: PadsPrinter (a,a_md) -> PadsPrinter (Try a,Try_md a_md)
 try_printFL p _ = printNothing
 

@@ -27,10 +27,10 @@ import qualified Language.Pads.Parser as P
 pads :: QuasiQuoter
 pads = padsDerivation (const $ return [])
 
--- | Same as @pads@, but parametrized by a higher order function which
+-- | Same as /pads/, but parametrized by a higher order function which
 -- constructs a list of Haskell decls to splice into scope for each PADS
--- metadata and data declaration. Namely the @type@, @newtype@, and @data@ PADS
--- constructs get passed into @derivation@ as a template haskell declaration.
+-- metadata and data declaration. Namely the /type/, /newtype/, and /data/ PADS
+-- constructs get passed into /derivation/ as a template haskell declaration.
 --
 -- PADS only supports quasiquotes in place of a Haskell declaration
 -- (expressions, patterns, and types produce errors).
@@ -41,8 +41,8 @@ padsDerivation derivation = QuasiQuoter
                     (error "parse type")
                     (pparseDecl derivation)
 
--- | Just the "declaration" parser for a PADS quasiquotation. Glues together
--- @'P.parsePadsDecls'@ and @'make_pads_declarations''@, the parser and code
+-- | Just the declaration parser for a PADS quasiquotation. Glues together
+-- 'P.parsePadsDecls' and 'make_pads_declarations', the parser and code
 -- generator.
 pparseDecl :: Derivation -> String -> Q [Dec]
 pparseDecl derivation input = do
@@ -53,8 +53,8 @@ pparseDecl derivation input = do
       Left err -> unsafePerformIO $ fail $ show err
       Right x  -> make_pads_declarations' derivation x
 
--- | Just the "declaration" parser for a PADS quasiquotation. Glues together
--- @'P.parsePadsDecls'@ and @'make_pads_declarations''@, the parser and code
+-- | Just the declaration parser for a PADS quasiquotation. Glues together
+-- 'P.parsePadsDecls' and 'make_pads_declarations', the parser and code
 -- generator.
 pparseExp :: String -> Q Exp
 pparseExp input = do

@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveDataTypeable,DeriveLift, DeriveAnyClass, DeriveGeneric #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.Syntax
   Description : The concrete syntax of Pads in Haskell

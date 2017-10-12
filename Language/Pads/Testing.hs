@@ -1,4 +1,4 @@
-{-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
+{-# OPTIONS_HADDOCK prune, ignore-exports #-}
 {-|
   Module      : Language.Pads.Testing
   Description : Pads testing utilities

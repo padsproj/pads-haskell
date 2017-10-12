@@ -14,6 +14,7 @@ import qualified Test.HUnit as H
 import Test.HUnit ((@?=))
 import Test.QuickCheck (Property, quickCheck, (==>))
 import qualified Test.QuickCheck.Monadic as TQM
+import Control.Monad.State.Lazy (liftIO)
 
 import Language.Pads.Padsc
 import Examples.Proc
@@ -44,23 +45,23 @@ testFirst =
   @?=
   H.Counts (length First.tests) (length First.tests) 0 0
 
-testAI =
-  unsafePerformIO (AI.result 1)
-  @?=
-  [ AI.Entry
-      { AI.host = AI.Addr (207, 136, 97, 49)
-      , AI.identdID = AI.Missing
-      , AI.httpID   = AI.Missing
-      , AI.time     = read "1997-10-16 01:46:51 UTC"
-      , AI.request  = AI.Request
-        { AI.method = AI.GET
-        , AI.url    = "/turkey/amnty1.gif"
-        , AI.version = AI.Version {AI.major = 1, AI.minor = 0}
+testAI = True ==> TQM.monadicIO $ do
+  r <- liftIO $ AI.result 1
+  TQM.assert $ r ==
+    [ AI.Entry
+        { AI.host = AI.Addr 207 136 97 49
+        , AI.identdID = AI.Missing
+        , AI.httpID   = AI.Missing
+        , AI.time     = read "1997-10-16 01:46:51 UTC"
+        , AI.request  = AI.Request
+          { AI.method = AI.GET
+          , AI.url    = "/turkey/amnty1.gif"
+          , AI.version = AI.Version {AI.major = 1, AI.minor = 0}
+          }
+        , AI.response = 200
+        , AI.contentLen = AI.ContentLength 3013
         }
-      , AI.response = 200
-      , AI.contentLen = AI.ContentLength 3013
-      }
-  ]
+    ]
 
 testBinary =
   unsafePerformIO Binary.test
@@ -70,7 +71,7 @@ testBinary =
 main :: IO ()
 main = defaultMainWithOpts
   [ testCase "Examples.First"   testFirst
-  , testCase "Examples.AI"      testAI
+  , testProperty "Examples.AI"  testAI
   , testCase "proc maps file 0" (procMaps "Test/data/maps0")
   ] mempty
 

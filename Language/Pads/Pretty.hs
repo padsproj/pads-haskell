@@ -1,4 +1,5 @@
 {-# LANGUAGE NamedFieldPuns,RecordWildCards #-}
+{-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.Pretty
   Description : Pretty printing utilities for Pads types
