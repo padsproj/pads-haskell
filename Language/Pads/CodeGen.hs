@@ -156,16 +156,21 @@ mkTyRepMDDecl name args ty = [repType, mdType]
 mkDataRepMDDecl :: Derivation -> UString -> [LString] -> PadsData -> [QString] -> Q [Dec]
 mkDataRepMDDecl derivation name args branches ds = do
   bs' <- mapM (return . mkMDUnion) bs
-  imdDecl  <- dataD (cxt []) (mkIMDName name) tyArgsMD Nothing bs'  (derive [])
+  imdDecl  <- dataD (cxt []) (mkIMDName name) tyArgsMD Nothing bs'  [derive []]
   bs'' <- mapM (return . mkRepUnion) bs
-  dataDecl <- dataD (cxt []) (mkRepName name) tyArgs   Nothing bs'' (derive ds)
+  --let ds' = map (conT . mkName . qName) ds
+  dataDecl <- dataD (cxt []) (mkRepName name) tyArgs   Nothing bs'' [derive ds]
   derivesData <- derivation dataDecl
   derivesImd <- derivation imdDecl
+  let mdName = mkMDName name
+  --let bT = bangType (mkStrict NotStrict)
+  --let mdDeclConstr = normalC mdName $ [bT $ return $ mkTupleT [ConT '' Base_md, imdApp]]
+  --mdDecl <- newtypeD (cxt []) mdName tyArgsMD Nothing mdDeclConstr []
+  let mdDecl   = TySynD   (mkMDName name)  tyArgsMD (mkTupleT [ConT ''Base_md, imdApp])
   return $ [dataDecl, mdDecl, imdDecl] ++ derivesData ++ derivesImd
   where
-    mdDecl   = TySynD   (mkMDName name)  tyArgsMD (mkTupleT [ConT ''Base_md, imdApp])
     tyArgs   = map (PlainTV . mkName) args
-    tyArgsMD   = map (PlainTV . mkName . (++"_md")) args
+    tyArgsMD = map (PlainTV . mkName . (++"_md")) args
     imdApp   = foldl AppT (ConT (mkIMDName name)) (map (VarT . mkName . (++"_md")) args)
     bs       = case branches of
                  PUnion bnchs    -> bnchs
@@ -208,9 +213,10 @@ mkMDUnion (BRecord c fields expM) = do
 
 -- | Make the type context of a data declaration, consisting of the typeclasses
 -- instanced by Pads data types.
-derive :: [QString] -> CxtQ
-derive ds = cxt (map (conT . mkName . qName) ds
-  ++ [conT $ mkName d | d<-["Show","Eq","Typeable","Data","Ord"], not (d `elem` map last ds)])
+--derive :: [QString] -> CxtQ
+derive :: [QString] -> DerivClauseQ
+derive ds = derivClause Nothing $ map (conT . mkName . qName) ds
+  ++ [conT $ mkName d | d<-["Show","Eq","Typeable","Data","Ord"], not (d `elem` map last ds)]
 
 -------------------------------------------------------------------------------
 -- * Generating Rep/MD Newtype Declarations
@@ -219,8 +225,10 @@ derive ds = cxt (map (conT . mkName . qName) ds
 -- using the "newtype" keyword.
 mkNewRepMDDecl :: Derivation -> UString -> [LString] -> BranchInfo -> [QString] -> Q [Dec]
 mkNewRepMDDecl derivation name args branch ds = do
-  imdDecl  <- newtypeD (cxt []) (mkIMDName name) tyArgsMD Nothing (mkMDUnion  branch) (derive [])
-  dataDecl <- newtypeD (cxt []) (mkRepName name) tyArgs   Nothing (mkRepUnion branch) (derive ds)
+  imdDecl  <- newtypeD (cxt []) (mkIMDName name) tyArgsMD Nothing (mkMDUnion  branch) [derive []]
+  let ds' = map (conT . mkName . qName) ds
+  dataDecl <- newtypeD (cxt []) (mkRepName name) tyArgs   Nothing (mkRepUnion branch) [derive ds]
+  --[derivClause Nothing ds']
   derivesData <- derivation dataDecl
   derivesImd <- derivation imdDecl
   return $ [dataDecl, mdDecl, imdDecl] ++ derivesData ++ derivesImd
@@ -326,7 +334,7 @@ mkMDTuple isMeta tys = case mds of
 -- > type instance PadsArg Foo = (Bar1, Bar2, Bar3)
 mkPadsInstance :: UString -> [LString] -> Maybe Type -> [Dec]
 mkPadsInstance str args mb@(Nothing)
-  = buildInst mb str args (ConT ''Pads)
+  = buildInst mb str args (ConT ''Pads1 `AppT` TupleT 0)
 mkPadsInstance str args mb@(Just ety) 
   = buildInst mb str args (ConT ''Pads1 `AppT` ety)
 
