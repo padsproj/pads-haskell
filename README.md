@@ -4,7 +4,7 @@ pads website (www.padsproj.org).
 
 # Building
 
-`pads-haskell` currently requires GHC 8.0.2.
+`pads-haskell` currently requires GHC 8.2.2.
 
 ## Setup
 
