@@ -9,7 +9,7 @@ Examples/data/VCard-infinite.vcf Examples/data/VCards.vcf
 Examples/data/vCards.vcf
 Examples/data/VcardSmall.vcf
 
-
+pads-haskell.cabal
 cabal.sandbox.config
 .cabal-sandbox/*
 /.stack-work/

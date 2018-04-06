@@ -1,0 +1,111 @@
+name:                pads-haskell
+version:             0.0.0.2
+github:              "padsproj/pads-haskell"
+license:             MIT
+author:              "Kathleen Fisher and John Launchbury"
+maintainer:          "karl@cs.tufts.edu"
+copyright:           "2011 Kathleen Fisher & John Launchbury"
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+- examples/First.hs
+- examples/AI.hs
+- examples/Binary.hs
+- examples/data/README
+- examples/data/test_file
+- examples/data/ai.3000
+- examples/data/ai.big
+- examples/data/binary
+- examples/data/a2b.c
+- examples/data/calls10.a
+- examples/data/calls10.b
+- examples/data/genBin.c
+- examples/data/binTest.a
+- examples/data/binTest.b
+- examples/data/maps0
+- Documentation/Info/PADS-Index.txt
+- Documentation/Info/PackagesUsedInPads.txt
+- Documentation/Info/Pads-grammar.tex
+
+# Metadata used when publishing your package
+synopsis:            PADS data description language for Haskell.
+category:            Language
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description: Please see the README on Github at <https://github.com/padsproj/pads-haskell#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- bytestring >= 0.10 && < 0.11
+- byteorder >= 1.0.4 && < 1.1
+- containers >= 0.5.10 && < 0.6
+- haskell-src-meta >= 0.8 && < 0.9 # Parsing Haskell code inside of a PADS description
+- HUnit >= 1.6 && < 1.7
+- mainland-pretty >= 0.6.1 && < 0.7
+  #- old-locale # 
+- parsec >= 3.1.13 && < 3.2
+- regex-posix >= 0.95.2 && < 0.96
+- syb >= 0.7 && < 0.8 # Data.Generics
+- template-haskell >= 2.12 && < 2.13
+- time >= 1.8.0 && < 1.8.1 # UTC and timezone in BaseTypes
+- th-lift >= 0.7.8 && < 0.7.9 # deriveLift
+
+library:
+  source-dirs:
+    - src
+  exposed-modules:
+    - Language.Pads.BaseTypes
+    - Language.Pads.CodeGen
+    - Language.Pads.CoreBaseTypes
+    - Language.Pads.Errors
+    - Language.Pads.Generic
+    - Language.Pads.GenPretty
+    - Language.Pads.MetaData
+    - Language.Pads.Padsc
+    - Language.Pads.PadsParser
+    - Language.Pads.PadsPrinter
+    - Language.Pads.Parser
+    - Language.Pads.Pretty
+    - Language.Pads.Quote
+    - Language.Pads.RegExp
+    - Language.Pads.Source
+    - Language.Pads.Syntax
+    - Language.Pads.Testing
+    - Language.Pads.TH
+    - Language.Pads.Library.BigEndian
+    - Language.Pads.Library.BinaryUtilities
+    - Language.Pads.Library.LittleEndian
+    - Language.Pads.Library.Native
+
+tests:
+  examples:
+    source-dirs:
+      - examples
+    main:                Main.hs
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    # All of the cores:
+    - -with-rtsopts=-N
+    dependencies:
+    - pads-haskell
+    - mwc-random >= 0.13.6.0 && < 0.14
+    - test-framework >= 0.8.2
+    - test-framework-hunit >= 0.3.0
+    - test-framework-quickcheck2 >= 0.3.0
+    - QuickCheck >= 2.10.1
+    - mtl >= 2.2.2
+    - random >= 1.1
+  
+  # Add more Examples like this one if you want to run tests separately from Main.hs:
+  small:
+    main: examples/Small.hs
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - pads-haskell
