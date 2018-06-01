@@ -5,7 +5,7 @@ are not readily available. Pads/Haskell is a domain-specific language that
 facilitates the generation of data processing tools for ad hoc formats.
 Pads/Haskell includes features such as dependent, polymorphic and recursive
 datatypes, which allow programmers to describe the syntax and semantics of ad
-hoc data in a concise, easy-to-read notation.
+hoc data in a concise, easy-to-read notation. 
 
 The pads haskell repository contains the code for the Haskell binding for PADS.
 For more information about the project, see the pads website
