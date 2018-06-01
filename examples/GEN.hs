@@ -26,40 +26,32 @@ import Language.Pads.Padsc
 
 padsExp = [pads|
 
-data SIMPLE = SIMPLE {
-  c1 :: Char,
-  '|',
-  "constant string",
-  '|',
-  i1 :: Int,
-  '|',
-  r1 :: StringFW 20
-}    
+    data Simple = Simple {
+        c1 :: Char,
+        '|',
+        "constant string",
+        '|',
+        i1 :: Int,
+        '|',
+        r1 :: StringFW 20
+    }
 
+    data Name = Bob "Bob" | Fred "Fred"
 
+    data Record = Record {
+        "first:",
+        fname :: Name, ' ',
+        "middle:",
+        mname :: Name, ' ',
+        "last:",
+        lname :: Name, ' ',
+        "age:",
+        age :: Int, ' ',
+        "height:",
+        height :: Int
+    }
 
-
-data NAME = BOB "bob" | FRED "fred"
-
-data RECORD = RECORD {
-  "first:",
-  fname :: NAME,
-            ' ',
-            "middle:",
-  mname :: NAME,
-            ' ',
-            "last:",
-  lname :: NAME,
-            ' ',
-            "age:",
-  age :: Int,' ',
-  "height:",
-  height :: Int
-
-
-}
-
-data RECORDS = RECORDS [RECORD | " | "] 
+    data Records = Records [Record | " | "]
 
 
 
