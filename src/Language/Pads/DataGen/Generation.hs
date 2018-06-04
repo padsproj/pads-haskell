@@ -40,6 +40,7 @@ envs = padsSamples
 
 gen_ast :: PadsDecl -> IO [GENTYPE]
 gen_ast (PadsDeclData id xs args padsdatas e) = gen_padsdatas padsdatas --  String [String] (Maybe Pat) PadsData [QString]
+gen_ast (PadsDeclType id xs args padsty)      = (:[]) <$> gen_padsty padsty
 gen_ast x = error $ "Error in gen_ast:  " ++ (show x)
 
 
