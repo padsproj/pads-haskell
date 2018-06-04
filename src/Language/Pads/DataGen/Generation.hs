@@ -131,6 +131,14 @@ possLetters = ['a'..'z']
 randLetter :: MWC.GenIO -> IO Char
 randLetter gen = RN.randElem possLetters gen
 
+randLetterExcluding :: MWC.GenIO -> Char -> IO Char
+randLetterExcluding gen c = do
+    char <- RN.randElem possLetters gen
+    if (c == char)
+        then do { char' <- randLetterExcluding gen c
+                ; return char' }
+        else return char
+
 randInteger :: MWC.GenIO -> IO Int
 randInteger gen = RN.randInt 0 2147483647 gen
 
@@ -141,7 +149,7 @@ mk_gen_char (LIT c)  gen = return [c]               -- If we have a constant, pr
 mk_gen_char (GTINT)  gen = show <$> randInteger gen
 mk_gen_char (APP GTSTRINGC (LIT c)) gen = do
     len <- RN.randInt 1 listLimit gen
-    str <- replicateM len (randLetter gen)
+    str <- replicateM len (randLetterExcluding gen c)
     return $ str ++ [c]
 mk_gen_char (APP GTSTRINGFW (INT n)) gen =
     concat <$> replicateM (fromIntegral n) (mk_gen_char GTCHAR gen)
