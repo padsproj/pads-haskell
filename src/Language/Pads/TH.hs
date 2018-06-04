@@ -137,8 +137,7 @@ patToExp pat = case pat of
   TildeP p    -> patToExp p
   BangP  p    -> patToExp p
   AsP n _     -> VarE n
-  WildP       -> error "Wild card patterns are not supported in PADS \
-                       \ declarations. Can't convert to expression"
+  WildP       -> error "Wild card patterns are not supported in PADS declarations. Can't convert to expression"
 
   {-  I think this is the correct represtentation of a line type. -}
   RecP name fieldPats -> RecConE name (map fieldPatToExp fieldPats)
