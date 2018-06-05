@@ -61,33 +61,39 @@ padsSamples = [pads|
     -- S3      -- a --> S3
     -- S3      -- t --> ACCEPT
 
-
-    data START = START {start::S1}
+    data START = START { start :: S1 }
 
     -- s1 -- c --> s2
 
-    data S1 = S1 {
-                    'c',
-                     s2::S2
-                 }
+    data S1 = S1 { 'c', s2 :: S2 }
 
     -- s2 -- a --> s3
 
-    data S2 = S2 {  'a',
-                    s3 :: S3
-                 }
+    data S2 = S2 { 'a', s3 :: S3 }
 
     -- s3 -- a --> s3
     -- s3 -- t --> s4
 
-    data S3 = S3A {'a', s3a::S3 } |
-              S3T {'t', ss4::S4 }
+    data S3 = S3A {'a', s3a :: S3 } | S3T {'t', ss4 :: S4 }
 
-    data S4 = S4 {s4::ACCEPT}
+    data S4 = S4 { s4 :: ACCEPT }
 
     data ACCEPT = ACCEPT { }
 
+    data Pixel = Pixel {
+        a :: Bits16 9,
+        b :: Bits8 5,
+        c :: Bits8 5,
+        d :: Bits8 5,
+        pb_index :: Bits8 4,
+        pr_index :: Bits8 4
+    }
 
+    data Mixed = Mixed {
+        bits1 :: Bits8 4,
+        'c',
+        bits2 :: Bits8 4
+    }
 
 |]
 
