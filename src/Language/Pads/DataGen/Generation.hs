@@ -24,10 +24,10 @@ import qualified Language.Haskell.TH as TH
 
 import Control.Monad
 import Data.Word
+import Data.Bits
 import Data.Maybe
 import qualified Data.ByteString as B
 import qualified Data.List as List
-import qualified Data.Bits as BTS
 import qualified System.Random.MWC as MWC
 
 import Language.Pads.Padsc
@@ -58,7 +58,7 @@ gen_fieldinfo ((id, constarg, exp)) = gen_constarg constarg
 
 gen_constarg  ((strict, padsty)) =  gen_padsty padsty
 
-listLimit = 50 -- Limit how long generated lists can be.
+listLimit = 20 -- Limit how long generated lists can be.
 
 
 -- This function actually takes apart padsty's
@@ -86,22 +86,22 @@ gen_padsty x = error $ "Error in gen_padsty: " ++ show x
 -- and turn it into a GENTYPE
 gen_lit (TH.LitE (TH.CharL x))    = (LIT x)
 gen_lit (TH.LitE (TH.StringL xs)) = (GTLIST (map LIT xs) ) -- treat string as a list of chars
-gen_lit (TH.LitE (TH.IntegerL x)) = (INT x)
+gen_lit (TH.LitE (TH.IntegerL x)) = (INT (fromIntegral x))
 
 
 
-data GENTYPE =  GTBITFIELD  --Bitfield (usually parameterized)
-              | GTBITS8
-              | GTBITS16
-              | GTBITS32
-              | GTBITS64
-              | GTSTRINGC
-              | GTSTRINGFW  -- String (usually parameterized)
+data GENTYPE =  GTBITFIELD -- parameterized
+              | GTBITS8    -- parameterized
+              | GTBITS16   -- parameterized
+              | GTBITS32   -- parameterized
+              | GTBITS64   -- parameterized
+              | GTSTRINGC  -- parameterized
+              | GTSTRINGFW -- parameterized
               | GTCHAR
               | GTINT
               | GTLIST [ GENTYPE ]
               | LIT Char    --Arguments to APP
-              | INT Integer --Arguments to APP
+              | INT Int --Arguments to APP
               | APP GENTYPE GENTYPE
               | CHOICE [ GENTYPE ]
   deriving (Show)
@@ -143,37 +143,87 @@ randLetterExcluding gen c = do
 randInteger :: MWC.GenIO -> IO Int
 randInteger gen = RN.randInt 0 2147483647 gen
 
--- Actual value generation, outputs string/char list
-mk_gen_char :: GENTYPE -> MWC.GenIO -> IO [Char]
-mk_gen_char (GTCHAR) gen = (:[]) <$> randLetter gen
-mk_gen_char (LIT c)  gen = return [c]               -- If we have a constant, produce it.
-mk_gen_char (GTINT)  gen = show <$> randInteger gen
-mk_gen_char (APP GTSTRINGC (LIT c)) gen = do
+data Chunk = CharChunk   Char
+           | BinaryChunk Integer Int -- val of data + num of significant bits
+           deriving Show
+
+-- Value generation, creates a list of Chunks, combined elsewhere
+generateChunks :: GENTYPE -> MWC.GenIO -> IO [Chunk]
+generateChunks (LIT c)  gen = return [CharChunk c]               -- If we have a constant, produce it.
+generateChunks (GTCHAR) gen = ((:[]) . CharChunk) <$> randLetter gen
+generateChunks (GTINT)  gen = ((map CharChunk) <$>) show <$> randInteger gen
+generateChunks (APP GTBITS8 (INT n)) gen = do
+    when (n > 8 || n < 0)
+        (error $ "Bad Bits8 value: " ++ (show n))
+    r <- randInteger gen
+    return $ [BinaryChunk (fromIntegral r) n]
+generateChunks (APP GTBITS16 (INT n)) gen = do
+    when (n > 16 || n < 0)
+        (error $ "Bad Bits16 value: " ++ (show n))
+    r <- randInteger gen
+    return $ [BinaryChunk (fromIntegral r) n]
+generateChunks (APP GTBITS32 (INT n)) gen = do
+    when (n > 32 || n < 0)
+        (error $ "Bad Bits32 value: " ++ (show n))
+    r <- randInteger gen
+    return $ [BinaryChunk (fromIntegral r) n]
+generateChunks (APP GTBITS64 (INT n)) gen = do
+    when (n > 64 || n < 0)
+        (error $ "Bad Bits64 value: " ++ (show n))
+    r <- MWC.uniformR (0 :: Word64, 2 ^ 64 - 1 :: Word64) gen
+    return $ [BinaryChunk (fromIntegral r) n]
+generateChunks (APP GTSTRINGFW (INT n)) gen =
+    concat <$> replicateM (fromIntegral n) (generateChunks GTCHAR gen)
+generateChunks (APP GTSTRINGC (LIT c)) gen = do
     len <- RN.randInt 1 listLimit gen
     str <- replicateM len (randLetterExcluding gen c)
-    return $ str ++ [c]
-mk_gen_char (APP GTSTRINGFW (INT n)) gen =
-    concat <$> replicateM (fromIntegral n) (mk_gen_char GTCHAR gen)
-mk_gen_char (APP GTBITS8 (INT n)) gen = do
-    when (n > 8 || n < 0) (error ("Bad Bits8 value: " ++ (show n)))
-    r <- RN.randInt 0 (2 ^ n - 1) gen
-    let n' = fromIntegral n
-    let c = word8ToChr $ fromIntegral $ BTS.shiftL r (8 - n')
-    return [c]
-mk_gen_char (GTLIST ds) gen = do
-    vals <- mapM (\x -> mk_gen_char x gen) ds
+    return $ (map CharChunk (str ++ [c]))
+generateChunks (GTLIST ds) gen = do
+    vals <- mapM (\x -> generateChunks x gen) ds
     return $ concat vals
-mk_gen_char (CHOICE cs) gen = do
+generateChunks (CHOICE cs) gen = do
     rand <- RN.randElem cs gen
-    mk_gen_char rand gen
-mk_gen_char (x) _ = error $ "Unimplemented generation: " ++ (show x)  -- = (\x -> '_':[]) --if we have no idea what to do
+    generateChunks rand gen
+generateChunks (x) _ = error $ "Unimplemented generation: " ++ (show x)  -- = (\x -> '_':[]) --if we have no idea what to do
+
+fromChunks :: [Chunk] -> IO [Word8]
+fromChunks cs = do
+    let len = foldr getBits 0 cs
+    when (len `mod` 8 /= 0)
+        (error $ "Bad total bit length: " ++ (show len) ++ " bits described")
+    i <- combineChunks cs len
+    w8s <- reverse <$> createWord8s i
+    return w8s
+
+    where
+        getBits :: Chunk -> Int -> Int
+        getBits (CharChunk _)     z = 8 + z
+        getBits (BinaryChunk _ b) z = b + z
+
+        combineChunks :: [Chunk] -> Int -> IO Integer
+        combineChunks [] _ = return 0
+        combineChunks _ 0 = error "combineChunks: ran out of bits?"
+        combineChunks ((CharChunk c):cs) bs = do
+            let i = ((fromIntegral . chrToWord8) c) `shiftL` (bs - 8)
+            rest <- combineChunks cs (bs - 8)
+            return $ i + rest
+        combineChunks ((BinaryChunk v b):cs) bs = do
+            let i = (fromIntegral $ v .&. (2^b - 1)) `shiftL` (bs - b)
+            rest <- combineChunks cs (bs - b)
+            return $ i + rest
+
+        createWord8s :: Integer -> IO [Word8]
+        createWord8s 0 = return []
+        createWord8s i = do
+            let w = fromIntegral $ i .&. 255
+            rest <- createWord8s (i `shiftR` 8)
+            return (w:rest)
 
 
-mk_render_char :: PadsDecl -> MWC.GenIO -> IO String
+mk_render_char :: PadsDecl -> MWC.GenIO -> IO [Chunk]
 mk_render_char pd gen = do
-    --print pd
     ds   <- gen_ast pd
-    vals <- mapM (\x -> mk_gen_char x gen) ds
+    vals <- mapM (\x -> generateChunks x gen) ds
     return $ concat vals
 
 findPadsAst name lst =
@@ -189,6 +239,7 @@ res str= let
 --generate :: [Char] -> ([Char], PadsDecl) -> IO String
 generate padsID padsExp = do
     gen <- MWC.createSystemRandom
-    mk_render_char (snd (findPadsAst padsID padsExp)) gen
+    cs <- mk_render_char (snd (findPadsAst padsID padsExp)) gen
+    ws <- fromChunks cs
+    return $ map word8ToChr ws
 -- example usage: generate "START" -- creates instance from START pads description
--- sTART_parseS generate "START"
