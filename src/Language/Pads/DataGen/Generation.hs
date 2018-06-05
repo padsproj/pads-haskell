@@ -14,40 +14,35 @@
 module Language.Pads.DataGen.Generation where
 
 
---import Addrs
 
-
-import qualified Language.Haskell.TH as TH
-
---import Language.Pads.Testing
---import System.IO.Unsafe (unsafePerformIO)
-
-import Control.Monad
-import Data.Word
-import Data.Bits
-import Data.Maybe
+import           Control.Monad
+import           Data.Bits
 import qualified Data.ByteString as B
-import qualified Data.List as List
+import qualified Data.List as L
+import           Data.Maybe
+import           Data.Word
+import qualified Language.Haskell.TH as TH
 import qualified System.Random.MWC as MWC
 
-import Language.Pads.Padsc
+import           Language.Pads.Padsc
 import qualified Language.Pads.DataGen.Rand as RN
-import Language.Pads.DataGen.GenDescriptions
+import           Language.Pads.DataGen.GenDescriptions
 
 -- Bring into scope our pads ASTs
 $(make_pads_declarations $ map snd padsSamples)
 envs = padsSamples
 
-gen_ast :: PadsDecl -> IO [GENTYPE]
-gen_ast (PadsDeclData id xs args padsdatas e) = gen_padsdatas padsdatas --  String [String] (Maybe Pat) PadsData [QString]
-gen_ast (PadsDeclType id xs args padsty)      = (:[]) <$> gen_padsty padsty
+gen_ast :: PadsDecl -> IO [GenType]
+gen_ast (PadsDeclData id xs args padsdatas e)  = gen_padsdatas padsdatas     --
+gen_ast (PadsDeclType id xs args padsty)       = (:[]) <$> gen_padsty padsty -- Is any of this complete? What do the other args mean?
+gen_ast (PadsDeclNew  id xs args branchinfo e) = gen_branches branchinfo     --
 gen_ast x = error $ "Error in gen_ast:  " ++ (show x)
 
 
 gen_padsdatas (PUnion branches) = do
     bs <- mapM gen_branches branches --generate for each branch
-    let gs = map GTLIST bs               --make each branch a list
-    return [CHOICE gs] --embed in a CHOICE type
+    let gs = map GTList bs               --make each branch a list
+    return [Choice gs] --embed in a Choice type
 gen_padsdatas x = error $ "Error in gen_padsdatas: " ++ (show x)
 
 
@@ -62,14 +57,13 @@ listLimit = 20 -- Limit how long generated lists can be.
 
 
 -- This function actually takes apart padsty's
-gen_padsty :: PadsTy -> IO GENTYPE
+gen_padsty :: PadsTy -> IO GenType
 gen_padsty (PTycon xs)            = gen_base $ xs !! 0
 gen_padsty (PExpression exp)      = return $ gen_lit exp
 --gen_padsty (PTuple xs)            =
 gen_padsty (PApp xs (Just e))     = do
     pt <- gen_padsty $ xs !! 0
-    print "App"
-    return $ APP pt (gen_lit e)
+    return $ App pt (gen_lit e)
 gen_padsty (PList pty delim term) = do
     t   <- gen_padsty pty
     gen <- MWC.createSystemRandom
@@ -77,51 +71,51 @@ gen_padsty (PList pty delim term) = do
     case delim
       of Just d -> do
             d' <- gen_padsty d
-            return $ GTLIST (List.intersperse d' (replicate n t))
-         Nothing -> return $ GTLIST (replicate n t)
+            return $ GTList (L.intersperse d' (replicate n t))
+         Nothing -> return $ GTList (replicate n t)
 gen_padsty x = error $ "Error in gen_padsty: " ++ show x
 
 
 -- step out into template haskell to get the literal value we need
--- and turn it into a GENTYPE
-gen_lit (TH.LitE (TH.CharL x))    = (LIT x)
-gen_lit (TH.LitE (TH.StringL xs)) = (GTLIST (map LIT xs) ) -- treat string as a list of chars
-gen_lit (TH.LitE (TH.IntegerL x)) = (INT (fromIntegral x))
+-- and turn it into a GenType
+gen_lit (TH.LitE (TH.CharL x))    = (Lit x)
+gen_lit (TH.LitE (TH.StringL xs)) = (GTList (map Lit xs) ) -- treat string as a list of chars
+gen_lit (TH.LitE (TH.IntegerL x)) = (Int (fromIntegral x))
 
 
 
-data GENTYPE =  GTBITFIELD -- parameterized
-              | GTBITS8    -- parameterized
-              | GTBITS16   -- parameterized
-              | GTBITS32   -- parameterized
-              | GTBITS64   -- parameterized
-              | GTSTRINGC  -- parameterized
-              | GTSTRINGFW -- parameterized
-              | GTCHAR
-              | GTINT
-              | GTLIST [ GENTYPE ]
-              | LIT Char    --Arguments to APP
-              | INT Int --Arguments to APP
-              | APP GENTYPE GENTYPE
-              | CHOICE [ GENTYPE ]
+data GenType = GTBitField -- Parameterized
+             | GTBits8    -- Parameterized
+             | GTBits16   -- Parameterized
+             | GTBits32   -- Parameterized
+             | GTBits64   -- Parameterized
+             | GTStringC  -- Parameterized
+             | GTStringFW -- Parameterized
+             | GTChar
+             | GTInt
+             | GTList [ GenType ]
+             | Lit Char    -- Argument to App
+             | Int Int     -- Argument to App
+             | App GenType GenType
+             | Choice [ GenType ]
   deriving (Show)
 
-gen_base "Char"      = return GTCHAR
-gen_base "Int"       = return GTINT
-gen_base "StringFW"  = return GTSTRINGFW
-gen_base "BitField"  = return GTBITFIELD
-gen_base "Bits8"     = return GTBITS8
-gen_base "Bits16"    = return GTBITS16
-gen_base "Bits32"    = return GTBITS32
-gen_base "Bits64"    = return GTBITS64
-gen_base "StringC"   = return GTSTRINGC
+gen_base "BitField"  = return GTBitField
+gen_base "Bits8"     = return GTBits8
+gen_base "Bits16"    = return GTBits16
+gen_base "Bits32"    = return GTBits32
+gen_base "Bits64"    = return GTBits64
+gen_base "Char"      = return GTChar
+gen_base "Int"       = return GTInt
+gen_base "StringFW"  = return GTStringFW
+gen_base "StringC"   = return GTStringC
 -- this will be replaced with something which actually can find all the ASTs
 -- in a single location
 gen_base x = (gen_lookup x envs)
 
 -- If we couldn't find a base type, maybe it's another PADS type...
 -- try looking it up.
-gen_lookup s ( (s1,b):xs ) | s == s1 = GTLIST <$> gen_ast b
+gen_lookup s ( (s1,b):xs ) | s == s1 = GTList <$> gen_ast b
 gen_lookup s ( (x,b):xs ) = gen_lookup s xs
 gen_lookup s [] = error ("could not find ast_" ++ s)
 
@@ -148,52 +142,58 @@ data Chunk = CharChunk   Char
            deriving Show
 
 -- Value generation, creates a list of Chunks, combined elsewhere
-generateChunks :: GENTYPE -> MWC.GenIO -> IO [Chunk]
-generateChunks (LIT c)  gen = return [CharChunk c]               -- If we have a constant, produce it.
-generateChunks (GTCHAR) gen = ((:[]) . CharChunk) <$> randLetter gen
-generateChunks (GTINT)  gen = ((map CharChunk) <$>) show <$> randInteger gen
-generateChunks (APP GTBITS8 (INT n)) gen = do
+generateChunks :: GenType -> MWC.GenIO -> IO [Chunk]
+generateChunks (Lit c)  gen = return [CharChunk c]
+generateChunks (GTChar) gen = ((:[]) . CharChunk) <$> randLetter gen
+generateChunks (GTInt)  gen = ((map CharChunk) <$>) show <$> randInteger gen
+generateChunks (App GTBits8 (Int n)) gen = do
     when (n > 8 || n < 0)
         (error $ "Bad Bits8 value: " ++ (show n))
     r <- randInteger gen
     return $ [BinaryChunk (fromIntegral r) n]
-generateChunks (APP GTBITS16 (INT n)) gen = do
+generateChunks (App GTBits16 (Int n)) gen = do
     when (n > 16 || n < 0)
         (error $ "Bad Bits16 value: " ++ (show n))
     r <- randInteger gen
     return $ [BinaryChunk (fromIntegral r) n]
-generateChunks (APP GTBITS32 (INT n)) gen = do
+generateChunks (App GTBits32 (Int n)) gen = do
     when (n > 32 || n < 0)
         (error $ "Bad Bits32 value: " ++ (show n))
     r <- randInteger gen
     return $ [BinaryChunk (fromIntegral r) n]
-generateChunks (APP GTBITS64 (INT n)) gen = do
+generateChunks (App GTBits64 (Int n)) gen = do
     when (n > 64 || n < 0)
         (error $ "Bad Bits64 value: " ++ (show n))
     r <- MWC.uniformR (0 :: Word64, 2 ^ 64 - 1 :: Word64) gen
     return $ [BinaryChunk (fromIntegral r) n]
-generateChunks (APP GTSTRINGFW (INT n)) gen =
-    concat <$> replicateM (fromIntegral n) (generateChunks GTCHAR gen)
-generateChunks (APP GTSTRINGC (LIT c)) gen = do
+generateChunks (App GTStringFW (Int n)) gen =
+    concat <$> replicateM (fromIntegral n) (generateChunks GTChar gen)
+generateChunks (App GTStringC (Lit c)) gen = do
     len <- RN.randInt 1 listLimit gen
     str <- replicateM len (randLetterExcluding gen c)
     return $ (map CharChunk (str ++ [c]))
-generateChunks (GTLIST ds) gen = do
+generateChunks (GTList ds) gen = do
     vals <- mapM (\x -> generateChunks x gen) ds
     return $ concat vals
-generateChunks (CHOICE cs) gen = do
+generateChunks (Choice cs) gen = do
     rand <- RN.randElem cs gen
     generateChunks rand gen
 generateChunks (x) _ = error $ "Unimplemented generation: " ++ (show x)  -- = (\x -> '_':[]) --if we have no idea what to do
 
+-- This should be (and is) O(n), unless shiftL and shiftR take linear time
+-- which they might on Integers
 fromChunks :: [Chunk] -> IO [Word8]
 fromChunks cs = do
-    let len = foldr getBits 0 cs
-    when (len `mod` 8 /= 0)
-        (error $ "Bad total bit length: " ++ (show len) ++ " bits described")
-    i <- combineChunks cs len
+    let bits = foldr getBits 0 cs
+    when (bits `mod` 8 /= 0)
+        (error $ "Bad total bit length: " ++ (show bits) ++ " bits described") -- Necessary? combineChunks should be robust enough
+    i <- combineChunks cs bits                                                 -- to handle weird non-byte-aligned stuff
     w8s <- reverse <$> createWord8s i
-    return w8s
+    return $ if   length w8s /= bits `div` 8
+             then (replicate ((bits `div` 8) - length w8s) 0) ++ w8s
+             else w8s
+    -- Necessary guard: with >=8 leading zeroes (generated with <=1/256 chance),
+    -- createWord8s behaves improperly by stripping them
 
     where
         getBits :: Chunk -> Int -> Int
@@ -202,7 +202,7 @@ fromChunks cs = do
 
         combineChunks :: [Chunk] -> Int -> IO Integer
         combineChunks [] _ = return 0
-        combineChunks _ 0 = error "combineChunks: ran out of bits?"
+        combineChunks _ 0 = error "ran out of bits"
         combineChunks ((CharChunk c):cs) bs = do
             let i = ((fromIntegral . chrToWord8) c) `shiftL` (bs - 8)
             rest <- combineChunks cs (bs - 8)
@@ -212,6 +212,7 @@ fromChunks cs = do
             rest <- combineChunks cs (bs - b)
             return $ i + rest
 
+        -- Result needs to be reversed
         createWord8s :: Integer -> IO [Word8]
         createWord8s 0 = return []
         createWord8s i = do
@@ -227,7 +228,7 @@ mk_render_char pd gen = do
     return $ concat vals
 
 findPadsAst name lst =
-    case List.find (((== name) . fst )) lst
+    case L.find ((== name) . fst) lst
       of Just n  -> n
          Nothing -> error $ "PADS identifier " ++ (show name) ++ " not found"
 
@@ -242,4 +243,10 @@ generate padsID padsExp = do
     cs <- mk_render_char (snd (findPadsAst padsID padsExp)) gen
     ws <- fromChunks cs
     return $ map word8ToChr ws
+
+generateTemp = do
+    gen <- MWC.createSystemRandom
+    cs <- mk_render_char (snd (findPadsAst "Pixel" padsSamples)) gen
+    ws <- fromChunks cs
+    return $ (cs, map word8ToChr ws)
 -- example usage: generate "START" -- creates instance from START pads description
