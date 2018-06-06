@@ -16,14 +16,6 @@ module Language.Pads.DataGen.GenDescriptions where
 
 import Language.Pads.Padsc
 
-
-
-
-
---import qualified Language.Pads.Rand as RN
---import qualified Data.ByteString.Conversion as BC
-
-
 padsSamples = [pads|
 
     data Simple = Simple {
@@ -53,7 +45,8 @@ padsSamples = [pads|
 
     data Records = Records [Record | " | "]
 
-
+    newtype Addresses = Addresses [Address]
+    data Address = Address {x :: Int, ' ', y :: StringC '\n'}
 
     -- START   -- _ --> S1
     -- S1      -- c --> S2
@@ -61,24 +54,24 @@ padsSamples = [pads|
     -- S3      -- a --> S3
     -- S3      -- t --> ACCEPT
 
-    data START = START { start :: S1 }
+    data START = START { S1 }
 
-    -- s1 -- c --> s2
+    data S1 = S1 { 'c', S2 }
 
-    data S1 = S1 { 'c', s2 :: S2 }
+    data S2 = S2 { 'a', S3 }
 
-    -- s2 -- a --> s3
+    data S3 = S3A { 'a', S3 }
+            | S3T { 't', S4 }
 
-    data S2 = S2 { 'a', s3 :: S3 }
+    data S4 = S4 { }
 
-    -- s3 -- a --> s3
-    -- s3 -- t --> s4
-
-    data S3 = S3A {'a', s3a :: S3 } | S3T {'t', ss4 :: S4 }
-
-    data S4 = S4 { s4 :: ACCEPT }
-
-    data ACCEPT = ACCEPT { }
+--                                     ___ a ___
+--                                   /           \
+--  |                               |             |      |--------|
+--  |    |----|          |----|      \-> |----| -/       | |----| |
+--   \-> | S1 | -- c --> | S2 | -- a --> | S3 | -- t --> | | S4 | |
+--       |----|          |----|          |----|          | |----| |
+--                                                       |--------|
 
     data Pixel = Pixel {
         a :: Bits16 9,
@@ -94,6 +87,9 @@ padsSamples = [pads|
         'c',
         bits2 :: Bits8 4
     }
+
+    data DT = DT1 [Int | ',']
+            | DT2 " START DT2 " DT "||" DT " END DT2 "
 
 |]
 

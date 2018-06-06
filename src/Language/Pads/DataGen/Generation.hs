@@ -10,10 +10,7 @@
            , RecordWildCards
            , NamedFieldPuns #-}
 
-
 module Language.Pads.DataGen.Generation where
-
-
 
 import           Control.Monad
 import           Data.Bits
@@ -33,47 +30,62 @@ $(make_pads_declarations $ map snd padsSamples)
 envs = padsSamples
 
 gen_ast :: PadsDecl -> IO [GenType]
-gen_ast (PadsDeclData id xs args padsdatas e)  = gen_padsdatas padsdatas     --
-gen_ast (PadsDeclType id xs args padsty)       = (:[]) <$> gen_padsty padsty -- Is any of this complete? What do the other args mean?
-gen_ast (PadsDeclNew  id xs args branchinfo e) = gen_branches branchinfo     --
+gen_ast (PadsDeclData id xs args padsdata e)   = gen_padsdatas padsdata      --
+gen_ast (PadsDeclType id xs args padsty)       = (:[]) <$> genPadsTy padsty   -- Is any of this complete? What do the other args mean?
+--gen_ast (PadsDeclNew  id xs args branchinfo e) = gen_branches branchinfo     --
+--gen_ast (PadsDeclObtain id xs padsty e) =
 gen_ast x = error $ "Error in gen_ast:  " ++ (show x)
 
 
+-- gen_padsdatas :: PadsData -> IO [GenType]
+-- gen_padsdatas (PUnion branches) = do
+--     print "here"
+--     bs <- mapM gen_branches branches --generate for each branch
+--     let gs = map GTList bs               --make each branch a list
+--     print "here"
+--     return [Choice gs] --embed in a Choice type
+-- -- gen_padsdatas (PSwitch e branches) =
+-- gen_padsdatas x = error $ "Error in gen_padsdatas: " ++ (show x)
+
 gen_padsdatas (PUnion branches) = do
-    bs <- mapM gen_branches branches --generate for each branch
-    let gs = map GTList bs               --make each branch a list
-    return [Choice gs] --embed in a Choice type
+    gen <- MWC.createSystemRandom
+    b <- RN.randElem branches gen
+    --bs <- mapM gen_branches branches --generate for each branch
+    bs <- gen_branches b
+    let gs = GTList bs               --make each branch a list
+    print "here"
+    return [gs] --[Choice gs] --embed in a CHOICE type
 gen_padsdatas x = error $ "Error in gen_padsdatas: " ++ (show x)
 
 
 gen_branches (BRecord id fs exp) =  mapM gen_fieldinfo fs
 gen_branches (BConstr id fs e)   =  mapM gen_constarg fs
 
-gen_fieldinfo ((id, constarg, exp)) = gen_constarg constarg
 
-gen_constarg  ((strict, padsty)) =  gen_padsty padsty
+gen_fieldinfo ((id, constarg, exp)) = gen_constarg constarg -- Can't always disregard exp
+
+gen_constarg  ((strict, padsty)) =  genPadsTy padsty
 
 listLimit = 20 -- Limit how long generated lists can be.
 
 
 -- This function actually takes apart padsty's
-gen_padsty :: PadsTy -> IO GenType
-gen_padsty (PTycon xs)            = gen_base $ xs !! 0
-gen_padsty (PExpression exp)      = return $ gen_lit exp
---gen_padsty (PTuple xs)            =
-gen_padsty (PApp xs (Just e))     = do
-    pt <- gen_padsty $ xs !! 0
+genPadsTy :: PadsTy -> IO GenType
+genPadsTy (PTycon xs)            = gen_base $ xs !! 0
+genPadsTy (PExpression exp)      = return $ gen_lit exp
+genPadsTy (PApp xs (Just e))     = do
+    pt <- genPadsTy $ xs !! 0
     return $ App pt (gen_lit e)
-gen_padsty (PList pty delim term) = do
-    t   <- gen_padsty pty
+genPadsTy (PList pty delim term) = do
+    t   <- genPadsTy pty
     gen <- MWC.createSystemRandom
     n   <- RN.randInt 1 listLimit gen
     case delim
       of Just d -> do
-            d' <- gen_padsty d
+            d' <- genPadsTy d
             return $ GTList (L.intersperse d' (replicate n t))
          Nothing -> return $ GTList (replicate n t)
-gen_padsty x = error $ "Error in gen_padsty: " ++ show x
+genPadsTy x = error $ "Error in genPadsTy: " ++ show x
 
 
 -- step out into template haskell to get the literal value we need
@@ -141,7 +153,7 @@ data Chunk = CharChunk   Char
            | BinaryChunk Integer Int -- val of data + num of significant bits
            deriving Show
 
--- Value generation, creates a list of Chunks, combined elsewhere
+-- Value generation: creates a list of Chunks, combined elsewhere
 generateChunks :: GenType -> MWC.GenIO -> IO [Chunk]
 generateChunks (Lit c)  gen = return [CharChunk c]
 generateChunks (GTChar) gen = ((:[]) . CharChunk) <$> randLetter gen
@@ -246,7 +258,7 @@ generate padsID padsExp = do
 
 generateTemp = do
     gen <- MWC.createSystemRandom
-    cs <- mk_render_char (snd (findPadsAst "Pixel" padsSamples)) gen
+    cs <- mk_render_char (snd (findPadsAst "START" padsSamples)) gen
     ws <- fromChunks cs
     return $ (cs, map word8ToChr ws)
 -- example usage: generate "START" -- creates instance from START pads description
