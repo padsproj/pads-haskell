@@ -46,7 +46,9 @@ padsSamples = [pads|
     data Records = Records [Record | " | "]
 
     newtype Addresses = Addresses [Address]
-    data Address = Address {x :: Int, ' ', y :: StringC '\n'}
+    data Address = Address { streetnum :: Int,
+                             ' ',
+                             streetname :: StringC '\n'}
 
     -- START   -- _ --> S1
     -- S1      -- c --> S2
@@ -90,6 +92,8 @@ padsSamples = [pads|
 
     data DT = DT1 [Int | ',']
             | DT2 " START DT2 " DT "||" DT " END DT2 "
+
+    data PadsTyValue = PadsTyValue { ptv :: Int, xIsEven = value <| even ptv |> :: Bool }
 
 |]
 
