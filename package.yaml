@@ -45,12 +45,15 @@ dependencies:
 - haskell-src-meta >= 0.8 && < 0.9 # Parsing Haskell code inside of a PADS description
 - HUnit >= 1.6 && < 1.7
 - mainland-pretty >= 0.6.1 && < 0.7
-  #- old-locale # 
+- mtl >= 2.2.2 && < 3
+- mwc-random >= 0.13.6.0 && < 0.14
+  #- old-locale #
 - parsec >= 3.1.13 && < 3.2
+- random >= 1.1
 - regex-posix >= 0.95.2 && < 0.96
 - syb >= 0.7 && < 0.8 # Data.Generics
 - template-haskell >= 2.12 && < 2.13
-- time >= 1.8.0 && < 1.8.1 # UTC and timezone in BaseTypes
+- time >= 1.7.0 && < 1.8.1 # UTC and timezone in BaseTypes
 - th-lift >= 0.7.8 && < 0.7.9 # deriveLift
 
 library:
@@ -79,6 +82,8 @@ library:
     - Language.Pads.Library.BinaryUtilities
     - Language.Pads.Library.LittleEndian
     - Language.Pads.Library.Native
+    - Language.Pads.DataGen.Generation
+    - Language.Pads.DataGen.GenDescriptions
 
 tests:
   examples:
@@ -99,7 +104,7 @@ tests:
     - QuickCheck >= 2.10.1
     - mtl >= 2.2.2
     - random >= 1.1
-  
+
   # Add more Examples like this one if you want to run tests separately from Main.hs:
   small:
     main: examples/Small.hs

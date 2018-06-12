@@ -116,7 +116,7 @@ bitBool_printFL (bb,bbmd) = fshow bb
 type BitField = Integer
 type BitField_md = Base_md
 
-bitField_parseM :: Int -> PadsParser (BitField, Base_md)
+bitField_parseM :: Integral a => a -> PadsParser (BitField, Base_md)
 bitField_parseM x =
     if   x < 0
     then returnError def (E.BitWidthError 0 (fromIntegral x))
@@ -125,10 +125,10 @@ bitField_parseM x =
              b <- takeBitsP x
              returnClean b
 
-bitField_def :: Int -> BitField
+bitField_def :: a -> BitField
 bitField_def _ = 0
 
-bitField_printFL :: Int -> PadsPrinter (BitField, md)
+bitField_printFL :: Integral a => a -> PadsPrinter (BitField, md)
 bitField_printFL _ (x, xmd) = fshow x
 
 -- type instance PadsArg Integer = ()
@@ -142,7 +142,7 @@ bitField_printFL _ (x, xmd) = fshow x
 type Bits8 = Word8
 type Bits8_md = Base_md
 
-bits8_parseM :: Int -> PadsParser (Bits8, Base_md)
+bits8_parseM :: Integral a => a -> PadsParser (Bits8, Base_md)
 bits8_parseM x =
     if   x < 1 || x > 8
     then returnError 0 (E.BitWidthError 8 (fromIntegral x))
@@ -155,7 +155,7 @@ bits8_parseM x =
 type Bits16 = Word16
 type Bits16_md = Base_md
 
-bits16_parseM :: Int -> PadsParser (Bits16, Base_md)
+bits16_parseM :: Integral a => a -> PadsParser (Bits16, Base_md)
 bits16_parseM x =
     if   x < 1 || x > 16
     then returnError 0 (E.BitWidthError 16 (fromIntegral x))
@@ -168,7 +168,7 @@ bits16_parseM x =
 type Bits32 = Word32
 type Bits32_md = Base_md
 
-bits32_parseM :: Int -> PadsParser (Bits32, Base_md)
+bits32_parseM :: Integral a => a -> PadsParser (Bits32, Base_md)
 bits32_parseM x =
     if   x < 1 || x > 32
     then returnError 0 (E.BitWidthError 32 (fromIntegral x))
@@ -181,7 +181,7 @@ bits32_parseM x =
 type Bits64 = Word64
 type Bits64_md = Base_md
 
-bits64_parseM :: Int -> PadsParser (Bits64, Base_md)
+bits64_parseM :: Integral a => a -> PadsParser (Bits64, Base_md)
 bits64_parseM x =
     if   x < 1 || x > 64
     then returnError 0 (E.BitWidthError 64 (fromIntegral x))
@@ -201,10 +201,10 @@ bits16_def _ = 0
 bits32_def _ = 0
 bits64_def _ = 0
 
-bits8_printFL  :: Int -> PadsPrinter (Bits8, md)
-bits16_printFL :: Int -> PadsPrinter (Bits16, md)
-bits32_printFL :: Int -> PadsPrinter (Bits32, md)
-bits64_printFL :: Int -> PadsPrinter (Bits64, md)
+bits8_printFL  :: Integral a => a -> PadsPrinter (Bits8, md)
+bits16_printFL :: Integral a => a -> PadsPrinter (Bits16, md)
+bits32_printFL :: Integral a => a -> PadsPrinter (Bits32, md)
+bits64_printFL :: Integral a => a -> PadsPrinter (Bits64, md)
 
 bits8_printFL  _ (x, xmd) = fshow x
 bits16_printFL _ (x, xmd) = fshow x

@@ -54,7 +54,7 @@ padsSamples = [pads|
     -- S1      -- c --> S2
     -- S2      -- a --> S3
     -- S3      -- a --> S3
-    -- S3      -- t --> ACCEPT
+    -- S3      -- t --> QACCEPT
 
     data START = START { S1 }
 
@@ -84,17 +84,40 @@ padsSamples = [pads|
         pr_index :: Bits8 4
     }
 
+    type Pixels = partition [Pixel] using none
+
     data Mixed = Mixed {
         bits1 :: Bits8 4,
         'c',
         bits2 :: Bits8 4
     }
 
+    data Dependent = Dependent { first :: Bits8 4, second :: Bits16 first, Char }
+
+    -- data Dependent' = Dependent' { first' :: Bits8 8, second' :: Bits8 first }
+
     data DT = DT1 [Int | ',']
             | DT2 " START DT2 " DT "||" DT " END DT2 "
 
     data PadsTyValue = PadsTyValue { ptv :: Int, xIsEven = value <| even ptv |> :: Bool }
 
+    -- All strings with an equal number of 01 and 10 substrings:
+
+    data Q1 = Q1_1 { '1', Q2 }
+            | Q1_0 { '0', Q4 }
+            | Q1_A {}
+    data Q2 = Q2_1 { '1', Q2 }
+            | Q2_0 { '0', Q3 }
+            | Q2_A {}
+    data Q3 = Q3_1 { '1', Q2 }
+            | Q3_0 { '0', Q3 }
+    data Q4 = Q4_1 { '1', Q5 }
+            | Q4_0 { '0', Q4 }
+            | Q4_A {}
+    data Q5 = Q5_1 { '1', Q5 }
+            | Q5_0 { '0', Q4 }
+
+    type ThreeInts = (Int, Char, Int)
 |]
 
 

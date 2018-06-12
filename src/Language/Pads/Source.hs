@@ -288,52 +288,52 @@ takeHead :: Source -> (Char, Source)
 takeHead (s @ Source{current,loc, ..}) =
     (word8ToChr $ B.head current, s{current = B.tail current, loc = incOffset loc})
 
-partitionBS :: B.ByteString -> Int -> Int -> (B.ByteString, B.ByteString, Bool)
+partitionBS :: Integral a => B.ByteString -> a -> a -> (B.ByteString, B.ByteString, Bool)
 partitionBS bS bitIndex bits =
     let part b bs = if bs > b + 1 then 1 + part zeroBit (bs - (b + 1)) else 1
         byteAlign = (bits - (bitIndex + 1)) `mod` 8 == 0
         withinByte = bits <= bitIndex + 1
-        hd = B.take (part bitIndex bits) bS
+        hd = B.take (part (fromIntegral bitIndex) (fromIntegral bits)) bS
         tl = B.drop (B.length hd - if not byteAlign then 1 else 0) bS
     in  (hd, tl, withinByte || not byteAlign)
 
 accumulate :: Integral a => a -> (a, Int) -> (a, Int)
 accumulate byte (num, pow) = ((byte * (256 ^ pow)) + num, pow + 1)
 
-takeBits8 :: Int -> Source -> (Word8, Source)
+takeBits8 :: Integral a => a -> Source -> (Word8, Source)
 takeBits8 b (s @ Source{current,loc,bit, ..}) =
-    let (hd, tl, partial) = partitionBS current bit b
+    let (hd, tl, partial) = partitionBS current bit (fromIntegral b)
         bS    = map (\x -> fromIntegral x :: Word16) (B.unpack $ B.take 2 hd)
         bytes = fst $ foldr accumulate (0,0) bS
         mask  = (2 ^ b) - 1
-        bits  = mask .&. shiftR bytes ((B.length hd * 8) - b - (zeroBit - bit))
+        bits  = mask .&. shiftR bytes ((B.length hd * 8) - (fromIntegral b) - (zeroBit - bit))
     in  (fromIntegral bits, s{current = tl,
                  loc = incOffsetBy loc (B.length hd - if partial then 1 else 0),
-                 bit = (zeroBit - (((zeroBit - bit) + b) `mod` 8))})
+                 bit = (zeroBit - (((zeroBit - bit) + (fromIntegral b)) `mod` 8))})
 
-takeBits16 :: Int -> Source -> (Word16, Source)
+takeBits16 :: Integral a => a -> Source -> (Word16, Source)
 takeBits16 b (s @ Source{current,loc,bit, ..}) =
-    let (hd, tl, partial) = partitionBS current bit b
+    let (hd, tl, partial) = partitionBS current bit (fromIntegral b)
         bS    = map (\x -> fromIntegral x :: Word32) (B.unpack $ B.take 3 hd)
         bytes = fst $ foldr accumulate (0,0) bS
         mask  = (2 ^ b) - 1
-        bits  = mask .&. shiftR bytes ((B.length hd * 8) - b - (zeroBit - bit))
+        bits  = mask .&. shiftR bytes ((B.length hd * 8) - (fromIntegral b) - (zeroBit - bit))
     in  (fromIntegral bits, s{current = tl,
                  loc = incOffsetBy loc (B.length hd - if partial then 1 else 0),
-                 bit = (zeroBit - (((zeroBit - bit) + b) `mod` 8))})
+                 bit = (zeroBit - (((zeroBit - bit) + (fromIntegral b)) `mod` 8))})
 
-takeBits32 :: Int -> Source -> (Word32, Source)
+takeBits32 :: Integral a => a -> Source -> (Word32, Source)
 takeBits32 b (s @ Source{current,loc,bit, ..}) =
-    let (hd, tl, partial) = partitionBS current bit b
+    let (hd, tl, partial) = partitionBS current bit (fromIntegral b)
         bS    = map (\x -> fromIntegral x :: Word64) (B.unpack $ B.take 5 hd)
         bytes = fst $ foldr accumulate (0,0) bS
         mask  = (2 ^ b) - 1
-        bits  = mask .&. shiftR bytes ((B.length hd * 8) - b - (zeroBit - bit))
+        bits  = mask .&. shiftR bytes ((B.length hd * 8) - (fromIntegral b) - (zeroBit - bit))
     in  (fromIntegral bits, s{current = tl,
                  loc = incOffsetBy loc (B.length hd - if partial then 1 else 0),
-                 bit = zeroBit - (((zeroBit - bit) + b) `mod` 8)})
+                 bit = zeroBit - (((zeroBit - bit) + (fromIntegral b)) `mod` 8)})
 
-takeBits64 :: Int -> Source -> (Word64, Source)
+takeBits64 :: Integral a => a -> Source -> (Word64, Source)
 takeBits64 b s = let (bits, s') = takeBits b s
                  in (fromIntegral bits, s')
 
@@ -342,17 +342,17 @@ tobinary x
     | (div x 2) == 0 = x
     | otherwise = (mod x 2) + (10 * (tobinary $ div x 2))
 
-takeBits :: Int -> Source -> (Integer, Source)
+takeBits :: Integral a => a -> Source -> (Integer, Source)
 takeBits b (s @ Source{current,loc,bit, ..}) =
-    let (hd, tl, partial) = partitionBS current bit b
+    let (hd, tl, partial) = partitionBS current bit (fromIntegral b)
         bS    = map fromIntegral (B.unpack hd)
         bytes = fst $ foldr accumulate (0,0) bS
         mask  = (2 ^ b) - 1
-        shiftAmt = max 0 ((B.length hd * 8) - b - (zeroBit - bit))
+        shiftAmt = max 0 ((B.length hd * 8) - (fromIntegral b) - (zeroBit - bit))
         bits  = mask .&. shiftR bytes shiftAmt
     in  (bits, s{current = tl,
                  loc = incOffsetBy loc (B.length hd - if partial then 1 else 0),
-                 bit = zeroBit - (((zeroBit - bit) + b) `mod` 8)})
+                 bit = zeroBit - (((zeroBit - bit) + (fromIntegral b)) `mod` 8)})
 
 takeHeadM :: Source -> (Maybe Char, Source)
 takeHeadM (s @ Source{current,loc, ..}) =

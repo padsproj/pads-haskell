@@ -13,8 +13,10 @@
 module Language.Pads.DataGen.Generation where
 
 import           Control.Monad
+import           Control.Monad.Reader
 import           Data.Bits
 import qualified Data.ByteString as B
+import           Data.IORef
 import qualified Data.List as L
 import           Data.Maybe
 import           Data.Word
@@ -22,11 +24,10 @@ import qualified Language.Haskell.TH as TH
 import qualified System.Random.MWC as MWC
 
 import           Language.Pads.Padsc
---import qualified Language.Pads.DataGen.Rand as RN
 import           Language.Pads.DataGen.GenDescriptions
 
 {-
- - General generation logic: extract relevalt info from a PADS AST, convert
+ - General generation logic: extract relevant info from a PADS AST, convert
  - into generation-friendly datatypes (GenType), convert into "Chunks" to
  - allow for non-byte-aligned and sub-byte generation, convert into [Word8]
  - as final raw output
@@ -34,6 +35,8 @@ import           Language.Pads.DataGen.GenDescriptions
 
 --                       Name      AST
 type PadsDescription = ([Char], PadsDecl)
+
+-- type Name = String
 
 -- Bring into scope our pads ASTs
 $(make_pads_declarations $ map snd padsSamples)
@@ -61,7 +64,7 @@ genBranches (BRecord _ fs e) = mapM genFieldInfo fs
 genBranches (BConstr _ fs e) = mapM genConstrArg fs
 
 genFieldInfo :: FieldInfo -> IO GenType
-genFieldInfo (_, constarg, e) = genConstrArg constarg -- Can't always disregard exp
+genFieldInfo (name, constrarg, e) = genConstrArg constrarg -- Can't always disregard exp
 
 genConstrArg :: ConstrArg -> IO GenType
 genConstrArg (_, padsTy) =  genPadsTy padsTy
@@ -71,8 +74,8 @@ listLimit = 20 -- Limit how long generated lists can be.
 
 -- This function actually takes apart padsTys
 genPadsTy :: PadsTy -> IO GenType
-genPadsTy (PList pty delim term) = do
-    t   <- genPadsTy pty
+genPadsTy (PList pt delim term) = do
+    t   <- genPadsTy pt
     gen <- MWC.createSystemRandom
     n   <- randIntBetween 1 listLimit gen
     case delim
@@ -80,33 +83,39 @@ genPadsTy (PList pty delim term) = do
             d' <- genPadsTy d
             return $ GTList (L.intersperse d' (replicate n t))
          Nothing -> return $ GTList (replicate n t)
+genPadsTy (PPartition pt e) = genPadsTy pt
 genPadsTy (PApp xs (Just e)) = do
     pt <- genPadsTy $ xs !! 0
-    return $ App pt (gen_lit e)
-genPadsTy (PExpression exp) = return $ gen_lit exp
+    case e of
+        TH.VarE n -> return $ GTVar (TH.nameBase n) -- $ App pt (genParam e)
+        _ -> return $ App pt (genParam e)
+genPadsTy (PTuple pts) = GTList <$> mapM genPadsTy pts
+genPadsTy (PExpression exp) = return $ genParam exp
 genPadsTy (PTycon xs) = genBase $ xs !! 0
+genPadsTy (PTyvar x) = error $ "genPadsTy: PTyvar: generation unsupported"
 genPadsTy x = error $ "genPadsTy: unimplemented: " ++ show x
 
 -- PConstrain Pat PadsTy Exp
 -- PTransform PadsTy PadsTy Exp
 ----- PList PadsTy (Maybe PadsTy) (Maybe TermCond)
--- PPartition PadsTy Exp
+----- PPartition PadsTy Exp
 -- PValue Exp PadsTy
 ----- PApp [PadsTy] (Maybe Exp)
--- PTuple [PadsTy]
+----- PTuple [PadsTy]
 ----- PExpression Exp
 ----- PTycon QString
--- PTyvar String
+----- PTyvar String
+
+genParam :: TH.Exp -> GenType
+genParam (TH.LitE (TH.CharL x))    = Lit x
+genParam (TH.LitE (TH.StringL xs)) = GTList $ map Lit xs -- treat string as a list of chars
+genParam (TH.LitE (TH.IntegerL x)) = Int $ fromIntegral x
+genParam (TH.VarE n)               = GTVar $ TH.nameBase n
+genParam x = error $ "genParam: unimplemented: " ++ show x
 
 
--- step out into template haskell to get the literal value we need
--- and turn it into a GenType
-gen_lit (TH.LitE (TH.CharL x))    = (Lit x)
-gen_lit (TH.LitE (TH.StringL xs)) = (GTList (map Lit xs) ) -- treat string as a list of chars
-gen_lit (TH.LitE (TH.IntegerL x)) = (Int (fromIntegral x))
-
-
-data GenType = GTBitField -- Parameterized
+data GenType = GTNamed String GenType
+             | GTBitField -- Parameterized
              | GTBits8    -- Parameterized
              | GTBits16   -- Parameterized
              | GTBits32   -- Parameterized
@@ -116,10 +125,12 @@ data GenType = GTBitField -- Parameterized
              | GTChar
              | GTInt
              | GTList [ GenType ]
+             | GTVar String
              | Lit Char    -- Argument to App
              | Int Int     -- Argument to App
              | App GenType GenType
              | Choice [ GenType ]
+
   deriving (Show)
 
 genBase :: [Char] -> IO GenType
@@ -139,10 +150,12 @@ genBase x = (genLookup x envs)
 -- If we couldn't find a base type, maybe it's another PADS type...
 -- try looking it up.
 genLookup :: [Char] -> [PadsDescription] -> IO GenType
-genLookup s ( (s1,b):xs ) | s == s1 = GTList <$> genAST b
-genLookup s ( (x,b):xs ) = genLookup s xs
-genLookup s [] = error ("could not find ast_" ++ s)
-
+genLookup s ds = case L.find ((== s) . fst) ds
+                   of Just d  -> GTList <$> genAST (snd d)
+                      Nothing -> error ("could not find ast_" ++ s)
+-- genLookup s ( (s1,b):xs ) | s == s1 = GTList <$> genAST b
+-- genLookup s ( (x,b):xs ) = genLookup s xs
+-- genLookup s [] = error ("could not find ast_" ++ s)
 
 
 
@@ -177,46 +190,68 @@ randLetterExcluding gen c = do
 
 
 data Chunk = CharChunk   Char
-           | BinaryChunk Integer Int -- val of data + num of significant bits
+           | BinaryChunk Integer Int -- val of data, num of significant bits
     deriving Show
+
+data Val = ValInt Int
+         | ValChar Char
+    deriving Show
+
+type ValEnv = [(String, Val)]
+
+data MEnv = MEnv { gen :: MWC.GenIO
+                 , env :: IORef ValEnv}
+
+find :: String -> MEnv -> IO Val
+find n e = do
+    valEnv <- readIORef $ env e
+    case L.find ((== n) . fst) valEnv of
+        Just (name, val) -> return val
+        Nothing          -> error "find: failed lookup"
+
+bind :: String -> Val -> MEnv -> IO ()
+bind n v e = do
+    valEnv <- readIORef $ env e
+    writeIORef (env e) $ (n,v):valEnv
 
 -- Value generation: creates a list of Chunks, combined elsewhere
 generateChunks :: GenType -> MWC.GenIO -> IO [Chunk]
-generateChunks (Lit c)  gen = return [CharChunk c]
-generateChunks (GTChar) gen = ((:[]) . CharChunk) <$> randLetter gen
-generateChunks (GTInt)  gen = ((map CharChunk) <$>) show <$> randInt gen
-generateChunks (App GTBits8 (Int n)) gen = do
+generateChunks (Lit c)  env = return [CharChunk c]
+generateChunks (GTChar) env = ((:[]) . CharChunk) <$> randLetter env
+generateChunks (GTInt)  env = ((map CharChunk) <$>) show <$> randInt env
+generateChunks (GTVar n) env = error "no"
+generateChunks (App GTBits8 (Int n)) env = do
     when (n > 8 || n < 0)
         (error $ "Bad Bits8 value: " ++ (show n))
-    r <- randInt gen
+    r <- randInt env
     return $ [BinaryChunk (fromIntegral r) n]
-generateChunks (App GTBits16 (Int n)) gen = do
+generateChunks (App GTBits16 (Int n)) env = do
     when (n > 16 || n < 0)
         (error $ "Bad Bits16 value: " ++ (show n))
-    r <- randInt gen
+    r <- randInt env
     return $ [BinaryChunk (fromIntegral r) n]
-generateChunks (App GTBits32 (Int n)) gen = do
+generateChunks (App GTBits32 (Int n)) env = do
     when (n > 32 || n < 0)
         (error $ "Bad Bits32 value: " ++ (show n))
-    r <- randInt gen
+    r <- randInt env
     return $ [BinaryChunk (fromIntegral r) n]
-generateChunks (App GTBits64 (Int n)) gen = do
+generateChunks (App GTBits64 (Int n)) env = do
     when (n > 64 || n < 0)
         (error $ "Bad Bits64 value: " ++ (show n))
-    r <- MWC.uniformR (0 :: Word64, 2 ^ 64 - 1 :: Word64) gen
+    r <- MWC.uniformR (0 :: Word64, 2 ^ 64 - 1 :: Word64) env
     return $ [BinaryChunk (fromIntegral r) n]
-generateChunks (App GTStringFW (Int n)) gen =
-    concat <$> replicateM (fromIntegral n) (generateChunks GTChar gen)
-generateChunks (App GTStringC (Lit c)) gen = do
-    len <- randIntBetween 1 listLimit gen
-    str <- replicateM len (randLetterExcluding gen c)
+generateChunks (App GTStringFW (Int n)) env =
+    concat <$> replicateM (fromIntegral n) (generateChunks GTChar env)
+generateChunks (App GTStringC (Lit c)) env = do
+    len <- randIntBetween 1 listLimit env
+    str <- replicateM len (randLetterExcluding env c)
     return $ (map CharChunk (str ++ [c]))
-generateChunks (GTList ds) gen = do
-    vals <- mapM (\x -> generateChunks x gen) ds
+generateChunks (GTList ds) env = do
+    vals <- mapM (\x -> generateChunks x env) ds
     return $ concat vals
-generateChunks (Choice cs) gen = do
-    rand <- randElem cs gen
-    generateChunks rand gen
+generateChunks (Choice cs) env = do
+    rand <- randElem cs env
+    generateChunks rand env
 generateChunks (x) _ = error $ "generateChunks: unimplemented: " ++ (show x)  -- = (\x -> '_':[]) --if we have no idea what to do
 
 -- This should be (and is) O(n), unless shiftL and shiftR take linear time on
@@ -260,10 +295,11 @@ fromChunks cs = do
             return (w:rest)
 
 
-mk_render_char :: PadsDecl -> MWC.GenIO -> IO [Chunk]
-mk_render_char pd gen = do
+mk_render_char :: PadsDecl -> MEnv -> IO [Chunk]
+mk_render_char pd env = do
     ds   <- genAST pd
-    vals <- mapM (\x -> generateChunks x gen) ds
+    let g = gen env
+    vals <- mapM (\x -> generateChunks x g) ds
     return $ concat vals
 
 findPadsAST :: [Char] -> [PadsDescription] -> PadsDescription
@@ -279,10 +315,13 @@ findPadsAST name lst =
 
 generate :: [Char] -> [PadsDescription] -> IO [Char]
 generate padsID padsExp = do
-    gen <- MWC.createSystemRandom
-    cs <- mk_render_char (snd (findPadsAST padsID padsExp)) gen
+    g <- MWC.createSystemRandom
+    e <- newIORef []
+    cs <- mk_render_char (snd (findPadsAST padsID padsExp)) (MEnv g e)
     ws <- fromChunks cs
     return $ map word8ToChr ws
+
+
 
 -- example usage: generate "START" padsSamples -- creates instance from START
 -- pads description in padsSamples
