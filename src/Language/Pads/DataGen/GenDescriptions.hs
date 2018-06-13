@@ -94,7 +94,7 @@ padsSamples = [pads|
 
     data Dependent = Dependent { first :: Bits8 4, second :: Bits16 first, Char }
 
-    -- data Dependent' = Dependent' { first' :: Bits8 8, second' :: Bits8 first }
+    -- data Dependent2 = Dependent2 { third :: Bits8 8, fourth :: Bytes third }
 
     data DT = DT1 [Int | ',']
             | DT2 " START DT2 " DT "||" DT " END DT2 "
