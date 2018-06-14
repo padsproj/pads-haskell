@@ -127,6 +127,7 @@ baseTypes = [ "BitField"
             , "Bits16"
             , "Bits32"
             , "Bits64"
+            , "Bytes"
             , "StringFW"
             , "StringC"
             , "Char"
@@ -154,6 +155,7 @@ data GenType = GTNamed String GenType
              | GTBits16   -- Parameterized
              | GTBits32   -- Parameterized
              | GTBits64   -- Parameterized
+             | GTBytes
              | GTStringC  -- Parameterized
              | GTStringFW -- Parameterized
              | GTChar
@@ -174,6 +176,7 @@ genBase _ "Bits8"     = return GTBits8
 genBase _ "Bits16"    = return GTBits16
 genBase _ "Bits32"    = return GTBits32
 genBase _ "Bits64"    = return GTBits64
+genBase _ "Bytes"     = return GTBytes
 genBase _ "StringFW"  = return GTStringFW
 genBase _ "StringC"   = return GTStringC
 genBase n "Char"      = return $ GTNamed n GTChar
@@ -201,7 +204,6 @@ find n = do
 
 bind :: String -> Val -> M ()
 bind n v = do
-    --printf "Bind: %s to (%s)\n" n (show v)
     env <- ask
     valEnv <- R.lift $ readIORef $ valEnvRef env
     R.lift $ writeIORef (valEnvRef env) $ (n,v):valEnv
@@ -258,10 +260,9 @@ generateChunks (GTApp (GTTycon x) e) = do
         replaceVarsInPadsData var lit (PUnion branches) = PUnion $ map (replaceVarsInBranchInfo var lit) branches
 
         replaceVarsInPadsTy :: TH.Exp -> TH.Exp -> PadsTy -> PadsTy
-        replaceVarsInPadsTy var lit (PApp x (Just e)) =
-            if   var == e
-            then PApp x (Just lit)
-            else PApp x (Just e)
+        replaceVarsInPadsTy var lit (PApp x (Just e)) = if   var == e
+                                                        then PApp x (Just lit)
+                                                        else PApp x (Just e)
         replaceVarsInPadsTy var lit x = x
 
         replaceVarsInBranchInfo :: TH.Exp -> TH.Exp -> BranchInfo -> BranchInfo
@@ -301,6 +302,9 @@ generateChunks (GTApp gt (TH.LitE (TH.IntegerL i))) = do
             else return $ [BinaryChunk (fromIntegral v) (fromIntegral i)]
         GTStringFW ->
             concat <$> replicateM (fromIntegral i) (generateChunks GTChar)
+        GTBytes -> do
+            bs <- R.lift $ replicateM (fromIntegral i) (MWC.uniformR (0 :: Word8, 255 :: Word8) (genIO env))
+            return $ map (CharChunk . word8ToChr) bs
         x -> error $ "generateChunks: unsupported generation type: " ++ show x
 generateChunks (GTApp gt (TH.LitE (TH.CharL c))) = do
     env <- ask
@@ -325,7 +329,7 @@ generateChunks x = error $ "generateChunks: unimplemented: " ++ show x
 fromChunks :: [Chunk] -> M [Word8]
 fromChunks cs = do
     let bits = foldr getBits 0 cs
-    -- when (bits `mod` 8 /= 0)                                                   -- Necessary? combineChunks should be robust enough
+    -- when (bits `mod` 8 /= 0)                                                   -- TODO: Necessary? combineChunks should be robust enough
     --     (error $ "Bad total bit length: " ++ (show bits) ++ " bits described") -- to handle weird non-byte-aligned stuff
     i <- combineChunks cs bits
     w8s <- reverse <$> createWord8s i
@@ -360,13 +364,6 @@ fromChunks cs = do
             rest <- createWord8s (i `shiftR` 8)
             return (w:rest)
 
-
-mk_render_char :: PadsDecl -> M [Chunk]
-mk_render_char pd = do
-    gts  <- genAST pd
-    vals <- mapM generateChunks gts
-    return $ concat vals
-
 findPadsAST :: [Char] -> PadsDescription
 findPadsAST name =
     case L.find ((== name) . fst) padsSamples
@@ -375,13 +372,17 @@ findPadsAST name =
 
 run :: [Char] -> M [Char]
 run padsID = do
-    cs <- mk_render_char (snd (findPadsAST padsID))
-    ws <- fromChunks cs
+    let ast = snd $ findPadsAST padsID
+    gentypes <- genAST ast
+    chunks <- mapM generateChunks gentypes
+    ws <- fromChunks $ concat chunks
     return $ map word8ToChr ws
 
 
 -- | Overall driver function. Usage: generate "Name", where Name is the name
 -- given to a PADS declaration.
+--
+-- TODO: probably best to make this produce a bytestring
 
 -- [pads| data Foo = Foo { x :: Int } |]
 -- generate "Foo"

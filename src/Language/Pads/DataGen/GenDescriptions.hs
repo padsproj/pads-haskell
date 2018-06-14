@@ -103,6 +103,8 @@ padsSamples = [pads|
     data DT = DT1 [Int | ',']
             | DT2 " START DT2 " DT "||" DT " END DT2 "
 
+    type SomeBytes = Bytes 8
+
     data PadsTyValue = PadsTyValue { ptv :: Int, xIsEven = value <| even ptv |> :: Bool }
 
     -- All strings with an equal number of 01 and 10 substrings:
