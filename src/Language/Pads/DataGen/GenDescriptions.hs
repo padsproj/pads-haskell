@@ -92,9 +92,13 @@ padsSamples = [pads|
         bits2 :: Bits8 4
     }
 
-    data Dependent = Dependent { first :: Bits8 4, second :: Bits16 first, Char }
+    data Dependent = Dependent { first :: Bits8 4, second :: Bits16 first, onronr::Char }
 
     -- data Dependent2 = Dependent2 { third :: Bits8 8, fourth :: Bytes third }
+
+    data Test0 = Test0 { f :: Bits8 6
+                       , g :: Test1 f }
+    data Test1 (x :: Bits8) = Test1 { h :: Bits64 x }
 
     data DT = DT1 [Int | ',']
             | DT2 " START DT2 " DT "||" DT " END DT2 "
