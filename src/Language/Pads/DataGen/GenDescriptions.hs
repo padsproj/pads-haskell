@@ -92,7 +92,7 @@ padsSamples = [pads|
         bits2 :: Bits8 4
     }
 
-    data Dependent = Dependent { first :: Bits8 4, second :: Bits16 first, onronr::Char }
+    data Dependent = Dependent { first :: Bits8 4, second :: Bits16 first, other :: StringFW 20 }
 
     -- data Dependent2 = Dependent2 { third :: Bits8 8, fourth :: Bytes third }
 
@@ -103,7 +103,7 @@ padsSamples = [pads|
     data DT = DT1 [Int | ',']
             | DT2 " START DT2 " DT "||" DT " END DT2 "
 
-    type SomeBytes = Bytes 8
+    type SomeBytes = Bytes <| fromIntegral 8 |>
 
     data PadsTyValue = PadsTyValue { ptv :: Int, xIsEven = value <| even ptv |> :: Bool }
 
@@ -124,6 +124,11 @@ padsSamples = [pads|
             | Q5_0 { '0', Q4 }
 
     type ThreeInts = (Int, Char, Int)
+
+    data ThreeIntsRecord = ThreeIntsRecord {runningoutofnames :: ThreeInts,
+                                            runningoutofnamesp2 :: StringFW 20}
+
+    data BitsRecord = BitsRecord { Int }
 |]
 
 

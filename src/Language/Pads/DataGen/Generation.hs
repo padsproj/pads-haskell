@@ -73,6 +73,8 @@ newMEnv = do
 $(make_pads_declarations $ map snd padsSamples)
 envs = padsSamples
 
+-- Convert PADS AST to list of GenTypes, more or less a simplified AST more
+-- conducive to value generation
 -- TODO: consider other arguments, esp. TH expressions
 genAST :: PadsDecl -> M [GenType]
 genAST (PadsDeclData _ xs args padsData e)   = genPadsData padsData
@@ -129,40 +131,36 @@ genPadsTy (PApp xs (Just e)) = do
     pt <- genPadsTy $ xs !! 0
     return $ GTApp pt e
 genPadsTy (PTuple pts) = GTList <$> mapM (genPadsTy) pts
-genPadsTy (PExpression exp) = return $ genParam exp
-genPadsTy (PTycon xs) = --genBase n $ xs !! 0
+genPadsTy (PExpression exp) = return $ genExp exp
+    where
+        genExp :: TH.Exp -> GenType
+        genExp (TH.LitE (TH.CharL c))    = GTCharL c
+        genExp (TH.LitE (TH.StringL cs)) = GTList $ map GTCharL cs -- treat string as a list of chars
+        genExp (TH.LitE (TH.IntegerL i)) = GTIntL $ fromIntegral i
+        genExp (TH.VarE n)               = GTVar $ TH.nameBase n
+        genExp x = error $ "genExp: unimplemented: " ++ show x
+genPadsTy (PTycon xs) =
     case xs of
         [x] -> if   any (== x) baseTypes
                then genBase x
                else return $ GTTycon x
         _   -> error $ "genPadsTy: unsupported: qualified names: " ++ show xs
+    where
+        baseTypes = [ "BitField"
+                    , "Bits8"
+                    , "Bits16"
+                    , "Bits32"
+                    , "Bits64"
+                    , "Bytes"
+                    , "StringFW"
+                    , "StringC"
+                    , "Char"
+                    , "Int"
+                    ]
 genPadsTy x@(PTyvar y) = error $ "genPadsTy: unsupported: PTyvar: " ++ show x
 
-baseTypes = [ "BitField"
-            , "Bits8"
-            , "Bits16"
-            , "Bits32"
-            , "Bits64"
-            , "Bytes"
-            , "StringFW"
-            , "StringC"
-            , "Char"
-            , "Int"
-            ]
 
 
--- | Some PADS descriptions are parameterized with a Haskell expression; this
--- function parses such expressions
-genParam :: TH.Exp -> GenType
-genParam (TH.LitE (TH.CharL c))    = GTCharL c
-genParam (TH.LitE (TH.StringL cs)) = GTList $ map GTCharL cs -- treat string as a list of chars
-genParam (TH.LitE (TH.IntegerL i)) = GTIntL $ fromIntegral i
-genParam (TH.VarE n)               = GTVar $ TH.nameBase n
-genParam x = error $ "genParam: unimplemented: " ++ show x
--- To support more complex parameterization (e.g. Bits8 <| len * 5 |>),
--- we require interpretation capabilities of TemplateHaskell. As of
--- now, only simple variable names are supported.
--- Possible future adaptations: simple arithmetic, use of fromIntegral
 
 data GenType = GTNamed String GenType
              | GTTycon String
@@ -176,16 +174,13 @@ data GenType = GTNamed String GenType
              | GTStringFW -- Parameterized
              | GTChar
              | GTInt
-             | GTList [ GenType ]
+             | GTList [GenType]
              | GTVar String
              | GTCharL Char -- Argument to GTApp
              | GTIntL Int   -- Argument to GTApp
              | GTApp GenType TH.Exp
-             | Choice [ GenType ]
-
   deriving (Show)
 
--- Parameterized types are named elsewhere (in GTApp/PApp)
 genBase :: String -> M GenType
 genBase "BitField"  = return GTBitField
 genBase "Bits8"     = return GTBits8
@@ -195,28 +190,24 @@ genBase "Bits64"    = return GTBits64
 genBase "Bytes"     = return GTBytes
 genBase "StringFW"  = return GTStringFW
 genBase "StringC"   = return GTStringC
-genBase "Char"      = return GTChar -- $ GTNamed n GTChar
-genBase "Int"       = return GTInt -- $ GTNamed n GTInt
--- this will be replaced with something which actually can find all the ASTs
--- in a single location
-genBase x = genLookup x envs
-
--- | Locate the AST of a non-base (user-defined) PADS type
-genLookup :: String -> [PadsDescription] -> M GenType
-genLookup s ds =
-    case L.find ((== s) . fst) ds of
-        Just d  -> GTList <$> genAST (snd d)
-        Nothing -> error $ "genLookup: failed lookup: " ++ s
-
+genBase "Char"      = return GTChar
+genBase "Int"       = return GTInt
+genBase x           = genLookup x envs
+    where
+        genLookup :: String -> [PadsDescription] -> M GenType
+        genLookup s ds =
+            case lookup s ds of
+                Just d  -> GTList <$> genAST d
+                Nothing -> error $ "genLookup: failed lookup: " ++ s
 
 
 find :: String -> M Val
 find n = do
     env <- ask
     valEnv <- R.lift $ readIORef $ valEnvRef env
-    case L.find ((== n) . fst) valEnv of
-        Just (_, val) -> return val
-        Nothing       -> error $ "find: failed lookup: " ++ n
+    case lookup n valEnv of
+        Just val -> return val
+        Nothing  -> error $ "find: failed lookup: " ++ n
 
 bind :: String -> Val -> M ()
 bind n v = do
@@ -226,7 +217,8 @@ bind n v = do
 
 
 
--- Value generation: creates a list of Chunks, combined elsewhere
+-- Create a list of Chunks, a datatype representing generated data which eases
+-- the combination of it into a final result
 generateChunks :: GenType -> M [Chunk]
 generateChunks (GTNamed n gt) = do
     cs <- generateChunks gt
@@ -248,9 +240,10 @@ generateChunks GTInt = do
     env <- ask
     R.lift $ map CharChunk <$> show <$> randInt (genIO env)
 generateChunks (GTTycon x) = genBase x >>= generateChunks
+-- TODO: applying GTTycon to a fromIntegral expression will result in an error,
+-- though this behavior is well-defined for base types
 generateChunks (GTApp (GTTycon x) e) = do
-    --printf "generateChunks: looking up %s\n" x
-    let ast = snd $ findPadsAST x
+    let ast = findPadsAST x
     lit <- case e of
         TH.LitE _ -> return e
         TH.VarE n -> do
@@ -264,7 +257,6 @@ generateChunks (GTApp (GTTycon x) e) = do
     -- substitution of literal value for variable name
     gt' <- genAST ast'
     generateChunks (GTList gt')
-    -- generation
 
     where
         replaceVars :: TH.Exp -> TH.Exp -> PadsDecl -> PadsDecl
@@ -327,7 +319,7 @@ generateChunks (GTApp gt (TH.LitE (TH.IntegerL i))) = do
             where
                 rand8 :: IO Word8
                 rand8 = MWC.uniformR (0 :: Word8, 255 :: Word8) (genIO env)
-        x -> error $ "generateChunks: unsupported generation type: " ++ show x
+        x -> error $ "generateChunks: unsupported application to Int: " ++ show x
 generateChunks (GTApp gt (TH.LitE (TH.CharL c))) = do
     env <- ask
     case gt of
@@ -335,6 +327,7 @@ generateChunks (GTApp gt (TH.LitE (TH.CharL c))) = do
             len <- MWC.uniformR (0, listLimit) (genIO env)
             str <- R.lift $ replicateM len (randLetterExcluding c (genIO env))
             return $ (map CharChunk (str ++ [c]))
+        x -> error $ "generateChunks: unsupported application to Char: " ++ show x
 generateChunks (GTApp gt (TH.VarE n)) = do
     let n' = TH.nameBase n
     v <- find n'
@@ -390,15 +383,15 @@ fromChunks cs = do
             rest <- createWord8s (i `shiftR` 8)
             return (w:rest)
 
-findPadsAST :: [Char] -> PadsDescription
+findPadsAST :: [Char] -> PadsDecl
 findPadsAST name =
-    case L.find ((== name) . fst) padsSamples
+    case lookup name padsSamples
       of Just n  -> n
          Nothing -> error $ "PADS identifier " ++ (show name) ++ " not found"
 
 run :: [Char] -> M [Char]
 run padsID = do
-    let ast = snd $ findPadsAST padsID
+    let ast = findPadsAST padsID
     gentypes <- genAST ast
     chunks <- mapM generateChunks gentypes
     ws <- fromChunks $ concat chunks
