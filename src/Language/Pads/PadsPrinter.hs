@@ -26,55 +26,55 @@ import Data.Data
 
 {- Printing Monad -}
 
--- | 
+-- |
 type PadsPrinter a = a -> FList
 
 -- Lazy append-lists
 
--- | 
+-- |
 type FList = B.ByteString -> B.ByteString
 
--- | 
+-- |
 (+++) :: FList -> FList -> FList
 p +++ q = p . q
 
--- | 
+-- |
 nil :: FList
 nil = id
 
--- | 
+-- |
 concatFL :: [FList] -> FList
-concatFL (f:fs) = foldr (+++) nil fs
+concatFL fs = foldr (+++) nil fs
 
--- | 
+-- |
 printNothing :: FList
 printNothing ws = ws
 
--- | 
+-- |
 addBString :: B.ByteString -> FList
 addBString bs = B.append bs
 
--- | 
+-- |
 addString :: String -> FList
 addString s = B.append (S.strToByteString s)
 
--- | 
+-- |
 fshow :: Show a => a -> FList
 fshow x = B.append (S.strToByteString (show x))
 
--- | 
+-- |
 printEOR :: FList
 printEOR = addString ['\n']
 
--- | 
+-- |
 printEOF :: FList
 printEOF = addString []
 
--- | 
+-- |
 endRecord :: FList -> FList
 endRecord fst = fst +++ printEOR
 
--- | 
+-- |
 printF :: FList -> IO ()
 printF q = Prelude.print (B.unpack (q B.empty))
 
@@ -120,4 +120,3 @@ intPair_printFL (r,m)
            int_PrintFL (r2,m2)
 
 -}
-

@@ -84,7 +84,7 @@ padsSamples = [pads|
         pr_index :: Bits8 4
     }
 
-    type Pixels = partition [Pixel] using none
+    type PixelP = partition Pixel using none
 
     data Mixed = Mixed {
         bits1 :: Bits8 4,
@@ -92,7 +92,7 @@ padsSamples = [pads|
         bits2 :: Bits8 4
     }
 
-    data Dependent = Dependent { first :: Bits8 4, second :: Bits16 first, other :: StringFW 20 }
+    data Dependent = Dependent { first :: Bits8 4, second :: Bits16 first }
 
     -- data Dependent2 = Dependent2 { third :: Bits8 8, fourth :: Bytes third }
 

@@ -59,7 +59,7 @@ data MEnv = MEnv { genIO     :: MWC.GenIO
                  , valEnvRef :: IORef ValEnv
                  }
 
-type M = ReaderT MEnv IO
+type M = ReaderT MEnv IO 
 
 
 
@@ -365,7 +365,8 @@ fromChunks cs = do
 
         combineChunks :: [Chunk] -> Int -> M Integer
         combineChunks [] _ = return 0
-        combineChunks _ 0 = error "ran out of bits"
+        combineChunks cs 0 = case cs of [BinaryChunk _ 0] -> return 0
+                                        _ -> error $ "ran out of bits" ++ show cs
         combineChunks ((CharChunk c):cs) bs = do
             let i = ((fromIntegral . chrToWord8) c) `shiftL` (bs - 8)
             rest <- combineChunks cs (bs - 8)
