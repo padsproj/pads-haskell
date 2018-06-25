@@ -28,7 +28,7 @@ module Language.Pads.Padsc (
      module Language.Pads.CoreBaseTypes,
      module Language.Pads.Quote,
      module Language.Pads.Syntax,
-     module Language.Pads.BaseTypes,
+     --module Language.Pads.BaseTypes,
      module Language.Pads.Pretty,
      module Language.Pads.PadsPrinter,
      module Data.Data,
@@ -45,7 +45,7 @@ import Language.Pads.Generic
 import Language.Pads.CoreBaseTypes
 import Language.Pads.Quote
 import Language.Pads.Syntax
-import Language.Pads.BaseTypes
+--import Language.Pads.BaseTypes
 import Language.Pads.Pretty
 import Language.Pads.PadsPrinter
 
@@ -56,4 +56,3 @@ import Text.PrettyPrint.Mainland.Class
 {- Fix these should be reexported -}
 -- parseAllS = Language.Pads.PadsParser.parseAllS
 numErrors = Language.Pads.MetaData.numErrors
-

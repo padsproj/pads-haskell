@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables,
              MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances,
-             FlexibleInstances #-}
+             FlexibleInstances, MagicHash #-}
 {-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.CoreBaseTypes
@@ -24,9 +24,11 @@ import Data.Maybe
 import qualified Language.Pads.Source as S
 import qualified Language.Pads.Errors as E
 import qualified Data.ByteString as B
+import           Data.ByteString.Internal
 import qualified Data.ByteString.Char8 as C
 
 import Language.Pads.PadsPrinter
+import Language.Pads.DataGen.Rand
 
 import Language.Haskell.TH as TH
 import Language.Haskell.TH.Syntax
@@ -42,6 +44,19 @@ import Text.PrettyPrint.Mainland as PP
 import Text.PrettyPrint.Mainland.Class
 
 import Control.Monad
+import System.Random.MWC
+import System.IO.Unsafe (unsafePerformIO)
+
+import GHC.Base
+import GHC.Exts
+
+
+{-# NOINLINE gen #-}
+gen = unsafePerformIO createSystemRandom
+
+{-# NOINLINE gen2 #-}
+!gen2 = createSystemRandom
+
 
 -- | Metadata type for a PADS Char
 type Char_md = Base_md
@@ -68,6 +83,9 @@ instance Pads1 () Char Base_md where
 char_printFL :: PadsPrinter (Char, md)
 char_printFL (c,bmd) = addString [c]
 
+char_genM :: IO Char
+char_genM = randLetter gen --gen = randLetter gen
+
 ---------------------------------------------
 
 type CharNB = Char
@@ -86,6 +104,9 @@ charNB_def = char_def
 charNB_printFL :: PadsPrinter (CharNB, md)
 charNB_printFL (c, bmd) = addString [c]
 
+charNB_genM :: IO Char
+charNB_genM = char_genM
+
 
 -----------------------------------------------------------------
 
@@ -103,6 +124,9 @@ bitBool_def = False
 
 bitBool_printFL :: PadsPrinter (BitBool, md)
 bitBool_printFL (bb,bbmd) = fshow bb
+
+bitBool_genM :: IO BitBool
+bitBool_genM = randElem [False,True] gen
 
 -- type instance PadsArg Bool = ()
 -- type instance Meta Bool = Base_md
@@ -211,6 +235,18 @@ bits16_printFL _ (x, xmd) = fshow x
 bits32_printFL _ (x, xmd) = fshow x
 bits64_printFL _ (x, xmd) = fshow x
 
+bits8_genM :: Integral a => a -> IO Bits8
+bits8_genM x = uniformR (0 :: Bits8, (2^x)-1 :: Bits8) gen
+
+bits16_genM :: Integral a => a -> IO Bits16
+bits16_genM x = uniformR (0 :: Bits16, (2^x)-1 :: Bits16) gen
+
+bits32_genM :: Integral a => a -> IO Bits32
+bits32_genM x = uniformR (0 :: Bits32, (2^x)-1 :: Bits32) gen
+
+bits64_genM :: Integral a => a -> IO Bits64
+bits64_genM x = uniformR (0 :: Bits64, (2^x)-1 :: Bits64) gen
+
 -----------------------------------------------------------------
 
 --type Int
@@ -242,6 +278,12 @@ instance Pads1 () Int Base_md where
 
 int_printFL :: PadsPrinter (Int, Base_md)
 int_printFL (i, bmd) = fshow i
+
+int_genM :: IO Int
+int_genM = randInt gen
+
+intBound_genM :: Int -> Int -> IO Int
+intBound_genM x y = uniformR (x, y) gen
 
 -----------------------------------------------------------------
 
@@ -451,6 +493,8 @@ instance Pads1 () String Base_md where
 string_printFL :: PadsPrinter (String, Base_md)
 string_printFL (str, bmd) = addString str
 
+string_genM = stringFW_genM 100
+
 -----------------------------------------------------------------
 
 type StringNB = String
@@ -542,6 +586,11 @@ stringC_def c = ""
 stringC_printFL :: Char -> PadsPrinter (StringC, Base_md)
 stringC_printFL c (str, bmd) = addString str
 
+stringC_genM :: Char -> IO StringC
+stringC_genM c = do
+  i <- intBound_genM 0 20
+  replicateM i (randLetterExcluding c gen)
+
 -----------------------------------------------------------------
 
 type StringCNB = String
@@ -581,6 +630,10 @@ stringFW_def n = replicate n 'X'
 
 stringFW_printFL :: Int -> PadsPrinter (StringFW, Base_md)
 stringFW_printFL n (str, bmd)  = addString (take n str)
+
+stringFW_genM :: Int -> IO StringFW
+stringFW_genM i = replicateM i (randLetter gen)
+
 
 -----------------------------------------------------------------
 
@@ -952,6 +1005,19 @@ bytes_printFL n (bs, bmd) =
 
 bytes_def :: Int -> Bytes
 bytes_def i = B.pack $ replicate i (0::Word8)
+
+-- {-# RULES
+-- "pack/packAddress" forall s . B.pack (map S.chrToWord8 (unpackCString# s)) = unsafePerformIO $ unsafePackAddress s
+-- #-}
+
+
+bytes_genM :: Int -> IO Bytes
+bytes_genM i = do
+  w8s <- replicateM i $ uniformR (1 :: Word8, 255 :: Word8) gen
+  let cs = ((map S.word8ToChr w8s) ++ "\NUL")
+  let cs' = "hey"#
+  return $ B.pack w8s
+  --unsafePackAddress cs
 
 type instance PadsArg Bytes = Int
 type instance Meta Bytes = Bytes_md

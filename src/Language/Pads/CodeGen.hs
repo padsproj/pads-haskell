@@ -44,7 +44,7 @@ import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import Control.Monad
 import Language.Haskell.TH.Syntax (lift)
-
+import qualified System.Random.MWC as MWC
 import qualified Debug.Trace as D
 
 -- |
@@ -85,33 +85,35 @@ genPadsDecl derivation pd@(PadsDeclType name args pat padsTy) = do
   parseM  <- genPadsParseM name args pat padsTy
   parseS  <- genPadsParseS name args pat
   printFL <- genPadsPrintFL name args pat padsTy
+  genM    <- genPadsGenM name args pat padsTy
   def <- genPadsDef name args pat padsTy
   let sigs = mkPadsSignature name args (fmap patType pat)
   ast <- astDecl name pd
-  return $ typeDecs ++ parseM ++ parseS ++ printFL ++ def ++ sigs
+  return $ typeDecs ++ parseM ++ parseS ++ printFL ++ genM ++ def ++ sigs
 
 genPadsDecl derivation pd@(PadsDeclData name args pat padsData derives) = do
   dataDecs <- mkDataRepMDDecl derivation name args padsData derives
   parseM <- genPadsDataParseM name args pat padsData
   parseS <- genPadsParseS name args pat
   printFL <- genPadsDataPrintFL name args pat padsData
-  --genM <- genPadsDataGenM name args pat padsData
+  genM <- genPadsDataGenM name args pat padsData
   def <- genPadsDataDef name args pat padsData
   let instances = mkPadsInstance name args (fmap patType pat)
   let sigs = mkPadsSignature name args (fmap patType pat)
   ast <- astDecl name pd
-  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
+  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ genM ++ def ++ instances ++ sigs
 
 genPadsDecl derivation pd@(PadsDeclNew name args pat branch derives) = do
   dataDecs <- mkNewRepMDDecl derivation name args branch derives
   parseM <- genPadsNewParseM name args pat branch
   parseS <- genPadsParseS name args pat
   printFL <- genPadsNewPrintFL name args pat branch
+  genM <- genPadsNewGenM name args pat branch
   def <- genPadsNewDef name args pat branch
   let instances = mkPadsInstance name args (fmap patType pat)
   let sigs = mkPadsSignature name args (fmap patType pat)
   ast <- astDecl name pd
-  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
+  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ genM ++ def ++ instances ++ sigs
 
 genPadsDecl derivation pd@(PadsDeclObtain name args padsTy exp) = do
   let mdDec = mkObtainMDDecl name args padsTy
@@ -437,6 +439,11 @@ genPadsParseM name args patM padsTy = do
   let body = genParseTy padsTy
   mkParserFunction name args patM body
 
+genPadsGenM :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
+genPadsGenM name args patM padsTy = do
+  let body = genGenTy padsTy
+  mkGeneratorFunction name args patM body
+
 -- | 'PadsData' data declaration flavour of the "_parseM" function.
 genPadsDataParseM :: UString -> [LString] -> (Maybe Pat) -> PadsData -> Q [Dec]
 genPadsDataParseM name args patM padsData = do
@@ -454,6 +461,12 @@ genPadsNewParseM name args patM branch = do
   (dec,exp) <- genParseBranchInfo branch
   let body = letE [return dec] (return exp)
   mkParserFunction name args patM body
+
+-- | TODO: pls to test
+genPadsNewGenM :: UString -> [LString] -> (Maybe Pat) -> BranchInfo -> Q [Dec]
+genPadsNewGenM name args patM branch = do
+  exp <- genGenBranchInfo branch
+  mkGeneratorFunction name args patM (return exp)
 
 -- | Pads Obtain declaration flavour of the "_parseM" function.
 genPadsObtainParseM :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
@@ -479,6 +492,7 @@ mkGeneratorFunction name args patM body
     fun = funD generatorName [clause generatorArgs (normalB body) []]
     generatorName = mkTyGeneratorName name
     generatorArgs = map (varP . mkVarGeneratorName) args ++ Maybe.maybeToList (return <$> patM)
+    --sig = sigD (mkTyGeneratorName name) (appT (varT $ mkName "IO") (varT $ mkName name))
 
 
 -------------------------------------------------------------------------------
@@ -520,16 +534,16 @@ genParseTy pty = case pty of
 
 genGenTy :: PadsTy -> Q Exp
 genGenTy pty = case pty of
-  PConstrain pat ty exp   -> error "genGenTy: TODO"
-  PTransform src dest exp -> error "genGenTy: TODO"
-  PList ty sep term       -> error "genGenTy: TODO"
+  PConstrain pat ty exp   -> error "genGenTy: PConstrain: TODO"
+  PTransform src dest exp -> error "genGenTy: PTransform: TODO"
+  PList ty sep term       -> genGenList ty sep term
   PPartition ty exp       -> genGenTy ty
-  PValue exp ty           -> error "genGenTy: TODO"
-  PApp tys argE           -> error "genGenTy: TODO"
+  PValue exp ty           -> genGenValue exp
+  PApp tys argE           -> genGenTyApp tys argE
   PTuple tys              -> genGenTuple tys
-  PExpression exp         -> error "genGenTy: TODO"
+  PExpression exp         -> [| return $(return exp) |]
   PTycon c                -> return $ mkGenTycon c
-  PTyvar v                -> error "genGenTy: TODO"
+  PTyvar v                -> [| v |]
 
 -- | Simply generate a call to the runtime system function 'parseConstraint'
 -- where the first argument is a Haskell expression spliced directly into the
@@ -540,6 +554,17 @@ genParseConstrain :: Q Pat -> PadsTy -> Q Exp -> Q Exp
 genParseConstrain patQ ty expQ = [| parseConstraint $(genParseTy ty) $pred |]
   where
     pred = lamE [patQ, varP (mkName "md")] expQ
+
+genGenConstrain :: Q Pat -> PadsTy -> Q Exp -> Q Exp
+genGenConstrain pat pty e = do
+  stmt1 <- bindS pat (genGenTy pty)
+  name <- newName "x"
+  stmt2 <- bindS (varP name) [| untilM_ ($e) $(genGenTy pty) |]
+  pat'  <- pat
+  stmt3 <- noBindS [| return $(fromVarP pat') |]
+  return $ DoE $ stmt1 : stmt2 : stmt3 : []
+  where
+    fromVarP (VarP x) = varE x
 
 -- | Simply generate a call to the runtime system function 'parseTransform'
 -- where the first argument is the spliced-in-place parser for the "source" Pads
@@ -565,6 +590,20 @@ genParseList ty sep term =
     (Nothing,  Just (LTerm term))-> [| parseListNoSepTerm $(genParseTy term) $(genParseTy ty) |]
     (Just sep, Just (LTerm term))-> [| parseListSepTerm $(genParseTy sep) $(genParseTy term) $(genParseTy ty) |]
 
+-- | Generate a list representing a Pads list type. We ignore the separator and
+-- PadsTy termination condition here and include them in the data during
+-- serialization.
+genGenList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> Q Exp
+genGenList pty sep term =
+  case (sep,term) of
+    (_, Just (LLen l)) -> [| sequence $ replicate $(return l) $(genGenTy pty) |]
+    _ -> do
+      name <- newName "n"
+      bind <- bindS (varP name) [| $(dyn "intBound_genM") 0 500 |]
+      ret  <- noBindS [| sequence $ replicate $(varE name) $(genGenTy pty) |]
+      return $ DoE (bind : [ret])
+
+
 -- | Simply generate a call to the runtime system function 'parsePartition'
 -- where the first argument is an expression for parsing the 'PadsTy' pads type
 -- we're partitioning on and the second argument is the Haskell expression given
@@ -585,6 +624,9 @@ genParsePartition ty disc = [| parsePartition $(genParseTy ty) $(return disc) |]
 genParseValue :: Exp -> Q Exp
 genParseValue exp = [| return ($(return exp), cleanBasePD) |]
 --genParseValue exp = return $ AppE (VarE 'return) (TupE [exp,VarE 'cleanBasePD])
+
+genGenValue :: Exp -> Q Exp
+genGenValue exp = [| return $(return exp) |]
 
 data D = D {i :: Int, b :: Bool}
   deriving Show
@@ -610,12 +652,19 @@ genParseTuple tys = do
 genGenTuple :: [PadsTy] -> Q Exp
 genGenTuple [] = [| return () |]
 genGenTuple tys = do
-  tys' <- mapM genGenTy tys
-  let freshvars = [mkName ("x" ++ show n) | n <- [1 .. length tys]]
-  let stmts = [BindS (VarP v) t | (v,t) <- zip freshvars tys']
+  let tys' = filter notPExp tys -- If it's a PExpression, then it's going to be a literal - don't generate
+  tys'' <- mapM genGenTy tys'
+  let freshvars = [mkName ("x" ++ show n) | n <- [1 .. length tys']]
+  --let gen = mkName "gen"
+  let stmts  = [BindS (VarP v) t | (v,t) <- zip freshvars tys'']
+  --let stmts' = (BindS (VarP gen) (VarE $ mkName "MWC.createSystemRandom")) : stmts
   let rets = tupE (map varE freshvars)
   ret <- [| return $rets |]
   return $ DoE (stmts ++ [NoBindS ret])
+  where
+    notPExp :: PadsTy -> Bool
+    notPExp (PExpression _) = False
+    notPExp _               = True
 
 -- | Glom the generated parser for the given 'PadsTy' onto the given parser
 -- using the '=@=' and '=@' runtime system operators.
@@ -714,6 +763,12 @@ genParseTyApp tys expM = do
   fs <- mapM genParseTy tys
   return (foldl1 AppE (fs ++ Maybe.maybeToList expM))
 
+-- | Generate the generator for a Pads type application.
+genGenTyApp :: [PadsTy] -> Maybe Exp -> Q Exp
+genGenTyApp tys expM = do
+  fs <- mapM genGenTy tys
+  return (foldl1 AppE (fs ++ Maybe.maybeToList expM))
+
 -- | Make the parser for a Pads type constructor - just return it as a Haskell
 -- variable expression.
 mkParseTycon :: QString -> Exp
@@ -721,8 +776,10 @@ mkParseTycon ["EOF"] = VarE 'eof_parseM
 mkParseTycon ["EOR"] = VarE 'eor_parseM
 mkParseTycon c       = VarE (mkTyParserQName c)
 
+-- | Basically same as mkParseTycon, but the name that results is different.
 mkGenTycon :: QString -> Exp
 mkGenTycon [c] = VarE (mkTyGeneratorName c)
+mkGenTycon x   = error $ "mkGenTycon: " ++ show x
 
 -- | Make the parser for a Pads type variable - just return it as a Haskell
 -- variable expression.
@@ -738,9 +795,12 @@ genParseData :: PadsData -> Q Exp
 genParseData (PUnion bs)       = genParseUnion bs
 genParseData (PSwitch exp pbs) = genParseSwitch exp pbs
 
+-- | Generate the generators for Pads data declarations.
 genGenData :: PadsData -> Q Exp
 genGenData (PUnion bs)       = genGenUnion bs
-genGenData (PSwitch exp pbs) = error "genGenData: TODO" --genGenSwitch exp pbs
+genGenData (PSwitch exp pbs) = do
+  let matches = [match (return p) (normalB $ genGenBranchInfo b) [] | (p,b) <- pbs]
+  caseE (return exp) matches
 
 -- | Generate the template haskell for parsing a Pads union expression. Namely
 -- generate the metadata constructors for each of the branches of the union and
@@ -756,14 +816,24 @@ genParseUnion bs = do
   ; return (LetE decs body)
   }
 
+-- | Choose a random branch of those available and create its generator. The
+-- variable "gen" (:: MWC.GenIO) is defined in CoreBaseTypes.
+-- TODO: this looks bad
 genGenUnion :: [BranchInfo] -> Q Exp
-genGenUnion bs = do
-  { bodies <- mapM genGenBranchInfo bs
-  ; let body = case bodies of
-                  [b] -> b
-                  bs  -> (VarE 'choiceP) `AppE` (ListE bs)
-  ; return body
-  }
+genGenUnion bs =
+  case bs of
+    [b] -> genGenBranchInfo b
+    bs  -> do --genGenBranchInfo (Prelude.head bs)
+      let bs' = map genGenBranchInfo bs
+      index <- newName "index"
+      dos <- newName "dos"
+      s1 <- letS [valD (varP dos) (normalB (listE bs')) []]
+      s2 <- bindS (varP index) [| intBound_genM 0 (length $(varE dos) - 1) |]
+      s3 <- noBindS [| $(varE dos) !! $(varE index) |]
+      return $ DoE [s1,s2,s3]
+
+
+
 
 -- | Generate the template haskell case expression from a Pads switch type. This
 -- is almost entirely just matching the syntax of a Pads case onto the syntax of
@@ -789,12 +859,20 @@ genParseBranchInfo (BConstr c args pred) = do
     tys  = [ty | (strict,ty) <- args]
     con_md = buildConstr_md (mkfnMDName c) (ConE (mkConstrIMDName c)) tys
 
--- TODO: logic for BConstr could be wildly inaccurate or spot on
 genGenBranchInfo :: BranchInfo -> Q Exp
 genGenBranchInfo (BRecord c fields pred) = genGenRecord c fields pred
-genGenBranchInfo (BConstr c args   pred) = let
-  fakeFields = map (\constrarg -> (Nothing, constrarg, Nothing)) args
-  in genGenRecord c fakeFields pred
+genGenBranchInfo (BConstr c args   pred) = do
+  let tys = [ty | (_,ty) <- args]
+  let ty = map genGenTy tys !! 0
+  when (length tys > 1) -- TODO
+    (error $ "genGenBranchInfo: BConstr: more than one type: " ++ show tys)
+  x <- newName "x"
+  bind <- bindS (varP x) ty
+  let toreturn = case tys !! 0 of PExpression _ ->       (conE . mkName) c
+                                  _             -> appE ((conE . mkName) c) (varE x)
+  ret <- noBindS [| return $toreturn |]
+  return $ DoE [bind,ret]
+  
 
 -- | Build the constructor function for tupling together the metadata results of
 -- parsing a bunch of Pads types.
@@ -824,13 +902,12 @@ genParseRecord c fields pred = do
   returnStmt <- [| return ($(return conLabs),$(return fnMDLabs)) |]
   return (con_md, DoE (concat doStmts ++ [NoBindS returnStmt]))
 
+-- | Generate the template Haskell code for generating a Pads record.
 genGenRecord :: UString -> [FieldInfo] -> (Maybe Exp) -> Q Exp
 genGenRecord c fields pred = do
   doStmts <- sequence $ map genGenField fields
-  let mkName' x = case x of Just y  -> mkName y
-                            Nothing -> mkName "x"
-  let labs = [mkName' lab | (lab,(_,ty),_) <- fields, hasRep ty]
-  let conLabs = applyE (ConE (mkConstrName c) : map VarE labs)
+  let labels = map mkName $ Maybe.catMaybes $ [label | (label,(_,ty),_) <- fields, hasRep ty]
+  let conLabs = applyE (ConE (mkConstrName c) : map VarE labels)
   returnStmt <- [| return ($(return conLabs)) |]
   return $ DoE (concat doStmts ++ [NoBindS returnStmt])
 
@@ -853,15 +930,15 @@ genParseField (labM, (strict, ty), expM) xn = do
               Just lab -> varP (mkName lab)
               Nothing  -> wildP
 
+-- | Generate the generator for a field of a Pads record; each one becomes a
+-- binding statement in a haskell do-expression.
 genGenField :: FieldInfo -> Q [Stmt]
 genGenField (labM, (strict, ty), expM) = do
-  let genTy = (case expM of Nothing  -> genGenTy ty
-                            Just exp -> error "genGenField: TODO")
+  let labP  = case labM of Nothing  -> wildP --varP $ mkName "ciuwbedfonoerhdgfo"
+                           Just lab -> varP $ mkName lab
+  let genTy = case expM of Nothing  -> genGenTy ty
+                           Just exp -> error "genGenField: TODO"
   sequence [bindS labP genTy]
-  where
-    labP = case labM of
-              Just lab -> varP (mkName lab)
-              Nothing  -> wildP
 
 -- | Generate the parser for a constrained field on a record.
 genParseRecConstrain :: Q Pat -> Q Pat -> PadsTy -> Q Exp -> Q Exp
