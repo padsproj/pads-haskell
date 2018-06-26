@@ -543,7 +543,7 @@ genGenTy pty = case pty of
   PTuple tys              -> genGenTuple tys
   PExpression exp         -> [| return $(return exp) |]
   PTycon c                -> return $ mkGenTycon c
-  PTyvar v                -> [| v |]
+  PTyvar v                -> return $ mkParseTyvar v
 
 -- | Simply generate a call to the runtime system function 'parseConstraint'
 -- where the first argument is a Haskell expression spliced directly into the
@@ -865,10 +865,11 @@ genGenBranchInfo (BConstr c args   pred) = do
   let tys = [ty | (_,ty) <- args]
   let ty = map genGenTy tys !! 0
   when (length tys > 1) -- TODO
-    (error $ "genGenBranchInfo: BConstr: more than one type: " ++ show tys)
+    (error $ "genGenBranchInfo: BConstr: more than one type: " ++ show tys) -- TODO
   x <- newName "x"
   bind <- bindS (varP x) ty
   let toreturn = case tys !! 0 of PExpression _ ->       (conE . mkName) c
+                                  PTycon ["Void"] ->     (conE . mkName) c
                                   _             -> appE ((conE . mkName) c) (varE x)
   ret <- noBindS [| return $toreturn |]
   return $ DoE [bind,ret]
