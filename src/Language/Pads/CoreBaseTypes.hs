@@ -148,6 +148,9 @@ bitField_def _ = 0
 bitField_printFL :: Integral a => a -> PadsPrinter (BitField, md)
 bitField_printFL _ (x, xmd) = fshow x
 
+bitField_genM :: Integral a => a -> IO BitField
+bitField_genM i = (toInteger . floor) <$> uniformR (0::Double,2^i::Double) gen
+
 -- type instance PadsArg Integer = ()
 -- type instance Meta Integer = Base_md
 -- instance Pads1 () Integer Base_md where
@@ -310,6 +313,9 @@ instance Pads1 () Integer Base_md where
 integer_printFL :: PadsPrinter (Integer, Base_md)
 integer_printFL (i, bmd) = fshow i
 
+integer_genM :: IO Integer
+integer_genM = fromIntegral <$> int_genM
+
 -----------------------------------------------------------------
 
 --type Float
@@ -364,6 +370,9 @@ instance Pads1 () Float Base_md where
 
 float_printFL :: PadsPrinter (Float, Base_md)
 float_printFL (d, bmd) = fshow d
+
+float_genM :: IO Float
+float_genM = uniformR (0,1000000000000000) gen
 
 -----------------------------------------------------------------
 
@@ -420,7 +429,8 @@ instance Pads1 () Double Base_md where
 double_printFL :: PadsPrinter (Double, Base_md)
 double_printFL (d, bmd) = fshow d
 
-
+double_genM :: IO Double
+double_genM = uniformR (0,1000000000000000) gen
 
 -----------------------------------------------------------------
 
@@ -438,6 +448,9 @@ try_printFL p _ = printNothing
 
 try_def :: a -> Try a
 try_def d = d
+
+try_genM :: IO a -> IO (Try a)
+try_genM g = g >>= return
 
 
 -----------------------------------------------------------------
@@ -461,6 +474,9 @@ digit_def = 0
 
 digit_printFL :: PadsPrinter (Digit, Base_md)
 digit_printFL (i, bmd) = fshow i
+
+digit_genM :: IO Digit
+digit_genM = intBound_genM 0 9
 
 
 -----------------------------------------------------------------
@@ -486,7 +502,8 @@ instance Pads1 () String Base_md where
 string_printFL :: PadsPrinter (String, Base_md)
 string_printFL (str, bmd) = addString str
 
-string_genM = stringFW_genM 100
+string_genM :: IO String
+string_genM = stringVW_genM 100
 
 -----------------------------------------------------------------
 
@@ -502,6 +519,9 @@ stringNB_def = string_def
 
 stringNB_printFL :: PadsPrinter (String, Base_md)
 stringNB_printFL = string_printFL
+
+stringNB_genM :: IO StringNB
+stringNB_genM = string_genM
 
 -----------------------------------------------------------------
 
@@ -602,6 +622,10 @@ stringCNB_def = stringC_def
 stringCNB_printFL :: Char -> PadsPrinter (StringCNB, Base_md)
 stringCNB_printFL = stringC_printFL
 
+stringCNB_genM :: Char -> IO StringCNB
+stringCNB_genM = stringC_genM
+
+
 -----------------------------------------------------------------
 
 -- | string of fixed length
@@ -650,6 +674,9 @@ stringFWNB_def n = replicate n 'X'
 stringFWNB_printFL :: Int -> PadsPrinter (StringFW, Base_md)
 stringFWNB_printFL = stringFW_printFL
 
+stringFWNB_genM :: Int -> IO StringFWNB
+stringFWNB_genM = stringFW_genM
+
 -----------------------------------------------------------------
 
 -- | string of variable length
@@ -671,7 +698,9 @@ stringVW_printFL :: Int -> PadsPrinter (StringVW, Base_md)
 stringVW_printFL n (str, bmd)  = addString (take n str)
 
 stringVW_genM :: Int -> IO StringVW
-stringVW_genM i = replicateM i (randLetter gen)
+stringVW_genM i = do
+  i' <- intBound_genM 0 i
+  replicateM i' (randLetter gen)
 
 ---- string of variable length (end if EOR)
 --type StringVW = String
@@ -716,6 +745,9 @@ stringME_printFL :: RE -> PadsPrinter (StringME, Base_md)
 stringME_printFL re (str, bmd) = addString str
            -- We're not likely to check that str matches re
 
+stringME_genM :: RE -> IO StringME
+stringME_genM = error "stringME_genM unimplemented"
+
 -----------------------------------------------------------------
 
 -- | string matching given native regex. PADS uses posix regex (from the
@@ -740,6 +772,9 @@ stringSE_def (REd re d) = d
 stringSE_printFL :: RE -> PadsPrinter (StringSE, Base_md)
 stringSE_printFL re (str, bmd) = addString str
 
+stringSE_genM :: RE -> IO StringSE
+stringSE_genM _ = error "stringSE_genM unimplemented"
+
 
 -----------------------------------------------------------------
 
@@ -760,6 +795,9 @@ stringP_def _ = ""
 
 stringP_printFL :: (Char -> Bool) -> PadsPrinter (StringP, Base_md)
 stringP_printFL p (str, bmd) = addString str
+
+stringP_genM :: (Char -> Bool) -> IO StringP
+stringP_genM _ = error "stringP_genM unimplemented"
 
 -----------------------------------------------------------------
 
@@ -806,7 +844,8 @@ stringPESC_printFL (_, (escape, stops)) (str, bmd) =
       newStr =  concat (map replace str)
   in addString newStr
 
-stringPESC_genM = error "unimplemented generation: stringPESC"
+stringPESC_genM :: (Bool, (Char, [Char])) -> IO StringPESC
+stringPESC_genM _ = error "unimplemented generation: stringPESC"
 
 
 
@@ -1041,5 +1080,15 @@ bytesNB_printFL = bytes_printFL
 bytesNB_def :: Int -> BytesNB
 bytesNB_def = bytes_def
 
+bytesNB_genM :: Int -> IO BytesNB
+bytesNB_genM = bytes_genM
+
 {- Helper functions -}
 mkStr c = "'" ++ [c] ++ "'"
+
+untilM :: Monad m => (a -> Bool) -> (a -> m a) -> a -> m a
+untilM p f z = do
+  let b = p z
+  if b
+    then return z
+    else f z >>= untilM p f
