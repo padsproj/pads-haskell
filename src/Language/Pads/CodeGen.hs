@@ -534,8 +534,8 @@ genParseTy pty = case pty of
 
 genGenTy :: PadsTy -> Q Exp
 genGenTy pty = case pty of
-  PConstrain pat ty exp   -> error "genGenTy: PConstrain: TODO"
-  PTransform src dest exp -> error "genGenTy: PTransform: TODO"
+  PConstrain pat ty exp   -> [| error "genGenTy: PConstrain: TODO" |]
+  PTransform src dest exp -> [| error "genGenTy: PTransform: TODO" |]
   PList ty sep term       -> genGenList ty sep term
   PPartition ty exp       -> genGenTy ty
   PValue exp ty           -> genGenValue exp
@@ -872,7 +872,7 @@ genGenBranchInfo (BConstr c args   pred) = do
                                   _             -> appE ((conE . mkName) c) (varE x)
   ret <- noBindS [| return $toreturn |]
   return $ DoE [bind,ret]
-  
+
 
 -- | Build the constructor function for tupling together the metadata results of
 -- parsing a bunch of Pads types.
@@ -937,7 +937,7 @@ genGenField (labM, (strict, ty), expM) = do
   let labP  = case labM of Nothing  -> wildP --varP $ mkName "ciuwbedfonoerhdgfo"
                            Just lab -> varP $ mkName lab
   let genTy = case expM of Nothing  -> genGenTy ty
-                           Just exp -> error "genGenField: TODO"
+                           Just exp -> [| error "genGenField: TODO" |]
   sequence [bindS labP genTy]
 
 -- | Generate the parser for a constrained field on a record.

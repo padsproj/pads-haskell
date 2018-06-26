@@ -47,15 +47,8 @@ import Control.Monad
 import System.Random.MWC
 import System.IO.Unsafe (unsafePerformIO)
 
-import GHC.Base
-import GHC.Exts
-
-
 {-# NOINLINE gen #-}
-gen = unsafePerformIO createSystemRandom
-
-{-# NOINLINE gen2 #-}
-!gen2 = createSystemRandom
+!gen = unsafePerformIO createSystemRandom
 
 
 -- | Metadata type for a PADS Char
@@ -588,7 +581,7 @@ stringC_printFL c (str, bmd) = addString str
 
 stringC_genM :: Char -> IO StringC
 stringC_genM c = do
-  i <- intBound_genM 0 20
+  i <- intBound_genM 0 100
   replicateM i (randLetterExcluding c gen)
 
 -----------------------------------------------------------------
@@ -676,6 +669,9 @@ stringVW_def n = replicate n 'X'
 
 stringVW_printFL :: Int -> PadsPrinter (StringVW, Base_md)
 stringVW_printFL n (str, bmd)  = addString (take n str)
+
+stringVW_genM :: Int -> IO StringVW
+stringVW_genM i = replicateM i (randLetter gen)
 
 ---- string of variable length (end if EOR)
 --type StringVW = String
@@ -810,6 +806,8 @@ stringPESC_printFL (_, (escape, stops)) (str, bmd) =
       newStr =  concat (map replace str)
   in addString newStr
 
+stringPESC_genM = error "unimplemented generation: stringPESC"
+
 
 
 -----------------------------------------------------------------
@@ -902,6 +900,9 @@ eOR_def = ()
 eof_printFL :: (EOF,Base_md) -> FList
 eof_printFL = const eofLit_printFL
 
+eOR_genM :: IO EOR
+eOR_genM = return eOR_def
+
 eOF_printFL = eof_printFL
 
 eOF_def :: EOF
@@ -933,6 +934,9 @@ instance Pads1 () Void Base_md where
 
 void_printFL :: PadsPrinter (Void,Base_md)
 void_printFL v = nil
+
+void_genM :: IO Void
+void_genM = return void_def
 
 
 
@@ -1006,18 +1010,10 @@ bytes_printFL n (bs, bmd) =
 bytes_def :: Int -> Bytes
 bytes_def i = B.pack $ replicate i (0::Word8)
 
--- {-# RULES
--- "pack/packAddress" forall s . B.pack (map S.chrToWord8 (unpackCString# s)) = unsafePerformIO $ unsafePackAddress s
--- #-}
-
-
 bytes_genM :: Int -> IO Bytes
 bytes_genM i = do
   w8s <- replicateM i $ uniformR (1 :: Word8, 255 :: Word8) gen
-  let cs = ((map S.word8ToChr w8s) ++ "\NUL")
-  let cs' = "hey"#
   return $ B.pack w8s
-  --unsafePackAddress cs
 
 type instance PadsArg Bytes = Int
 type instance Meta Bytes = Bytes_md
