@@ -534,8 +534,8 @@ genParseTy pty = case pty of
 
 genGenTy :: PadsTy -> Q Exp
 genGenTy pty = case pty of
-  PConstrain pat ty exp   -> [| error "genGenTy: PConstrain: TODO" |]
-  PTransform src dest exp -> [| error "genGenTy: PTransform: TODO" |]
+  PConstrain pat ty exp   -> genGenConstrain (return pat) ty (return exp) --[| return $ error "genGenTy: PConstrain: TODO" |]
+  PTransform src dest exp -> [| return $ error "genGenTy: PTransform: TODO" |]
   PList ty sep term       -> genGenList ty sep term
   PPartition ty exp       -> genGenTy ty
   PValue exp ty           -> genGenValue exp
@@ -555,15 +555,18 @@ genParseConstrain patQ ty expQ = [| parseConstraint $(genParseTy ty) $pred |]
   where
     pred = lamE [patQ, varP (mkName "md")] expQ
 
+-- | Generate code that uses the runtime function 'untilM' to generate random
+-- examples of data until one satisfies the constraint.
 genGenConstrain :: Q Pat -> PadsTy -> Q Exp -> Q Exp
 genGenConstrain pat pty e = do
-  stmt1 <- bindS pat (genGenTy pty)
   name <- newName "x"
-  stmt2 <- bindS (varP name) [| untilM_ ($e) $(genGenTy pty) |]
-  pat'  <- pat
-  stmt3 <- noBindS [| return $(fromVarP pat') |]
-  return $ DoE $ stmt1 : stmt2 : stmt3 : []
+  orig <- bindS (varP name) (genGenTy pty)
+  gen  <- bindS pat [| $(dyn "untilM") $(lamE [pat] e) (const $(genGenTy pty)) $(varE name) |]
+  pat' <- pat
+  ret  <- noBindS [| return $(fromVarP pat') |]
+  return $ DoE [orig,gen,ret]
   where
+    fromVarP :: Pat -> Q Exp
     fromVarP (VarP x) = varE x
 
 -- | Simply generate a call to the runtime system function 'parseTransform'
