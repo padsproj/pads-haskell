@@ -86,10 +86,11 @@ genPadsDecl derivation pd@(PadsDeclType name args pat padsTy) = do
   parseS  <- genPadsParseS name args pat
   printFL <- genPadsPrintFL name args pat padsTy
   genM    <- genPadsGenM name args pat padsTy
+  serialize <- genPadsSerialize name args pat padsTy
   def <- genPadsDef name args pat padsTy
   let sigs = mkPadsSignature name args (fmap patType pat)
   ast <- astDecl name pd
-  return $ typeDecs ++ parseM ++ parseS ++ printFL ++ genM ++ def ++ sigs
+  return $ typeDecs ++ parseM ++ parseS ++ printFL ++ genM ++ serialize ++ def ++ sigs
 
 genPadsDecl derivation pd@(PadsDeclData name args pat padsData derives) = do
   dataDecs <- mkDataRepMDDecl derivation name args padsData derives
@@ -534,8 +535,8 @@ genParseTy pty = case pty of
 
 genGenTy :: PadsTy -> Q Exp
 genGenTy pty = case pty of
-  PConstrain pat ty exp   -> genGenConstrain (return pat) ty (return exp) --[| return $ error "genGenTy: PConstrain: TODO" |]
-  PTransform src dest exp -> [| return $ error "genGenTy: PTransform: TODO" |]
+  PConstrain pat ty exp   -> genGenConstrain (return pat) ty (return exp)
+  PTransform src dest exp -> [| error "genGenTy: PTransform: TODO" |]
   PList ty sep term       -> genGenList ty sep term
   PPartition ty exp       -> genGenTy ty
   PValue exp ty           -> genGenValue exp
@@ -782,7 +783,7 @@ mkParseTycon c       = VarE (mkTyParserQName c)
 -- | Basically same as mkParseTycon, but the name that results is different.
 mkGenTycon :: QString -> Exp
 mkGenTycon [c] = VarE (mkTyGeneratorName c)
-mkGenTycon x   = error $ "mkGenTycon: " ++ show x
+mkGenTycon x   = error $ "mkGenTycon: " ++ show x -- TODO: EOF and EOR
 
 -- | Make the parser for a Pads type variable - just return it as a Haskell
 -- variable expression.
@@ -949,6 +950,80 @@ genParseRecConstrain :: Q Pat -> Q Pat -> PadsTy -> Q Exp -> Q Exp
 genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred |]
   where
     pred = lamE [labP, xnP] exp
+
+-------------------------------------------------------------------------------
+
+sArgName = "rep"
+
+genPadsSerialize :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
+genPadsSerialize name args patM padsTy = do
+  body <- genSerializeTy padsTy
+  return [mkSerializerFunction name args patM body]
+
+mkSerializerFunction :: UString -> [LString] -> Maybe Pat -> Exp -> Dec
+mkSerializerFunction name args patM body =
+  FunD serializerName [Clause (serializerArgs ++ [(VarP . mkName) sArgName]) (NormalB body) []]
+  where
+  serializerName = mkTySerializerName name
+  serializerArgs = map (VarP . mkTySerializerVarName) args ++ Maybe.maybeToList patM
+
+genSerializeTy :: PadsTy -> Q Exp
+genSerializeTy (PConstrain pat ty exp)   = genSerializeConstrain pat ty exp
+genSerializeTy (PTransform src dest exp) = genSerializeTransform src dest exp
+genSerializeTy (PList ty sepM termM)     = genSerializeList ty sepM termM
+genSerializeTy (PPartition ty exp)       = genSerializePartition ty exp
+genSerializeTy (PValue exp ty)           = genSerializeValue exp ty
+genSerializeTy (PApp tys expM)           = genSerializeApp tys expM
+genSerializeTy (PTuple tys)              = genSerializeTuple tys
+genSerializeTy (PExpression exp)         = [| exp_serialize |] -- TODO: to not apply exp_serialize to exp here may be unsound
+genSerializeTy (PTycon c)                = genSerializeTycon c
+genSerializeTy (PTyvar v)                = genSerializeTyvar v
+
+genSerializeConstrain :: Pat -> PadsTy -> Exp -> Q Exp
+genSerializeConstrain pat ty exp = [| error "genSerializeTy: PConstrain unimplemented" |]
+
+genSerializeTransform :: PadsTy -> PadsTy -> Exp -> Q Exp
+genSerializeTransform src dest exp = [| error "genSerializeTy: PTransform unimplemented" |]
+
+genSerializeList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> Q Exp
+genSerializeList ty sepM termM = [| error "genSerializeTy: PList unimplemented" |]
+
+genSerializePartition :: PadsTy -> Exp -> Q Exp
+genSerializePartition ty exp = [| error "genSerializeTy: PPartition unimplemented" |]
+
+genSerializeValue :: Exp -> PadsTy -> Q Exp
+genSerializeValue exp ty = [| error "genSerializeTy: PValue unimplemented" |]
+
+genSerializeApp :: [PadsTy] -> (Maybe Exp) -> Q Exp
+genSerializeApp tys expM = [| error "genSerializeTy: PApp unimplemented" |]
+
+genSerializeTuple :: [PadsTy] -> Q Exp
+genSerializeTuple tys = do
+  let tys' = map genSerializeTy tys
+  letnames  <- sequence [newName "x" | ty <- tys']
+  casenames <- sequence [newName "y" | ty <- tys']
+  let letdecs = map thing (zip3 letnames casenames tys)
+  let letbody = [| concat $(listE $ map varE letnames) |]
+  let casebody = normalB $ letE letdecs letbody
+  let casenames' = [cn | (cn,ty) <- zip casenames tys, not (isPExp ty)]
+  caseE (dyn sArgName) [match (tupP [varP cn | cn <- casenames']) casebody []]
+  where
+    isPExp (PExpression _) = True
+    isPExp _               = False
+
+    thing :: (Name, Name, PadsTy) -> Q Dec
+    thing (ln, cn, t) = case t of
+      PExpression e -> valD (varP ln) (normalB (appE (genSerializeTy t) (return e))) []
+      _             -> valD (varP ln) (normalB (appE (genSerializeTy t) (varE cn))) []
+
+genSerializeTycon :: QString -> Q Exp
+genSerializeTycon [c] = (return . VarE . mkTySerializerName) c
+genSerializeTycon  c  = error "genSerializeTy: " c
+
+genSerializeTyvar :: String -> Q Exp
+genSerializeTyvar s = [| error "genSerializeTy: PTyvar unimplemented" |]
+
+-- Just (PadsDeclType "ThreeInts" [] Nothing (PTuple [PTycon ["Int"],PTycon ["Char"],PTycon ["Int"],PExpression (LitE (CharL 'd'))]))
 
 -------------------------------------------------------------------------------
 -- Generating Printing Function from a Declaration
@@ -1400,6 +1475,9 @@ mkTyDefVarName str = mkName (str ++ "__d")
 
 mkTyGeneratorName str = mkName (strToLower str ++ "_genM")
 mkVarGeneratorName str = mkName (strToLower str ++ "__p")
+
+mkTySerializerName str = mkName (strToLower str ++ "_serialize")
+mkTySerializerVarName str = mkName (str ++ "__s")
 
 
 appendTo :: QString -> String -> String

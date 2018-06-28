@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables,
              MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances,
-             FlexibleInstances, MagicHash #-}
+             FlexibleInstances, UndecidableInstances #-}
 {-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.CoreBaseTypes
@@ -78,6 +78,8 @@ char_printFL (c,bmd) = addString [c]
 
 char_genM :: IO Char
 char_genM = randLetter gen --gen = randLetter gen
+
+char_serialize c = [CharChunk c]
 
 ---------------------------------------------
 
@@ -280,6 +282,8 @@ int_genM = randInt gen
 
 intBound_genM :: Int -> Int -> IO Int
 intBound_genM x y = uniformR (x, y) gen
+
+int_serialize i = map CharChunk $ show i
 
 -----------------------------------------------------------------
 
@@ -505,6 +509,8 @@ string_printFL (str, bmd) = addString str
 string_genM :: IO String
 string_genM = stringVW_genM 100
 
+string_serialize s = map CharChunk s
+
 -----------------------------------------------------------------
 
 type StringNB = String
@@ -549,6 +555,9 @@ instance Pads1 () Text Base_md where
 
 text_printFL :: PadsPrinter (Text, Base_md)
 text_printFL (Text str, bmd) = addBString str
+
+text_genM :: IO Text
+text_genM = Text <$> B.pack <$> (map S.chrToWord8) <$> stringVW_genM 500
 
 
 -----------------------------------------------------------------
@@ -852,6 +861,25 @@ stringPESC_genM _ = error "unimplemented generation: stringPESC"
 -----------------------------------------------------------------
 
 
+data Chunk = CharChunk   Char
+           | BinaryChunk Integer Int -- Value, significant bits of value
+    deriving Show
+
+
+class ExpSerialize a where
+  exp_serialize :: a -> [Chunk]
+
+instance ExpSerialize Char where
+  exp_serialize = char_serialize
+
+instance ExpSerialize String where
+  exp_serialize = string_serialize
+
+instance ExpSerialize Int where
+  exp_serialize = int_serialize
+
+-----------------------------------------------------------------
+
 class LitParse a where
   litParse :: a -> PadsParser ((), Base_md)
   litPrint :: a -> FList
@@ -946,6 +974,9 @@ eOF_printFL = eof_printFL
 
 eOF_def :: EOF
 eOF_def = ()
+
+eOF_genM :: IO EOF
+eOF_genM = return eOF_def
 
 eorLit_printFL :: FList
 eorLit_printFL = printEOR
