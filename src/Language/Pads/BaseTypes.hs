@@ -38,7 +38,7 @@ import qualified Data.ByteString as B
 
 [pads|
 -- string that stops in a newline
--- type StringEOR = [Char] terminator EOR
+type StringEOR = [Char] terminator EOR
 type Line a   = (a, EOR)
 type StringLn = [Char] terminator (Try EOR)
 type StringLnP (p :: String -> Bool) = constrain s :: StringLn where <| p s |>
