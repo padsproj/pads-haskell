@@ -173,6 +173,18 @@ bits8_parseM x =
              b <- takeBits8P x
              returnClean b
 
+bits8_def :: a -> Bits8
+bits8_def _ = 0
+
+bits8_printFL  :: Integral a => a -> PadsPrinter (Bits8, md)
+bits8_printFL  _ (x, xmd) = fshow x
+
+bits8_genM :: Integral a => a -> IO Bits8
+bits8_genM x = uniformR (0 :: Bits8, (2^x)-1 :: Bits8) gen
+
+bits8_serialize :: Int -> Bits8 -> [Chunk]
+bits8_serialize b v = [BinaryChunk (fromIntegral v) b]
+
 
 type Bits16 = Word16
 type Bits16_md = Base_md
@@ -185,6 +197,18 @@ bits16_parseM x =
          handleEOR 0 "Bits16" $ do
              b <- takeBits16P x
              returnClean b
+
+bits16_def :: a -> Bits16
+bits16_def _ = 0
+
+bits16_printFL :: Integral a => a -> PadsPrinter (Bits16, md)
+bits16_printFL _ (x, xmd) = fshow x
+
+bits16_genM :: Integral a => a -> IO Bits16
+bits16_genM x = uniformR (0 :: Bits16, (2^x)-1 :: Bits16) gen
+
+bits16_serialize :: Int -> Bits16 -> [Chunk]
+bits16_serialize b v = [BinaryChunk (fromIntegral v) b]
 
 
 type Bits32 = Word32
@@ -199,6 +223,18 @@ bits32_parseM x =
              b <- takeBits32P x
              returnClean b
 
+bits32_def :: a -> Bits32
+bits32_def _ = 0
+
+bits32_printFL :: Integral a => a -> PadsPrinter (Bits32, md)
+bits32_printFL _ (x, xmd) = fshow x
+
+bits32_genM :: Integral a => a -> IO Bits32
+bits32_genM x = uniformR (0 :: Bits32, (2^x)-1 :: Bits32) gen
+
+bits32_serialize :: Int -> Bits32 -> [Chunk]
+bits32_serialize b v = [BinaryChunk (fromIntegral v) b]
+
 
 type Bits64 = Word64
 type Bits64_md = Base_md
@@ -212,38 +248,17 @@ bits64_parseM x =
              b <- takeBits64P x
              returnClean b
 
-
-bits8_def  :: a -> Bits8
-bits16_def :: a -> Bits16
-bits32_def :: a -> Bits32
 bits64_def :: a -> Bits64
-
-bits8_def  _ = 0
-bits16_def _ = 0
-bits32_def _ = 0
 bits64_def _ = 0
 
-bits8_printFL  :: Integral a => a -> PadsPrinter (Bits8, md)
-bits16_printFL :: Integral a => a -> PadsPrinter (Bits16, md)
-bits32_printFL :: Integral a => a -> PadsPrinter (Bits32, md)
 bits64_printFL :: Integral a => a -> PadsPrinter (Bits64, md)
-
-bits8_printFL  _ (x, xmd) = fshow x
-bits16_printFL _ (x, xmd) = fshow x
-bits32_printFL _ (x, xmd) = fshow x
 bits64_printFL _ (x, xmd) = fshow x
-
-bits8_genM :: Integral a => a -> IO Bits8
-bits8_genM x = uniformR (0 :: Bits8, (2^x)-1 :: Bits8) gen
-
-bits16_genM :: Integral a => a -> IO Bits16
-bits16_genM x = uniformR (0 :: Bits16, (2^x)-1 :: Bits16) gen
-
-bits32_genM :: Integral a => a -> IO Bits32
-bits32_genM x = uniformR (0 :: Bits32, (2^x)-1 :: Bits32) gen
 
 bits64_genM :: Integral a => a -> IO Bits64
 bits64_genM x = uniformR (0 :: Bits64, (2^x)-1 :: Bits64) gen
+
+bits64_serialize :: Int -> Bits64 -> [Chunk]
+bits64_serialize b v = [BinaryChunk (fromIntegral v) b]
 
 -----------------------------------------------------------------
 
@@ -869,13 +884,14 @@ data Chunk = CharChunk   Char
 class ExpSerialize a where
   exp_serialize :: a -> [Chunk]
 
-instance ExpSerialize Char where
+-- TODO: fix overlapping
+instance {-# OVERLAPPING #-} ExpSerialize Char where
   exp_serialize = char_serialize
 
 instance ExpSerialize String where
   exp_serialize = string_serialize
 
-instance ExpSerialize Int where
+instance (Num a, Show a) => ExpSerialize a where
   exp_serialize = int_serialize
 
 -----------------------------------------------------------------
