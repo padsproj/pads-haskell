@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving, TemplateHaskell, ScopedTypeVariables,
              MultiParamTypeClasses, DeriveDataTypeable, TypeSynonymInstances,
-             FlexibleInstances, UndecidableInstances #-}
+             FlexibleInstances, UndecidableInstances, DeriveLift #-}
 {-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.CoreBaseTypes
@@ -79,7 +79,7 @@ char_printFL (c,bmd) = addString [c]
 char_genM :: IO Char
 char_genM = randLetter gen --gen = randLetter gen
 
-char_serialize c = [CharChunk c]
+char_serialize c = toCL [CharChunk c]
 
 ---------------------------------------------
 
@@ -182,8 +182,8 @@ bits8_printFL  _ (x, xmd) = fshow x
 bits8_genM :: Integral a => a -> IO Bits8
 bits8_genM x = uniformR (0 :: Bits8, (2^x)-1 :: Bits8) gen
 
-bits8_serialize :: Int -> Bits8 -> [Chunk]
-bits8_serialize b v = [BinaryChunk (fromIntegral v) b]
+bits8_serialize :: Int -> Bits8 -> CList
+bits8_serialize b v = toCL [BinaryChunk (fromIntegral v) b]
 
 
 type Bits16 = Word16
@@ -207,8 +207,8 @@ bits16_printFL _ (x, xmd) = fshow x
 bits16_genM :: Integral a => a -> IO Bits16
 bits16_genM x = uniformR (0 :: Bits16, (2^x)-1 :: Bits16) gen
 
-bits16_serialize :: Int -> Bits16 -> [Chunk]
-bits16_serialize b v = [BinaryChunk (fromIntegral v) b]
+bits16_serialize :: Int -> Bits16 -> CList
+bits16_serialize b v = toCL [BinaryChunk (fromIntegral v) b]
 
 
 type Bits32 = Word32
@@ -232,8 +232,8 @@ bits32_printFL _ (x, xmd) = fshow x
 bits32_genM :: Integral a => a -> IO Bits32
 bits32_genM x = uniformR (0 :: Bits32, (2^x)-1 :: Bits32) gen
 
-bits32_serialize :: Int -> Bits32 -> [Chunk]
-bits32_serialize b v = [BinaryChunk (fromIntegral v) b]
+bits32_serialize :: Int -> Bits32 -> CList
+bits32_serialize b v = toCL [BinaryChunk (fromIntegral v) b]
 
 
 type Bits64 = Word64
@@ -257,8 +257,8 @@ bits64_printFL _ (x, xmd) = fshow x
 bits64_genM :: Integral a => a -> IO Bits64
 bits64_genM x = uniformR (0 :: Bits64, (2^x)-1 :: Bits64) gen
 
-bits64_serialize :: Int -> Bits64 -> [Chunk]
-bits64_serialize b v = [BinaryChunk (fromIntegral v) b]
+bits64_serialize :: Int -> Bits64 -> CList
+bits64_serialize b v = toCL [BinaryChunk (fromIntegral v) b]
 
 -----------------------------------------------------------------
 
@@ -298,7 +298,7 @@ int_genM = randInt gen
 intBound_genM :: Int -> Int -> IO Int
 intBound_genM x y = uniformR (x, y) gen
 
-int_serialize i = map CharChunk $ show i
+int_serialize i = toCL $ map CharChunk $ show i
 
 -----------------------------------------------------------------
 
@@ -524,7 +524,7 @@ string_printFL (str, bmd) = addString str
 string_genM :: IO String
 string_genM = stringVW_genM 100
 
-string_serialize s = map CharChunk s
+string_serialize s = toCL $ map CharChunk s
 
 -----------------------------------------------------------------
 
@@ -627,6 +627,9 @@ stringC_genM :: Char -> IO StringC
 stringC_genM c = do
   i <- intBound_genM 0 100
   replicateM i (randLetterExcluding c gen)
+
+stringC_serialize :: Char -> StringC -> CList
+stringC_serialize c s = (string_serialize s) `cApp` (toCL [CharChunk c])
 
 -----------------------------------------------------------------
 
@@ -878,17 +881,34 @@ stringPESC_genM _ = error "unimplemented generation: stringPESC"
 
 data Chunk = CharChunk   Char
            | BinaryChunk Integer Int -- Value, significant bits of value
-    deriving Show
+    deriving (Eq, Show, Lift)
 
+type CList = [Chunk] -> [Chunk]
+
+-- For debugging mostly
+instance Show CList where
+  show cl = show $ fromCL cl
+
+cApp :: CList -> CList -> CList
+cs1 `cApp` cs2 = cs1 . cs2
+
+toCL :: [Chunk] -> CList
+toCL cs = (cs ++)
+
+concatCs :: [CList] -> CList
+concatCs cl = foldr cApp id cl
+
+fromCL :: CList -> [Chunk]
+fromCL cl = cl []
 
 class ExpSerialize a where
-  exp_serialize :: a -> [Chunk]
+  exp_serialize :: a -> CList
 
 -- TODO: fix overlapping
 instance {-# OVERLAPPING #-} ExpSerialize Char where
   exp_serialize = char_serialize
 
-instance ExpSerialize String where
+instance {-# OVERLAPPING #-} ExpSerialize [Char] where
   exp_serialize = string_serialize
 
 instance (Num a, Show a) => ExpSerialize a where
@@ -1100,6 +1120,9 @@ bytes_genM :: Int -> IO Bytes
 bytes_genM i = do
   w8s <- replicateM i $ uniformR (1 :: Word8, 255 :: Word8) gen
   return $ B.pack w8s
+
+bytes_serialize :: Int -> Bytes -> CList
+bytes_serialize _ bs = toCL $ map (CharChunk . S.word8ToChr) $ B.unpack bs
 
 type instance PadsArg Bytes = Int
 type instance Meta Bytes = Bytes_md
