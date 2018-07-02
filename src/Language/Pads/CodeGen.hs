@@ -545,7 +545,7 @@ genGenTy pty = case pty of
   PTuple tys              -> genGenTuple tys
   PExpression exp         -> [| return $(return exp) |]
   PTycon c                -> return $ mkGenTycon c
-  PTyvar v                -> return $ mkParseTyvar v
+  PTyvar v                -> return $ mkGenTyvar v
 
 -- | Simply generate a call to the runtime system function 'parseConstraint'
 -- where the first argument is a Haskell expression spliced directly into the
@@ -787,6 +787,9 @@ mkGenTycon x   = error $ "mkGenTycon: " ++ show x -- TODO: EOF and EOR
 mkParseTyvar :: String -> Exp
 mkParseTyvar v = VarE (mkVarParserName v) -- should gensym these, but probably ok
 
+mkGenTyvar :: String -> Exp
+mkGenTyvar v = VarE (mkVarGeneratorName v)
+
 -------------------------------------------------------------------------------
 -- * Generating Parsers from Union/Switch Expressions
 
@@ -863,17 +866,16 @@ genParseBranchInfo (BConstr c args pred) = do
 genGenBranchInfo :: BranchInfo -> Q Exp
 genGenBranchInfo (BRecord c fields pred) = genGenRecord c fields pred
 genGenBranchInfo (BConstr c args   pred) = do
-  let tys = [ty | (_,ty) <- args]
-  let ty = map genGenTy tys !! 0
-  when (length tys > 1) -- TODO
-    (error $ "genGenBranchInfo: BConstr: more than one type: " ++ show tys) -- TODO
-  x <- newName "x"
-  bind <- bindS (varP x) ty
-  let toreturn = case tys !! 0 of PExpression _ ->       (conE . mkName) c
-                                  PTycon ["Void"] ->     (conE . mkName) c
-                                  _             -> appE ((conE . mkName) c) (varE x)
+  let tys  = [ty | (_,ty) <- args]
+  let tys' = map genGenTy tys
+  names <- sequence [newName "x" | ty <- tys']
+  binds <- sequence [bindS (varP n) ty | (n,ty) <- zip names tys']
+  let constructor = (conE . mkName) c
+  let toreturn = case tys of [PExpression _]   -> constructor
+                             [PTycon ["Void"]] -> constructor -- TODO: more special cases?
+                             _ -> foldl1 appE (constructor : (map varE names))
   ret <- noBindS [| return $toreturn |]
-  return $ DoE [bind,ret]
+  return $ DoE (binds ++ [ret])
 
 
 -- | Build the constructor function for tupling together the metadata results of
@@ -977,7 +979,7 @@ genSerializeUnion :: [BranchInfo] -> Maybe Exp -> Q Exp
 genSerializeUnion bs (Just rep) = do
   matches <- concat <$> mapM (genSerializeBranchInfo False) bs
   return $ CaseE rep matches
-genSerializeUnion bs _ = error "In progress"
+genSerializeUnion bs _ = error "genSerializeUnion: in progress"
 -- --   let doDef = if length bs > 1 then True else False
 -- --   matches <- liftM concat $ mapM (genSerializeBranchInfo doDef) bs
 -- --   return $ CaseE rm matches
@@ -999,7 +1001,7 @@ genSerializeRecord recName fields predM = do
   let fSerializers = map (flip genSerializeTy Nothing) fTys
   let serialized = [s `appE` nameOrDef n t | (s,n,t) <- zip3 fSerializers fNamesM fTys]
   casePat  <- conP (mkName recName) (map (varP . mkName) (Maybe.catMaybes fNamesM))
-  caseBody <- normalB [| concat $(listE serialized) |]
+  caseBody <- normalB [| concatCs $(listE serialized) |]
   return [Match casePat caseBody []]
   where
     nameOrDef :: Maybe String -> PadsTy -> Q Exp
@@ -1008,53 +1010,15 @@ genSerializeRecord recName fields predM = do
 
 genSerializeConstr :: Bool -> String -> [ConstrArg] -> Maybe Exp -> Q [Match]
 genSerializeConstr _ name args predM = do
-  -- when (length args > 1)
-  --   (error "genSerializeConstr: more than one type")
-  -- let ty = map (\(_,t) -> t) args
-  -- let serializer = map (flip genSerializeTy (Just ((VarE . mkName) sArgName))) tys
-  -- let serialized = serializer `appE`
-  -- -- let matches =
-  return []
--- getPEforField :: (PadsTy -> Q Exp) -> (String -> Q Name) -> FieldInfo -> Q (Exp, Maybe FieldPat)
--- getPEforField def mkFieldNm (nameOpt, (strict,pty), optPred) = case nameOpt of
---   Nothing -> def pty >>= \d -> return (d,Nothing)
---   Just str -> do
---     name <- mkFieldNm str
---     let (varE, varP) = genPE name
---     return (varE, Just (name, varP))
---
--- getPEforFields :: (PadsTy -> Q Exp) -> (String -> Q Name) -> [FieldInfo] -> Q ([Exp], [FieldPat])
--- getPEforFields def mkFieldNm fields = do
---   eps <- mapM (getPEforField def mkFieldNm) fields
---   let (es, pOpts) = List.unzip eps
---       ps = Maybe.catMaybes pOpts
---   return (es, ps)
---
--- genPrintConstr :: Bool -> String -> [ConstrArg] -> (Maybe Exp) -> Q [Match]
--- genPrintConstr doDef (mkName -> recName) args predM = do
---   let fields = map (\c -> (Just "arg",c,Nothing)) args
---   (repEs, repPs) <- getPEforFields (\t -> genDefTy t >>= \def -> return $ SigE def (mkRepTy t)) newName fields
---   (mdEs,  mdPs)  <- getPEforFields (return . SigE (VarE 'myempty) . mkMDTy False) newName fields
---   let ptys = map (\(n,(s,ty),p) -> ty) fields
---
---   let genBody mdEs = (do
---       { let genTyRepMd = (\(ty,r,m) -> if hasRep ty then return (ty,r,m) else genDefTy ty >>= (\def -> return (ty,SigE def (mkRepTy ty),m)))
---       ; ty_rep_mds <- mapM genTyRepMd $ zip3 ptys repEs mdEs
---       ; expE <- mapM (\(ty,repE,mdE) -> genPrintTy ty $ Just $ TupE [repE,mdE]) ty_rep_mds
---       ; let printItemsE = ListE expE
---       ; let caseBody = NormalB (AppE (VarE 'concatFL) printItemsE)
---       ; return caseBody
---       })
---
---   let repPat = ConP recName (filterByHasRep ptys $ map snd repPs)
---   let mdPat  = TupP[SigP WildP (ConT ''Base_md), ConP (getStructInnerMDName recName) (map snd mdPs)]
---
---   caseBody <- genBody mdEs
---   let match = Match (TupP [repPat, mdPat]) caseBody []
---
---   caseBodyDef <- genBody $ map (\(_,ty) -> SigE (VarE 'myempty) (mkMDTy False ty)) args
---   let matchDef = Match (TupP [repPat,WildP]) caseBodyDef []
---   if doDef then return [match,matchDef] else return [match]
+  let tys = [ty | (_,ty) <- args]
+  let tys' = map (flip genSerializeTy Nothing) tys
+  names <- sequence [newName "x" | ty <- (filter hasRep tys)]
+  let params = case tys of [PExpression e] -> [return e]
+                           tys             -> [varE n | n <- names]
+  let apps = listE [s `appE` p | (s,p) <- zip tys' params]
+  matchPat  <- conP (mkName name) [varP n | n <- names]
+  matchBody <- normalB $ [| concatCs $apps |]
+  return [Match matchPat matchBody []]
 
 genSerializeSwitch :: Exp -> [(Pat,BranchInfo)] -> Maybe Exp -> Q Exp
 genSerializeSwitch _ pbs r = genSerializeUnion (map snd pbs) r
@@ -1104,17 +1068,18 @@ genSerializeList ty sepM termM r = do
       def   = genDefTy t
       def_s = genSerializeTy t Nothing
       in  [d| $(varP cs'') = $(varE cs') ++ [$(def_s `appE` def)] |]
-  return $ LetE (dec1 ++ dec2 ++ dec3) ((VarE . mkName) "concat" `AppE` VarE cs'')
+  return $ LetE (dec1 ++ dec2 ++ dec3) ((VarE . mkName) "concatCs" `AppE` VarE cs'')
 
 genSerializePartition :: PadsTy -> Exp -> (Maybe Exp) -> Q Exp
 genSerializePartition ty exp r = [| error "genSerializeTy: PPartition unimplemented" |]
 
 -- | PValues are stored in a parse result but do not appear in the original
--- data. Relying on all serializations being concatenated, we can provide an
--- "empty" serialization for a PValue with (const) [].
+-- data. Relying on all serializations being concatenated, where each
+-- serialization is a CList, we can provide an "empty" serialization for a
+-- PValue with (const) id.
 genSerializeValue :: Exp -> PadsTy -> (Maybe Exp) -> Q Exp
-genSerializeValue _ _ (Just rep) = [|       [] |]
-genSerializeValue _ _ Nothing    = [| const [] |]
+genSerializeValue _ _ (Just rep) = [|       id |]
+genSerializeValue _ _ Nothing    = [| const id |]
 
 genSerializeApp :: [PadsTy] -> (Maybe Exp) -> (Maybe Exp) -> Q Exp
 genSerializeApp tys expM r = do
@@ -1127,14 +1092,11 @@ genSerializeTuple tys r = do
   letnames  <- sequence [newName "x" | ty <- tys']
   casenames <- sequence [newName "y" | ty <- tys']
   let letdecs = map mkDec (zip3 letnames casenames (zip tys tys'))
-  let letbody = [| concat $(listE $ map varE letnames) |]
+  let letbody = [| concatCs $(listE $ map varE letnames) |]
   let casebody = normalB $ letE letdecs letbody
-  let casenames' = [cn | (cn,ty) <- zip casenames tys, not (isPExp ty)]
+  let casenames' = [cn | (cn,ty) <- zip casenames tys, hasRep ty]
   caseE (dyn sArgName) [match (tupP [varP cn | cn <- casenames']) casebody []]
   where
-    isPExp (PExpression _) = True
-    isPExp _               = False
-
     mkDec :: (Name, Name, (PadsTy, Q Exp)) -> Q Dec
     mkDec (ln, cn, (t, t')) = case t of
       PExpression e -> valD (varP ln) (normalB (appE t' (return e))) []
@@ -1150,9 +1112,7 @@ genSerializeTycon [c] Nothing    = return $       (VarE . mkTySerializerName) c
 genSerializeTycon  c  r = error "genSerializeTy: " c
 
 genSerializeTyvar :: String -> (Maybe Exp) -> Q Exp
-genSerializeTyvar s r = [| error "genSerializeTy: PTyvar unimplemented" |]
-
--- Just (PadsDeclType "ThreeInts" [] Nothing (PTuple [PTycon ["Int"],PTycon ["Char"],PTycon ["Int"],PExpression (LitE (CharL 'd'))]))
+genSerializeTyvar s r = return $ VarE $ mkTySerializerVarName s
 
 -------------------------------------------------------------------------------
 -- Generating Printing Function from a Declaration
@@ -1603,7 +1563,7 @@ mkTyDefVarName str = mkName (str ++ "__d")
 -- ** Naming Generators
 
 mkTyGeneratorName str = mkName (strToLower str ++ "_genM")
-mkVarGeneratorName str = mkName (strToLower str ++ "__p")
+mkVarGeneratorName str = mkName (strToLower str ++ "__g")
 
 mkTySerializerName str = mkName (strToLower str ++ "_serialize")
 mkTySerializerVarName str = mkName (str ++ "__s")
