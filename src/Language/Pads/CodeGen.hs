@@ -537,7 +537,7 @@ genParseTy pty = case pty of
 genGenTy :: PadsTy -> Q Exp
 genGenTy pty = case pty of
   PConstrain pat ty exp   -> genGenConstrain (return pat) ty (return exp)
-  PTransform src dest exp -> [| error "genGenTy: PTransform: TODO" |]
+  PTransform src dest exp -> [| error "genGenTy: PTransform unimplemented" |]
   PList ty sep term       -> genGenList ty sep term
   PPartition ty exp       -> genGenTy ty
   PValue exp ty           -> genGenValue exp
@@ -653,15 +653,11 @@ genParseTuple tys = do
 genGenTuple :: [PadsTy] -> Q Exp
 genGenTuple [] = [| return () |]
 genGenTuple tys = do
-  let tys' = filter notPExp tys -- If it's a PExpression, then it's going to be a literal - don't generate
-  tys'' <- mapM genGenTy tys'
-  let freshvars = [mkName ("x" ++ show n) | n <- [1 .. length tys']]
-  --let gen = mkName "gen"
-  let stmts  = [BindS (VarP v) t | (v,t) <- zip freshvars tys'']
-  --let stmts' = (BindS (VarP gen) (VarE $ mkName "MWC.createSystemRandom")) : stmts
-  let rets = tupE (map varE freshvars)
-  ret <- [| return $rets |]
-  return $ DoE (stmts ++ [NoBindS ret])
+  tys'  <- mapM genGenTy (filter hasRep tys)
+  names <- sequence [newName "x" | t <- tys']
+  let stmts = [BindS (VarP n) t | (n,t) <- zip names tys']
+  ret <- noBindS [| return $(tupE (map varE names)) |]
+  return $ DoE (stmts ++ [ret])
   where
     notPExp :: PadsTy -> Bool
     notPExp (PExpression _) = False
@@ -1008,6 +1004,7 @@ genSerializeRecord recName fields predM = do
     nameOrDef (Just name) _ = (varE . mkName) name
     nameOrDef Nothing     t = genDefTy t
 
+
 genSerializeConstr :: Bool -> String -> [ConstrArg] -> Maybe Exp -> Q [Match]
 genSerializeConstr _ name args predM = do
   let tys = [ty | (_,ty) <- args]
@@ -1020,6 +1017,8 @@ genSerializeConstr _ name args predM = do
   matchBody <- normalB $ [| concatCs $apps |]
   return [Match matchPat matchBody []]
 
+-- | At the serialization stage, a PSwitch is simply a sugared PUnion; treat it
+-- accordingly here.
 genSerializeSwitch :: Exp -> [(Pat,BranchInfo)] -> Maybe Exp -> Q Exp
 genSerializeSwitch _ pbs r = genSerializeUnion (map snd pbs) r
 
@@ -1041,13 +1040,13 @@ genSerializeTy (PTycon c) r                = genSerializeTycon c r
 genSerializeTy (PTyvar v) r                = genSerializeTyvar v r
 
 genSerializeConstrain :: Pat -> PadsTy -> Exp -> (Maybe Exp) -> Q Exp
-genSerializeConstrain pat ty exp r = [| error "genSerializeTy: PConstrain unimplemented" |]
+genSerializeConstrain _ ty _ r = genSerializeTy ty r
 
 genSerializeTransform :: PadsTy -> PadsTy -> Exp -> (Maybe Exp) -> Q Exp
-genSerializeTransform src dest exp r = [| error "genSerializeTy: PTransform unimplemented" |]
+genSerializeTransform _ _ _ _ = [| error "genSerializeTy: PTransform unimplemented" |]
 
 -- | Create a serializer for a PList, which will intersperse separators and
--- append terminators as necessary.
+-- incorporate terminating conditions as necessary.
 genSerializeList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> (Maybe Exp) -> Q Exp
 genSerializeList ty sepM termM r = do
   let ty' = genSerializeTy ty Nothing
@@ -1060,15 +1059,17 @@ genSerializeList ty sepM termM r = do
     Just s  -> let
       def   = genDefTy s
       def_s = genSerializeTy s Nothing
-      in  [d| $(varP cs') = intersperse $(def_s `appE` def) $(varE cs) |]
+      app = if hasRep s then def_s `appE` def else def_s
+      in  [d| $(varP cs') = intersperse $app $(varE cs) |]
   dec3 <- case termM of
-    Nothing        -> [d| $(varP cs'') = $(varE cs') |]
-    Just (LLen e)  -> [d| $(varP cs'') = $(varE cs') |] -- handled during generation but TODO
+    Nothing        -> [d| $(varP cs'') = concatCs $(varE cs') |]
+    Just (LLen e)  -> [d| $(varP cs'') = concatCs $(varE cs') |] -- handled during generation but TODO
     Just (LTerm t) -> let
       def   = genDefTy t
       def_s = genSerializeTy t Nothing
-      in  [d| $(varP cs'') = $(varE cs') ++ [$(def_s `appE` def)] |]
-  return $ LetE (dec1 ++ dec2 ++ dec3) ((VarE . mkName) "concatCs" `AppE` VarE cs'')
+      app = if hasRep t then def_s `appE` def else def_s
+      in  [d| $(varP cs'') = concatCs $(varE cs') `cApp` $app |]
+  return $ LetE (dec1 ++ dec2 ++ dec3) (VarE cs'')
 
 genSerializePartition :: PadsTy -> Exp -> (Maybe Exp) -> Q Exp
 genSerializePartition ty exp r = [| error "genSerializeTy: PPartition unimplemented" |]
@@ -1081,15 +1082,21 @@ genSerializeValue :: Exp -> PadsTy -> (Maybe Exp) -> Q Exp
 genSerializeValue _ _ (Just rep) = [|       id |]
 genSerializeValue _ _ Nothing    = [| const id |]
 
+-- | A PADS application of types is translated directly to a Template Haskell
+-- application (AppE).
 genSerializeApp :: [PadsTy] -> (Maybe Exp) -> (Maybe Exp) -> Q Exp
 genSerializeApp tys expM r = do
   tys' <- mapM (flip genSerializeTy Nothing) tys
   return (foldl1 AppE (tys' ++ Maybe.maybeToList expM ++ Maybe.maybeToList r))
 
+-- | In the runtime function, a case statement is deployed to ensure the input
+-- has the correct tuple format, then a serializer for each element of the tuple
+-- is bound in a let statement, with their results concatenated to create the
+-- function's overall result.
 genSerializeTuple :: [PadsTy] -> (Maybe Exp) -> Q Exp
 genSerializeTuple tys r = do
   let tys' = map (flip genSerializeTy Nothing) tys
-  letnames  <- sequence [newName "x" | ty <- tys']
+  letnames  <- sequence [newName "k" | ty <- tys'] -- newName "x" results in a capturable name?
   casenames <- sequence [newName "y" | ty <- tys']
   let letdecs = map mkDec (zip3 letnames casenames (zip tys tys'))
   let letbody = [| concatCs $(listE $ map varE letnames) |]
@@ -1098,19 +1105,26 @@ genSerializeTuple tys r = do
   caseE (dyn sArgName) [match (tupP [varP cn | cn <- casenames']) casebody []]
   where
     mkDec :: (Name, Name, (PadsTy, Q Exp)) -> Q Dec
-    mkDec (ln, cn, (t, t')) = case t of
-      PExpression e -> valD (varP ln) (normalB (appE t' (return e))) []
-      _             -> valD (varP ln) (normalB (appE t' (varE cn)))  []
+    mkDec (ln, cn, (t, t')) = if hasRep t
+      then valD (varP ln) (normalB (appE t' (varE cn))) []
+      else valD (varP ln) (normalB       t'           ) []
 
+
+-- | The runtime function exp_serialize can be called on literal numbers,
+-- characters, and strings, and will serialize them appropriately.
 genSerializeExp :: Exp -> (Maybe Exp) -> Q Exp
-genSerializeExp exp (Just rep) = appE [| exp_serialize |] (return rep)
-genSerializeExp exp Nothing    =      [| exp_serialize |] -- TODO: to not apply exp_serialize to exp here may be unsound
+genSerializeExp exp (Just rep) = error "genSerializeExp: unexpected representation" --appE [| exp_serialize $(return exp) |] (return rep)
+genSerializeExp exp Nothing = [| exp_serialize $(return exp) |] -- TODO: to apply exp_serialize to exp here may be unsound
 
+-- | A PTycon is represented according to mkTySerializerName, where the
+-- resultant name will be an in-scope runtime serializer.
 genSerializeTycon :: QString -> (Maybe Exp) -> Q Exp
 genSerializeTycon [c] (Just rep) = return $ AppE ((VarE . mkTySerializerName) c) rep
 genSerializeTycon [c] Nothing    = return $       (VarE . mkTySerializerName) c
-genSerializeTycon  c  r = error "genSerializeTy: " c
+genSerializeTycon c _ = [| error $ "genSerializeTy: qualified names unsupported: " ++ c |]
 
+-- | A PTyvar is represented according to mkTySerializerVarName, where the
+-- resultant name will stand for a serializer the user must provide.
 genSerializeTyvar :: String -> (Maybe Exp) -> Q Exp
 genSerializeTyvar s r = return $ VarE $ mkTySerializerVarName s
 
