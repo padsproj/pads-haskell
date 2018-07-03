@@ -180,12 +180,10 @@ hasRep (PExpression l)   = False
 hasRep (PTycon ["EOF"])  = False
 hasRep (PTycon ["EOR"])  = False
 hasRep (PTycon ["Void"]) = False
+hasRep (PApp [PTycon ["Try"], t] _) = hasRep t
 hasRep ty                 = True
 
 -- | > ["Foo", "Bar"] -> "Foo.Bar"
 qName :: QString -> String
 qName [n] = n
 qName (n:ms) = n ++ "." ++ qName ms
-
-
-

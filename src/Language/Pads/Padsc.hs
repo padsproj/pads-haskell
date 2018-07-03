@@ -32,11 +32,12 @@ module Language.Pads.Padsc (
      module Language.Pads.Pretty,
      module Language.Pads.PadsPrinter,
      module Data.Data,
+     module Data.List,
      ppr, pretty
   )
   where
 
-import Language.Pads.Source
+import Language.Pads.Source hiding (take, span, head, tail)
 import Language.Pads.RegExp
 import Language.Pads.Errors  hiding (msg)
 import Language.Pads.PadsParser
@@ -50,6 +51,7 @@ import Language.Pads.Pretty
 import Language.Pads.PadsPrinter
 
 import Data.Data
+import Data.List
 import Text.PrettyPrint.Mainland hiding (line,  dot)
 import Text.PrettyPrint.Mainland.Class
 
