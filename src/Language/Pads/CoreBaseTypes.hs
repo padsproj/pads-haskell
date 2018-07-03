@@ -471,6 +471,9 @@ try_def d = d
 try_genM :: IO a -> IO (Try a)
 try_genM g = g >>= return
 
+try_serialize :: a -> Try a
+try_serialize = id
+
 
 -----------------------------------------------------------------
 
@@ -678,6 +681,8 @@ stringFW_printFL n (str, bmd)  = addString (take n str)
 stringFW_genM :: Int -> IO StringFW
 stringFW_genM i = replicateM i (randLetter gen)
 
+stringFW_serialize _ = string_serialize
+
 
 -----------------------------------------------------------------
 
@@ -872,9 +877,10 @@ stringPESC_printFL (_, (escape, stops)) (str, bmd) =
   in addString newStr
 
 stringPESC_genM :: (Bool, (Char, [Char])) -> IO StringPESC
-stringPESC_genM _ = error "unimplemented generation: stringPESC"
+stringPESC_genM _ = error "stringPESC_genM: unimplemented"
 
-
+stringPESC_serialize :: (Bool, (Char, [Char])) -> CList
+stringPESC_serialize _ = error "stringPESC_serialize: unimplemented"
 
 -----------------------------------------------------------------
 
@@ -910,6 +916,9 @@ instance {-# OVERLAPPING #-} ExpSerialize Char where
 
 instance {-# OVERLAPPING #-} ExpSerialize [Char] where
   exp_serialize = string_serialize
+
+instance {-# OVERLAPPING #-} ExpSerialize RE where
+  exp_serialize _ = string_serialize "RegEx Literal" -- TODO
 
 instance (Num a, Show a) => ExpSerialize a where
   exp_serialize = int_serialize
@@ -1006,6 +1015,9 @@ eof_printFL = const eofLit_printFL
 eOR_genM :: IO EOR
 eOR_genM = return eOR_def
 
+eOR_serialize :: CList
+eOR_serialize = toCL [CharChunk '\n']
+
 eOF_printFL = eof_printFL
 
 eOF_def :: EOF
@@ -1013,6 +1025,9 @@ eOF_def = ()
 
 eOF_genM :: IO EOF
 eOF_genM = return eOF_def
+
+eOF_serialize :: CList
+eOF_serialize = toCL []
 
 eorLit_printFL :: FList
 eorLit_printFL = printEOR
@@ -1043,6 +1058,9 @@ void_printFL v = nil
 
 void_genM :: IO Void
 void_genM = return void_def
+
+void_serialize :: CList
+void_serialize = toCL []
 
 
 
