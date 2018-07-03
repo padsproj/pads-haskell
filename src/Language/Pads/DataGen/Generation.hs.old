@@ -34,6 +34,7 @@ import           Text.Printf
 import           Language.Pads.Padsc
 import           Language.Pads.DataGen.GenDescriptions
 import           Language.Pads.DataGen.Rand
+import           Language.Pads.DataGen.Types
 
 {-
  - General generation logic: extract relevant info from a PADS AST, convert
@@ -41,26 +42,6 @@ import           Language.Pads.DataGen.Rand
  - allow for non-byte-aligned and sub-byte generation, convert into [Word8]
  - as final raw output
  -}
-
---                       Name      AST
-type PadsDescription = ([Char], PadsDecl)
-
-data Chunk = CharChunk   Char
-           | BinaryChunk Integer Int -- Value, number of significant bits of value
-    deriving Show
-
-data Val = CharVal Char
-         | IntVal Integer
-    deriving Show
-
-type ValEnv = [(String, Val)]
-
-data MEnv = MEnv { genIO     :: MWC.GenIO
-                 , valEnvRef :: IORef ValEnv
-                 }
-
-type M = ReaderT MEnv IO 
-
 
 
 newMEnv = do

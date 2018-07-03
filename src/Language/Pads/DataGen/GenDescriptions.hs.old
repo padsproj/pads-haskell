@@ -8,7 +8,8 @@
            , FlexibleInstances
            , FlexibleContexts
            , RecordWildCards
-           , NamedFieldPuns #-}
+           , NamedFieldPuns
+           , UndecidableInstances #-}
 
 
 
@@ -56,16 +57,16 @@ padsSamples = [pads|
     -- S3      -- a --> S3
     -- S3      -- t --> QACCEPT
 
-    data START = START { S1 }
-
-    data S1 = S1 { 'c', S2 }
-
-    data S2 = S2 { 'a', S3 }
-
-    data S3 = S3A { 'a', S3 }
-            | S3T { 't', S4 }
-
-    data S4 = S4 { }
+    -- data START = START { S1 }
+    --
+    -- data S1 = S1 { 'c', S2 }
+    --
+    -- data S2 = S2 { 'a', S3 }
+    --
+    -- data S3 = S3A { 'a', S3 }
+    --         | S3T { 't', S4 }
+    --
+    -- data S4 = S4 { }
 
 --                                     ___ a ___
 --                                   /           \
@@ -100,35 +101,56 @@ padsSamples = [pads|
                        , g :: Test1 f }
     data Test1 (x :: Bits8) = Test1 { h :: Bits64 x }
 
-    data DT = DT1 [Int | ',']
-            | DT2 " START DT2 " DT "||" DT " END DT2 "
+    -- data DT = DT1 [Int | ',']
+    --         | DT2 "START DT2" DT "||" DT "END DT2"
 
     type SomeBytes = Bytes <| fromIntegral 8 |>
 
-    data PadsTyValue = PadsTyValue { ptv :: Int, xIsEven = value <| even ptv |> :: Bool }
+    -- data PadsTyValue = PadsTyValue { ptv :: Int, xIsEven = value <| even ptv |> :: Bool }
 
     -- All strings with an equal number of 01 and 10 substrings:
 
-    data Q1 = Q1_1 { '1', Q2 }
-            | Q1_0 { '0', Q4 }
-            | Q1_A {}
-    data Q2 = Q2_1 { '1', Q2 }
-            | Q2_0 { '0', Q3 }
-            | Q2_A {}
-    data Q3 = Q3_1 { '1', Q2 }
-            | Q3_0 { '0', Q3 }
-    data Q4 = Q4_1 { '1', Q5 }
-            | Q4_0 { '0', Q4 }
-            | Q4_A {}
-    data Q5 = Q5_1 { '1', Q5 }
-            | Q5_0 { '0', Q4 }
+    -- data Q1 = Q1_1 { '1', Q2 }
+    --         | Q1_0 { '0', Q4 }
+    --         | Q1_A {}
+    -- data Q2 = Q2_1 { '1', Q2 }
+    --         | Q2_0 { '0', Q3 }
+    --         | Q2_A {}
+    -- data Q3 = Q3_1 { '1', Q2 }
+    --         | Q3_0 { '0', Q3 }
+    -- data Q4 = Q4_1 { '1', Q5 }
+    --         | Q4_0 { '0', Q4 }
+    --         | Q4_A {}
+    -- data Q5 = Q5_1 { '1', Q5 }
+    --         | Q5_0 { '0', Q4 }
 
-    type ThreeInts = (Int, Char, Int)
+    type ThreeInts = (Int, Char, Int, 'd')
 
     data ThreeIntsRecord = ThreeIntsRecord {runningoutofnames :: ThreeInts,
                                             runningoutofnamesp2 :: StringFW 20}
 
     data BitsRecord = BitsRecord { Int }
+
+    newtype Image = Image (partition (Header, '\n',
+                                      Dimensions, '\n',
+                                      [Pixel] terminator EOF) using none)
+
+    type Header = StringC '\n'
+    type Header2 = String
+
+    data Dimensions = Dimensions {w :: Int, ' ', hh :: Int}
+
+    -- data SwitchRecord = case <| 1 + 2 |>
+    --                       of 3 -> Foo "Hello"
+    --                        | 2 -> Bar "Not Likely"
+
+    data UnionRecord1 = UnionRecord2 {xyz :: Int}
+                      | UnionRecord3 {zyx :: Int}
+
+    newtype NT1 = NT1 (Int, Int)
+
+    type TwoBytes = (Bits8 8, Bits8 8)
+
 |]
 
 
