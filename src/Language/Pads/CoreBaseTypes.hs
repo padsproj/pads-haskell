@@ -1197,9 +1197,24 @@ bytesNB_genM = bytes_genM
 {- Helper functions -}
 mkStr c = "'" ++ [c] ++ "'"
 
-untilM :: Monad m => (a -> Bool) -> (a -> m a) -> a -> m a
-untilM p f z = do
+recLimit = 500
+
+untilM :: Monad m => (a -> Bool) -> (a -> m a) -> Integer -> a -> m a
+untilM p f i z = do
+  when (i <= 0) (error $ "untilM: recursion too deep. If you want to increase "
+                      ++ "the recursion limit, edit it (currently set to "
+                      ++ show recLimit
+                      ++ ") in CoreBaseTypes.hs")
   let b = p z
   if b
     then return z
-    else f z >>= untilM p f
+    else f z >>= untilM p f (i - 1)
+
+-- | Some PADS types, PConstrain for instance, are designed to have access to
+-- parsed metadata, stored as the variable md. In parsing, metadata is created
+-- and supplied to the constraint at the appropriate time in the runtime parsing
+-- functions. However, during generation, metadata is not created nor in scope.
+-- Providing this variable assignment prevents compile time errors of functions
+-- with predicates that refer to md, and is safe to use with parsing predicates
+-- because their md variables are hidden behind lambda abstractions.
+md = Base_md 0 Nothing
