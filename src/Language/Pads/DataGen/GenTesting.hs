@@ -13,6 +13,7 @@
 
 module Language.Pads.DataGen.GenTesting where
 
+import           Control.Monad
 import           Data.Bits
 import qualified Data.ByteString as B
 import           Data.Word
@@ -62,23 +63,133 @@ fromChunks cs = do
             rest <- createWord8s (i `shiftR` 8)
             return (w:rest)
 
+fromChunks' :: [Chunk] -> [Word8]
+fromChunks' cs = let
+  bits = concat $ chunksToBin cs
+  toPad = case (8 - ((length bits) `mod` 8)) of 8 -> 0; x -> x
+  padding = replicate toPad 0
+  binary = asBytes $ bits ++ padding
+  in if   (length (bits ++ padding) `mod` 8) /= 0
+     then error "fromChunks': bug in binary conversion"
+     else map fromBinary binary
+  where
+    chunksToBin :: [Chunk] -> [[Word8]]
+    chunksToBin [] = []
+    chunksToBin ((CharChunk c):cs) = (toPaddedBinary (fromEnum c) 8) : chunksToBin cs
+    chunksToBin ((BinaryChunk v b):cs) = (toPaddedBinary v b) : chunksToBin cs
+
+    toPaddedBinary :: Integral a => a -> Int -> [Word8]
+    toPaddedBinary x padTo = let
+      x' = toBinary x []
+      padding = replicate (padTo - length x') 0
+      in if   (padTo - length x') < 0
+         then drop (abs $ padTo - length x') x'
+         else padding ++ x'
+
+    toBinary :: Integral a => a -> [Word8] -> [Word8]
+    toBinary 0 [] = [0]
+    toBinary 0 bs = bs
+    toBinary x bs = toBinary (x `div` 2) (fromIntegral x `mod` 2 : bs)
+
+    asBytes :: [Word8] -> [[Word8]]
+    asBytes [] = []
+    asBytes xs = (take 8 xs) : (asBytes $ drop 8 xs)
+
+    fromBinary :: [Word8] -> Word8
+    fromBinary bs = let
+      withPowers = zip bs (reverse [0..7])
+      in foldr1 (+) (map (\(b,p) -> b * 2^p) withPowers)
+
+sampleSize = 100 -- used for "cycle" testing - generate, serialize, parse
+
+--------------------------------------------------------------------------------
+-- Unit testing of serialization of pure/primitive PADS types
+
 charTest_name = "Char"
-charTest_expected = [CharChunk 'a']
-charTest_got = fromCL $ char_serialize 'a'
+charTest_expected = [chrToWord8 'a']
+charTest_got = fromChunks' $ fromCL $ char_serialize 'a'
 charTest = TestCase (charTest_expected @=? charTest_got)
 
+charCycleTest_name = "Char Cycle"
+charCycleTest = do
+  cs <- replicateM sampleSize char_genM
+  let cs_serialized = map ((map word8ToChr) . fromChunks' . fromCL . char_serialize) cs
+  let cs_parsed = map (fst . fst . (parseStringInput char_parseM)) cs_serialized
+  return $ all (== True) (map (\(x,y) -> x == y) (zip cs cs_parsed))
+
 intTest_name = "Int"
-intTest_expected = [CharChunk '2']
-intTest_got = fromCL $ int_serialize (2 :: Int)
+intTest_expected = [chrToWord8 '2']
+intTest_got = fromChunks' $ fromCL $ int_serialize 2
 intTest = TestCase (intTest_expected @=? intTest_got)
 
+intCycleTest_name = "Int Cycle"
+intCycleTest = do
+  xs <- replicateM sampleSize int_genM
+  let xs_serialized = map ((map word8ToChr) . fromChunks' . fromCL . int_serialize) xs
+  let xs_parsed = map (fst . fst . (parseStringInput int_parseM)) xs_serialized
+  return $ all (== True) (map (\(x,y) -> x == y) (zip xs xs_parsed))
+
+bits8Test_name = "Bits8"
+bits8Test_expected = [98]
+bits8Test_got = (fromChunks' $ (fromCL $ ((bits8_serialize 8) 98)))
+bits8Test = TestCase (bits8Test_expected @=? bits8Test_got)
+
+bits8CycleTest_name = "Bits8 Cycle"
+bits8CycleTest = do
+  xs <- (filter (/= chrToWord8 '\n')) <$> replicateM sampleSize (bits8_genM 8)
+  let xs_serialized = map ((map word8ToChr) . fromChunks' . fromCL . (bits8_serialize 8)) xs
+  let xs_parsed = map (fst . fst . (parseStringInput (bits8_parseM 8))) xs_serialized
+  return $ all (== True) (map (\(x,y) -> x == y) (zip xs xs_parsed))
+
+bits8MisalignedTest_name = "Bits8 Misaligned"
+bits8MisalignedTest_expected = [224]
+bits8MisalignedTest_got
+  = (fromChunks' $ (fromCL $ ((bits8_serialize 3) 7)))
+bits8MisalignedTest
+  = TestCase
+      (bits8MisalignedTest_expected @=? bits8MisalignedTest_got)
+
+-- | Use BitField generator and serializer but BitField50 parser to avoid record
+-- discipline problems
+[pads| type BitField50 = partition BitField 50 using none |]
+bitFieldCycleTest_name = "BitField Cycle"
+bitFieldCycleTest = do
+  xs <- replicateM sampleSize (bitField_genM 50)
+  let xs_serialized = map ((map word8ToChr) . fromChunks' . fromCL . (bitField_serialize 50)) xs
+  let xs_parsed = map (fst . fst . bitField50_parseS) xs_serialized
+  return $ all (== True) (map (\(x,y) -> x == y) (zip xs xs_parsed))
+
+bytesTest_name = "Bytes"
+bytesTest_expected = [1, 2, 3, 4]
+bytesTest_got
+  = (fromChunks' $ (fromCL $ ((bytes_serialize 4) $ (B.pack [1, 2, 3, 4]))))
+bytesTest = TestCase (bytesTest_expected @=? bytesTest_got)
+
+[pads| type MyStringC = StringC 'f' |]
+--mkSTest "MyStringC" [CharChunk 't',CharChunk 'g',CharChunk 'i',CharChunk 'f'] [| fromCL $ myStringC_serialize "tgi" |]
+myStringCTest_name = "MyStringC"
+myStringCTest_expected
+  = [CharChunk 't', CharChunk 'g', CharChunk 'i', CharChunk 'f']
+myStringCTest_got = (fromCL $ (myStringC_serialize "tgi"))
+myStringCTest
+  = TestCase (myStringCTest_expected @=? myStringCTest_got)
+
+myStringCCycleTest_name = "MyStringC Cycle"
+myStringCCycleTest = do
+  ss <- replicateM sampleSize myStringC_genM
+  let ss_serialized = map ((map word8ToChr) . fromChunks' . fromCL . myStringC_serialize) ss
+  let ss_parsed = map (fst . fst . myStringC_parseS) ss_serialized
+  return $ all (== True) (map (\(x,y) -> x == y) (zip ss ss_parsed))
+
+-------------------------------------------------------------------------------
+-- Unit testing of user-defined PADS types
 
 [pads| type MyTuple = (Int,'c',Bits8 4,'d') |]
 
 myTupleTest_name = "MyTuple"
 myTupleTest_expected
   = [CharChunk '1', CharChunk 'c', (BinaryChunk 10) 4, CharChunk 'd']
-myTupleTest_got = fromCL $ myTuple_serialize ((1, 10) :: MyTuple)
+myTupleTest_got = fromCL $ myTuple_serialize (1, 10)
 myTupleTest
   = TestCase (myTupleTest_expected @=? myTupleTest_got)
 
@@ -108,7 +219,17 @@ twoBytesTest_got = fromCL $ twoBytes_serialize ((0, 122) :: TwoBytes)
 twoBytesTest
   = TestCase (twoBytesTest_expected @=? twoBytesTest_got)
 
+-- Nested tuple
+[pads| type TupleN = (Int, ',', (Int,':',Int), ';', Int) |]
+nestedTupleTest_name = "Nested Tuple"
+nestedTupleTest_expected
+  = [CharChunk '1', CharChunk ',', CharChunk '2', CharChunk ':',
+     CharChunk '3', CharChunk ';', CharChunk '4']
+nestedTupleTest_got = fromCL $ tupleN_serialize (1, (2, 3), 4)
+nestedTupleTest
+  = TestCase (nestedTupleTest_expected @=? nestedTupleTest_got)
 
+-- PLists of several forms
 [pads| type RegularList = [Bits8 8]
        type SepList     = [Bits8 8 | '|']
        type SepTermList = [Bits8 8 | '|'] terminator Char
@@ -117,14 +238,14 @@ twoBytesTest
 regularListTest_name = "RegularList"
 regularListTest_expected = [(BinaryChunk 10) 8, (BinaryChunk 5) 8]
 regularListTest_got
-  = fromCL $ regularList_serialize ([10, 5] :: RegularList)
+  = fromCL $ regularList_serialize [10, 5]
 regularListTest
   = TestCase (regularListTest_expected @=? regularListTest_got)
 
 sepListTest_name = "SepList"
 sepListTest_expected
   = [(BinaryChunk 10) 8, CharChunk '|', (BinaryChunk 5) 8]
-sepListTest_got = fromCL $ sepList_serialize ([10, 5] :: SepList)
+sepListTest_got = fromCL $ sepList_serialize [10, 5]
 sepListTest
   = TestCase (sepListTest_expected @=? sepListTest_got)
 
@@ -132,7 +253,7 @@ sepTermListTest_name = "SepTermList"
 sepTermListTest_expected
   = [(BinaryChunk 10) 8, CharChunk '|', (BinaryChunk 5) 8, CharChunk 'X']
 sepTermListTest_got
-  = fromCL $ sepTermList_serialize ([10, 5] :: SepTermList)
+  = fromCL $ sepTermList_serialize [10, 5]
 sepTermListTest
   = TestCase (sepTermListTest_expected @=? sepTermListTest_got)
 
@@ -143,13 +264,15 @@ sepTermListBytesTest_got
 sepTermListBytesTest
   = TestCase (sepTermListBytesTest_expected @=? sepTermListBytesTest_got)
 
-
+-- Run-of-the-mill record with sub-byte data
 [pads| data Pixel = Pixel { a :: Bits16 9
                           , b :: Bits8 5
                           , c :: Bits8 5
                           , d :: Bits8 5
                           , pb_index :: Bits8 4
-                          , pr_index :: Bits8 4 } deriving Generic |]
+                          , pr_index :: Bits8 4 }
+
+       type PixelNone = partition Pixel using none |]
 
 pixelTest_name = "Pixel"
 pixelTest_expected
@@ -166,9 +289,34 @@ pixelBytesTest_got
 pixelBytesTest
   = TestCase (pixelBytesTest_expected @=? pixelBytesTest_got)
 
-mkGTest "Pixel Gen" ["Pixel"]
+pixelCycleTest_name = "Pixel Cycle"
+pixelCycleTest_invariant = do
+  ps <- replicateM sampleSize pixel_genM
+  ps_cs <- mapM (fromChunks . fromCL . pixel_serialize) ps
+  let ps_s = map ((map word8ToChr) . B.unpack) ps_cs
+  let ps_p = map (fst . fst . pixelNone_parseS) ps_s
+  return $ all (\(x,y) -> x == y) (zip ps ps_p)
+pixelCycleTest
+  = TestCase (assert pixelCycleTest_invariant)
 
+-- Constants in records
+[pads| data Constants = Constants { var1 :: Int
+                                  , "string"
+                                  , 'c'
+                                  , var2 :: StringFW 10 } |]
 
+recordConstantsTest_name = "Record Constants"
+recordConstantsTest_expected
+  = [52, 50, 115, 116, 114, 105, 110, 103, 99, 104, 101, 108, 108,
+     111, 116, 104, 101, 114, 101] -- represents "42stringchellothere"
+recordConstantsTest_got
+  = (fromChunks'
+       $ (fromCL $ (constants_serialize $ ((Constants 42) "hellothere"))))
+recordConstantsTest
+  = TestCase
+      (recordConstantsTest_expected @=? recordConstantsTest_got)
+
+-- Simple PValue example
 [pads| data Foo = Foo { x :: Int, xSucc = value <| x + 1 |> :: Int }
                 | Bar { x :: Int } |]
 
@@ -182,26 +330,32 @@ fooBarTest_expected = [CharChunk '0']
 fooBarTest_got = fromCL $ foo_serialize (Bar 0)
 fooBarTest = TestCase (fooBarTest_expected @=? fooBarTest_got)
 
-mkGTest "Foo Gen" ["Foo","Bar"]
-
-
+-- Test branch constructors
 [pads| data MyConstr = MyConstr1 Int Char
-                     | MyConstr2 Void |]
+                     | MyConstr2 Void
+                     | MyConstr3 "Hello" |]
 
-myConstrWithArgsTest_name = "MyConstr With Args"
-myConstrWithArgsTest_expected
+myConstr1WithArgsTest_name = "MyConstr1 With Args"
+myConstr1WithArgsTest_expected
   = [CharChunk '1', CharChunk '2', CharChunk 'x']
-myConstrWithArgsTest_got
+myConstr1WithArgsTest_got
   = (fromCL $ (myConstr_serialize ((MyConstr1 12) 'x')))
-myConstrWithArgsTest
-  = TestCase (myConstrWithArgsTest_expected @=? myConstrWithArgsTest_got)
+myConstr1WithArgsTest
+  = TestCase (myConstr1WithArgsTest_expected @=? myConstr1WithArgsTest_got)
 
-myConstrNoArgsTest_name = "MyConstr No Args"
-myConstrNoArgsTest_expected = []
-myConstrNoArgsTest_got
+myConstr2NoArgsTest_name = "MyConstr2 No Args"
+myConstr2NoArgsTest_expected = []
+myConstr2NoArgsTest_got
   = (fromCL $ (myConstr_serialize MyConstr2))
-myConstrNoArgsTest
-  = TestCase (myConstrNoArgsTest_expected @=? myConstrNoArgsTest_got)
+myConstr2NoArgsTest
+  = TestCase (myConstr2NoArgsTest_expected @=? myConstr2NoArgsTest_got)
+
+myConstr3NoArgsTest_name = "MyConstr3 No Args"
+myConstr3NoArgsTest_expected = []
+myConstr3NoArgsTest_got = (fromCL $ (myConstr_serialize MyConstr3))
+myConstr3NoArgsTest
+  = TestCase
+      (myConstr3NoArgsTest_expected @=? myConstr3NoArgsTest_got)
 
 myConstrGenTest_name = "MyConstr Gen"
 myConstr_check MyConstr1 {} = True
@@ -211,14 +365,16 @@ myConstrGenTest
       ((assertBool "MyConstr Gen")
          (myConstr_check $ (unsafePerformIO myConstr_genM)))
 
-
+-- Test use of type variables and newtype
 [pads| data MyList a = MyCons a (MyList a)
-                     | MyNil Void |]
+                     | MyNil Void
+
+       newtype IntList = MyList Int |]
 
 myListEmptyTest_name = "MyList Empty"
 myListEmptyTest_expected = []
 myListEmptyTest_got
-  = (fromCL $ ((myList_serialize char_serialize) MyNil))
+  = (fromCL $ ((myList_serialize undefined) MyNil))
 myListEmptyTest
   = TestCase (myListEmptyTest_expected @=? myListEmptyTest_got)
 
@@ -232,144 +388,160 @@ myListNonemptyTest_got
 myListNonemptyTest
   = TestCase (myListNonemptyTest_expected @=? myListNonemptyTest_got)
 
+-- intListEmptyTest_name = "IntList Empty"
+-- intListEmptyTest_expected = []
+-- intListEmptyTest_got = (fromCL $ (intList_serialize MyNil))
+-- intListEmptyTest
+--   = TestCase (intListEmptyTest_expected @=? intListEmptyTest_got)
+--
+-- intListNonemptyTest_name = "IntList Nonempty"
+-- intListNonemptyTest_expected
+--   = [CharChunk '1', CharChunk '2', CharChunk '3']
+-- intListNonemptyTest_got
+--   = (fromCL
+--        $ (intList_serialize ((MyCons 1) ((MyCons 2) ((MyCons 3) MyNil)))))
+-- intListNonemptyTest
+--   = TestCase
+--       (intListNonemptyTest_expected @=? intListNonemptyTest_got)
 
-tests = TestList [ TestLabel charTest_name charTest
-                 , TestLabel intTest_name intTest
-                 , TestLabel myTupleTest_name myTupleTest
-                 , TestLabel byteTest_name byteTest
-                 , TestLabel justACharTest_name justACharTest
-                 , TestLabel twoBytesTest_name twoBytesTest
-                 , TestLabel regularListTest_name regularListTest
-                 , TestLabel sepListTest_name sepListTest
-                 , TestLabel sepTermListTest_name sepTermListTest
-                 , TestLabel sepTermListBytesTest_name sepTermListBytesTest
-                 , TestLabel pixelTest_name pixelTest
-                 , TestLabel pixelBytesTest_name pixelBytesTest
-                 , TestLabel pixelGenTest_name pixelGenTest
-                 , TestLabel fooFooTest_name fooFooTest
-                 , TestLabel fooBarTest_name fooBarTest
-                 , TestLabel fooGenTest_name fooGenTest
-                 , TestLabel myConstrNoArgsTest_name myConstrNoArgsTest
-                 , TestLabel myConstrWithArgsTest_name myConstrWithArgsTest
-                 , TestLabel myListEmptyTest_name myListEmptyTest
-                 , TestLabel myListNonemptyTest_name myListNonemptyTest
+-- Test references to previously defined variables
+[pads| data Dependent = Dependent { f :: Bits8 8
+                                  , g :: Bytes <|fromIntegral f|> } |]
+
+dependentSerTest_name = "Dependent Serialization"
+dependentSerTest_expected
+  = [BinaryChunk 7 8] ++ replicate 7 (CharChunk 'c')
+dependentSerTest_got
+  = fromCL $ dependent_serialize (Dependent 7 (B.pack [99,99,99,99,99,99,99]))
+dependentSerTest
+  = TestCase (dependentSerTest_expected @=? dependentSerTest_got)
+
+dependentGenTest_name = "Dependent Generation"
+dependentGenTest_invariant = do
+  deps <- replicateM sampleSize dependent_genM
+  return $ all (== True)
+    (map (\dep -> (fromIntegral $ f dep) == (B.length $ g dep)) deps)
+dependentGenTest
+  = TestCase (assert dependentGenTest_invariant)
+
+-- Test paramaterization of structures
+[pads| data Param1 = Param1 { p1 :: Bits8 8
+                            , p2 :: Param2 p1}
+
+       data Param2 (param :: Bits8) = Param2 { p3 :: Bytes <|fromIntegral param|> } |]
+
+paramSerTest_name = "Parameterized Serialization"
+paramSerTest_expected
+  = [BinaryChunk 3 8, CharChunk 'c', CharChunk 'c', CharChunk 'c']
+paramSerTest_got
+  = (fromCL
+       $ (param1_serialize ((Param1 3) (Param2 (B.pack [99, 99, 99])))))
+paramSerTest
+  = TestCase (paramSerTest_expected @=? paramSerTest_got)
+
+paramGenTest_name = "Parameterized Generation"
+paramGenTest_invariant = do
+  params <- replicateM sampleSize param1_genM
+  return $ all (== True)
+    (map (\par -> (fromIntegral $ p1 par) == (B.length (p3 (p2 par)))) params)
+paramGenTest
+  = TestCase (assert paramGenTest_invariant)
+
+
+
+-------------------------------------------------------------------------------
+-- Unit testing of fromChunks function
+
+emptyChunksTest_name = "Empty Chunks"
+emptyChunksTest_expected = []
+emptyChunksTest_got = fromChunks' []
+emptyChunksTest
+  = TestCase (emptyChunksTest_expected @=? emptyChunksTest_got)
+
+charChunksTest_name = "CharChunks"
+charChunksTest_expected = [100,99,98]
+charChunksTest_got = fromChunks' [CharChunk 'd',CharChunk 'c',CharChunk 'b']
+charChunksTest
+  = TestCase (charChunksTest_expected @=? charChunksTest_got)
+
+binaryChunksTest_name = "Binary Chunks"
+binaryChunksTest_expected = [100, 100]
+binaryChunksTest_got
+  = fromChunks'
+      [(BinaryChunk 12) 5, (BinaryChunk 8) 4, (BinaryChunk 6) 3,
+       (BinaryChunk 4) 4]
+binaryChunksTest
+  = TestCase (binaryChunksTest_expected @=? binaryChunksTest_got)
+
+misalignedChunksTest_name = "Misaligned Chunks"
+misalignedChunksTest_expected = [100, 96]
+misalignedChunksTest_got
+  = fromChunks'
+      [(BinaryChunk 12) 5, (BinaryChunk 8) 4, (BinaryChunk 6) 3]
+misalignedChunksTest
+  = TestCase
+      (misalignedChunksTest_expected
+         @=? misalignedChunksTest_got)
+
+misalignedChunks2Test_name = "Misaligned Chunks 2"
+misalignedChunks2Test_expected = [192]
+misalignedChunks2Test_got = fromChunks' [(BinaryChunk 3) 2]
+misalignedChunks2Test
+  = TestCase (misalignedChunks2Test_expected @=? misalignedChunks2Test_got)
+
+mixedChunksTest_name = "Mixed Chunks"
+mixedChunksTest_expected = [76, 128, 200]
+mixedChunksTest_got
+  = fromChunks'
+      [(BinaryChunk 2) 3, CharChunk 'd', (BinaryChunk 1) 6,
+       (BinaryChunk 2) 2, (BinaryChunk 1) 2]
+mixedChunksTest
+  = TestCase (mixedChunksTest_expected @=? mixedChunksTest_got)
+
+
+tests = TestList [ charTest_name              ~: charTest
+                 , charCycleTest_name         ~: charCycleTest
+                 , intTest_name               ~: intTest
+                 , intCycleTest_name          ~: intCycleTest
+                 , bits8Test_name             ~: bits8Test
+                 , bits8MisalignedTest_name   ~: bits8MisalignedTest
+                 , bitFieldCycleTest_name     ~: bitFieldCycleTest
+                 , bytesTest_name             ~: bytesTest
+                 , myStringCTest_name         ~: myStringCTest
+                 , myStringCCycleTest_name    ~: myStringCCycleTest
+                 , myTupleTest_name           ~: myTupleTest
+                 , byteTest_name              ~: byteTest
+                 , justACharTest_name         ~: justACharTest
+                 , twoBytesTest_name          ~: twoBytesTest
+                 , nestedTupleTest_name       ~: nestedTupleTest
+                 , regularListTest_name       ~: regularListTest
+                 , sepListTest_name           ~: sepListTest
+                 , sepTermListTest_name       ~: sepTermListTest
+                 , sepTermListBytesTest_name  ~: sepTermListBytesTest
+                 , pixelTest_name             ~: pixelTest
+                 , pixelBytesTest_name        ~: pixelBytesTest
+                 , pixelCycleTest_name        ~: pixelCycleTest
+                 , recordConstantsTest_name   ~: recordConstantsTest
+                 , fooFooTest_name            ~: fooFooTest
+                 , fooBarTest_name            ~: fooBarTest
+                 , myConstr1WithArgsTest_name ~: myConstr1WithArgsTest
+                 , myConstr2NoArgsTest_name   ~: myConstr2NoArgsTest
+                 , myConstr3NoArgsTest_name   ~: myConstr3NoArgsTest
+                 , myListEmptyTest_name       ~: myListEmptyTest
+                 , myListNonemptyTest_name    ~: myListNonemptyTest
+                 --, intListEmptyTest_name      ~: intListEmptyTest
+                 --, intListNonemptyTest_name   ~: intListNonemptyTest
+                 , dependentSerTest_name      ~: dependentSerTest
+                 , dependentGenTest_name      ~: dependentGenTest
+                 , paramSerTest_name          ~: paramSerTest
+                 , paramGenTest_name          ~: paramGenTest
+                 , emptyChunksTest_name       ~: emptyChunksTest
+                 , charChunksTest_name        ~: charChunksTest
+                 , binaryChunksTest_name      ~: binaryChunksTest
+                 , misalignedChunksTest_name  ~: misalignedChunksTest
+                 , misalignedChunks2Test_name ~: misalignedChunks2Test
+                 , mixedChunksTest_name       ~: mixedChunksTest
+
                  ]
 
 test = runTestTT tests
-
-[pads| type MyString = constrain s :: StringFW 100 where <| take 3 s == "ccc" |> |]
-
-
-
-
--- pixelTestName = "Pixel composition"
--- pixelCheck :: Pixel -> Bool
--- pixelCheck (Pixel a b c d pb pr) = assertBetween a  0 (2^9-1)
---                                 && assertBetween b  0 (2^5-1)
---                                 && assertBetween c  0 (2^5-1)
---                                 && assertBetween d  0 (2^5-1)
---                                 && assertBetween pb 0 (2^4-1)
---                                 && assertBetween pr 0 (2^4-1)
---
--- pixelTest = do
---   pixels <- sequence $ replicate 1000 pixel_genM
---   return $ (pixels, all (== True) $ map pixelCheck pixels)
-
-
-
-
-
--- data Test = Test String Bool
---     deriving Show
---
--- makeMany :: String -> IO [[Char]]
--- makeMany s = replicateM replicateVal $ generate s
---     where
---         replicateVal = 500
---
--- assertLengths :: (Int -> Bool) -> [[a]] -> Bool
--- assertLengths p xss = all p $ map length xss
-
--- createTest 1 "SomeBytes length"  [| assertLengths (== 8) samples |] Nothing
--- createTest 2 "Pixel length"      [| assertLengths (== 4) samples |] Nothing
--- createTest 3 "Pixel composition" [| all (\x -> x == "" || Prelude.head x == '\n') $ (map (snd . pixel_parseS)) samples |] Nothing
--- createTest 4 "Pixel parse"       [| all (== 0) $ map (numErrors . fst . snd . fst . pixelP_parseS) samples |] Nothing
--- createTest 5 "Mixed length"      [| assertLengths (== 2) samples |] Nothing
--- createTest 6 "Mixed composition" [| and $ map checkChar samples |] $
---     Just [d| checkChar xs = let
---                 x0 = chrToWord8 $ xs !! 0
---                 x1 = chrToWord8 $ xs !! 1
---                 in (x0 `shiftL` 4) + (x1 `shiftR` 4) == chrToWord8 'c' |]
--- createTest 7 "Dependent length" [| assertLengths (\x -> x >= 0 && x <= 3) samples |] Nothing
--- createTest 8 "Q1 composition"   [| all (== 0) $ map (snd . checkSubstrings) samples |] $
---     Just [d| checkSubstrings [] = (undefined, 0)
---              checkSubstrings xs = foldr comp (last xs, 0) (init xs)
---
---              comp x (y, z) =
---                  case (x, y) of ('1', '0') -> (x, z + 1)
---                                 ('0', '1') -> (x, z - 1)
---                                 _          -> (x, z) |]
-
--- test1 = do
---     let name = "SomeBytes length"
---     printf "Running test %s\n" name
---     samples <- makeMany "SomeBytes"
---     let result = assertLengths (== 8) samples
---     return $ Test name result
--- test2 = do
---     let name = "Pixel length"
---     printf "Running test %s\n" name
---     samples <- makeMany "Pixel"
---     let result = assertLengths (== 4) samples
---     return $ Test name result
--- test3 = do
---     let name = "Pixel composition"
---     printf "Running test %s\n" name
---     samples <- makeMany "Pixel"
---     let result = all (\x -> x == "" || Prelude.head x == '\n') $ (map (snd . pixel_parseS)) samples
---     return $ Test name result
--- test4 = do
---     let name = "Pixel parse"
---     printf "Running test %s\n" name
---     samples <- makeMany "Pixels"
---     let result = all (== 0) $ map (numErrors . fst . snd . fst . pixels_parseS) samples
---     return $ Test name result
--- test5 = do
---     let name = "Mixed length"
---     printf "Running test %s\n" name
---     samples <- makeMany "Mixed"
---     let result = assertLengths (== 2) samples
---     return $ Test name result
--- test6 = do
---     let name = "Mixed composition"
---     printf "Running test %s\n" name
---     samples <- makeMany "Mixed"
---     let result = and $ map checkChar samples
---     return $ Test name result
---     where
---         checkChar xs = let
---             x0 = chrToWord8 $ xs !! 0
---             x1 = chrToWord8 $ xs !! 1
---             in (x0 `shiftL` 4) + (x1 `shiftR` 4) == chrToWord8 'c'
--- test7 = do
---     let name = "Dependent length"
---     printf "Running test %s\n" name
---     samples <- makeMany "Dependent"
---     let result = assertLengths (\x -> x >= 0 && x <= 3) samples
---     return $ Test name result
--- test8 = do
---     let name = "Q1 composition"
---     printf "Running test %s\n" name
---     samples <- makeMany "Q1"
---     let result = all (== 0) $ map (snd . checkSubstrings) samples
---     return $ Test name result
---     where
---         checkSubstrings :: [Char] -> (Char, Int)
---         checkSubstrings [] = (undefined, 0)
---         checkSubstrings xs = foldr comp (last xs, 0) (init xs)
---
---         comp :: Char -> (Char, Int) -> (Char, Int)
---         comp x (y, z) =
---             case (x, y) of ('1', '0') -> (x, z + 1)
---                            ('0', '1') -> (x, z - 1)
---                            _          -> (x, z)
