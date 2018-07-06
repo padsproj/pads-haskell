@@ -123,6 +123,9 @@ bitBool_printFL (bb,bbmd) = fshow bb
 bitBool_genM :: IO BitBool
 bitBool_genM = randElem [False,True] gen
 
+bitBool_serialize :: BitBool -> CList
+bitBool_serialize b = toCL [BinaryChunk ((fromIntegral . fromEnum) b) 1]
+
 -- type instance PadsArg Bool = ()
 -- type instance Meta Bool = Base_md
 -- instance Pads1 () Bool Base_md where
@@ -153,12 +156,8 @@ bitField_printFL _ (x, xmd) = fshow x
 bitField_genM :: Integral a => a -> IO BitField
 bitField_genM i = (toInteger . floor) <$> uniformR (0::Double,2^i::Double) gen
 
--- type instance PadsArg Integer = ()
--- type instance Meta Integer = Base_md
--- instance Pads1 () Integer Base_md where
---     parsePP1 () = bitField_parseM
---     printFL1 () = bitField_printFL
---     def1 () = bitField_def
+--bitField_serialize :: Integral a => a -> BitField -> CList
+bitField_serialize b v = toCL [BinaryChunk v b]
 
 
 type Bits8 = Word8
@@ -298,6 +297,7 @@ int_genM = randInt gen
 intBound_genM :: Int -> Int -> IO Int
 intBound_genM x y = uniformR (x, y) gen
 
+int_serialize :: Int -> CList
 int_serialize i = toCL $ map CharChunk $ show i
 
 -----------------------------------------------------------------
@@ -334,6 +334,9 @@ integer_printFL (i, bmd) = fshow i
 
 integer_genM :: IO Integer
 integer_genM = fromIntegral <$> int_genM
+
+integer_serialize :: Integer -> CList
+integer_serialize i = toCL $ map CharChunk $ show i
 
 -----------------------------------------------------------------
 
@@ -393,6 +396,9 @@ float_printFL (d, bmd) = fshow d
 float_genM :: IO Float
 float_genM = uniformR (0,1000000000000000) gen
 
+float_serialize :: Float -> CList
+float_serialize f = toCL $ map CharChunk $ show f
+
 -----------------------------------------------------------------
 
 --type Double
@@ -451,6 +457,9 @@ double_printFL (d, bmd) = fshow d
 double_genM :: IO Double
 double_genM = uniformR (0,1000000000000000) gen
 
+double_serialize :: Double -> CList
+double_serialize d = toCL $ map CharChunk $ show d
+
 -----------------------------------------------------------------
 
 -- tries to parse @a@ without consuming the input string
@@ -471,7 +480,7 @@ try_def d = d
 try_genM :: IO a -> IO (Try a)
 try_genM g = g >>= return
 
-try_serialize :: a -> Try a
+--try_serialize :: Try a -> CList
 try_serialize = id
 
 
@@ -500,6 +509,9 @@ digit_printFL (i, bmd) = fshow i
 digit_genM :: IO Digit
 digit_genM = intBound_genM 0 9
 
+digit_serialize :: Digit -> CList
+digit_serialize d = toCL $ map CharChunk $ show d
+
 
 -----------------------------------------------------------------
 
@@ -527,6 +539,7 @@ string_printFL (str, bmd) = addString str
 string_genM :: IO String
 string_genM = stringVW_genM 100
 
+string_serialize :: String -> CList
 string_serialize s = toCL $ map CharChunk s
 
 -----------------------------------------------------------------
@@ -780,6 +793,9 @@ stringME_printFL re (str, bmd) = addString str
 stringME_genM :: RE -> IO StringME
 stringME_genM = error "stringME_genM unimplemented"
 
+stringME_serialize :: RE -> StringME -> CList
+stringME_serialize _ s = string_serialize s
+
 -----------------------------------------------------------------
 
 -- | string matching given native regex. PADS uses posix regex (from the
@@ -807,6 +823,9 @@ stringSE_printFL re (str, bmd) = addString str
 stringSE_genM :: RE -> IO StringSE
 stringSE_genM _ = error "stringSE_genM unimplemented"
 
+stringSE_serialize :: RE -> StringSE -> CList
+stringSE_serialize _ s = string_serialize s
+
 
 -----------------------------------------------------------------
 
@@ -830,6 +849,10 @@ stringP_printFL p (str, bmd) = addString str
 
 stringP_genM :: (Char -> Bool) -> IO StringP
 stringP_genM _ = error "stringP_genM unimplemented"
+
+stringP_serialize :: (Char -> Bool) -> StringP -> CList
+stringP_serialize _ s = string_serialize s
+
 
 -----------------------------------------------------------------
 
@@ -879,8 +902,8 @@ stringPESC_printFL (_, (escape, stops)) (str, bmd) =
 stringPESC_genM :: (Bool, (Char, [Char])) -> IO StringPESC
 stringPESC_genM _ = error "stringPESC_genM: unimplemented"
 
-stringPESC_serialize :: (Bool, (Char, [Char])) -> CList
-stringPESC_serialize _ = error "stringPESC_serialize: unimplemented"
+stringPESC_serialize :: (Bool, (Char, [Char])) -> StringPESC -> CList
+stringPESC_serialize _ _ = error "stringPESC_serialize: unimplemented"
 
 -----------------------------------------------------------------
 
@@ -921,7 +944,7 @@ instance {-# OVERLAPPING #-} ExpSerialize RE where
   exp_serialize _ = string_serialize "RegEx Literal" -- TODO
 
 instance (Num a, Show a) => ExpSerialize a where
-  exp_serialize = int_serialize
+  exp_serialize x = toCL $ map CharChunk $ show x --int_serialize
 
 -----------------------------------------------------------------
 
