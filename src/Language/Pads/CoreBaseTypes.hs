@@ -907,10 +907,68 @@ stringPESC_serialize _ _ = error "stringPESC_serialize: unimplemented"
 
 -----------------------------------------------------------------
 
-
+-- | Chunks represent an abstraction of literal data, and allow for easy
+-- consumption and concatenation into one ByteString/Word8 (TODO) list of data, which
+-- can be written to disk.
+-- A CharChunk represents just an ASCII character, and is used for the vast
+-- majority of PADS types, since almost all have a disk representation of a
+-- string of characters. A BinaryChunk is used for those types whose on-disk
+-- representations may not be multiples of whole bytes, and contains the value
+-- of the data and the bits of it we care about, where a value of n bits means
+-- we care about the n least significant bits of the val. For this, we consider
+-- a binary number to have bits increasing in significance from right to left.
 data Chunk = CharChunk   Char
-           | BinaryChunk Integer Int -- Value, significant bits of value
+           | BinaryChunk { val :: Integer, bits :: Int }
     deriving (Eq, Show, Lift)
+
+-- | fromChunks' provides a translation from Chunks to a list of bytes. It
+-- accomplishes this in time linear to the length of the list of Chunks. It
+-- converts each chunk into "binary" (a list of 1's and 0's) the splits that
+-- into "bytes" (lists of length 8 each) to simplify combination in non-byte-
+-- aligned cases.
+-- When the data does not add up to a multiple of full bytes, the resultant
+-- binary can be thought of as being "left-aligned," e.g. a description of just
+-- 3 bits of data would result in a byte where the 3 *most* significant bits
+-- are the ones that get described, somewhat in opposition to the way Chunks
+-- represent binary but in union with the way the parsing engine handles non-
+-- byte-aligned data.
+-- TODO: probably make this take a CList to improve abstraction
+fromChunks' :: [Chunk] -> [Word8]
+fromChunks' cs = let
+  bits = concat $ chunksToBin cs
+  toPad = case (8 - ((length bits) `mod` 8)) of 8 -> 0; x -> x
+  padding = replicate toPad 0
+  binary = asBytes $ bits ++ padding
+  in if   (length (bits ++ padding) `mod` 8) /= 0
+     then error "fromChunks': bug in binary conversion"
+     else map fromBinary binary
+  where
+    chunksToBin :: [Chunk] -> [[Word8]]
+    chunksToBin [] = []
+    chunksToBin ((CharChunk c):cs)     = (toPaddedBinary (fromEnum c) 8) : chunksToBin cs
+    chunksToBin ((BinaryChunk v b):cs) = (toPaddedBinary v            b) : chunksToBin cs
+
+    toPaddedBinary :: Integral a => a -> Int -> [Word8]
+    toPaddedBinary x padTo = let
+      x' = toBinary x []
+      padding = replicate (padTo - length x') 0
+      in if   (padTo - length x') < 0
+         then drop (abs $ padTo - length x') x'
+         else padding ++ x'
+
+    toBinary :: Integral a => a -> [Word8] -> [Word8]
+    toBinary 0 [] = [0]
+    toBinary 0 bs = bs
+    toBinary x bs = toBinary (x `div` 2) (fromIntegral x `mod` 2 : bs)
+
+    asBytes :: [Word8] -> [[Word8]]
+    asBytes [] = []
+    asBytes xs = (take 8 xs) : (asBytes $ drop 8 xs)
+
+    fromBinary :: [Word8] -> Word8
+    fromBinary bs = let
+      withPowers = zip bs (reverse [0..7])
+      in foldr1 (+) (map (\(b,p) -> b * 2^p) withPowers)
 
 type CList = [Chunk] -> [Chunk]
 

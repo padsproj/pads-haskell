@@ -26,79 +26,42 @@ import           Test.HUnit hiding (test)
 import Language.Pads.Padsc
 import Language.Pads.DataGen.GenTestingTH
 
-fromChunks :: [Chunk] -> IO B.ByteString
-fromChunks cs = do
-    let bits = foldr getBits 0 cs
-    i <- combineChunks cs bits
-    w8s <- reverse <$> createWord8s i
-    -- return guard: when >=8 leading zeroes are randomly generated,
-    -- createWord8s behaves improperly by stripping them - add them back in here
-    return $ if   length w8s /= bits `div` 8
-             then B.pack $ (replicate ((bits `div` 8) - length w8s) 0) ++ w8s
-             else B.pack w8s
-
-    where
-        getBits :: Chunk -> Int -> Int
-        getBits (CharChunk _)     z = 8 + z
-        getBits (BinaryChunk _ b) z = b + z
-
-        combineChunks :: [Chunk] -> Int -> IO Integer
-        combineChunks [] _ = return 0
-        combineChunks cs 0 = case cs of [BinaryChunk _ 0] -> return 0
-                                        _ -> error $ "ran out of bits" ++ show cs
-        combineChunks ((CharChunk c):cs) bs = do
-            let i = ((fromIntegral . chrToWord8) c) `shiftL` (bs - 8)
-            rest <- combineChunks cs (bs - 8)
-            return $ i + rest
-        combineChunks ((BinaryChunk v b):cs) bs = do
-            let i = (fromIntegral $ v .&. (2^b - 1)) `shiftL` (bs - b)
-            rest <- combineChunks cs (bs - b)
-            return $ i + rest
-
-        -- Outcome will need to be reversed
-        createWord8s :: Integer -> IO [Word8]
-        createWord8s 0 = return []
-        createWord8s i = do
-            let w = fromIntegral $ i .&. 255
-            rest <- createWord8s (i `shiftR` 8)
-            return (w:rest)
-
-fromChunks' :: [Chunk] -> [Word8]
-fromChunks' cs = let
-  bits = concat $ chunksToBin cs
-  toPad = case (8 - ((length bits) `mod` 8)) of 8 -> 0; x -> x
-  padding = replicate toPad 0
-  binary = asBytes $ bits ++ padding
-  in if   (length (bits ++ padding) `mod` 8) /= 0
-     then error "fromChunks': bug in binary conversion"
-     else map fromBinary binary
-  where
-    chunksToBin :: [Chunk] -> [[Word8]]
-    chunksToBin [] = []
-    chunksToBin ((CharChunk c):cs) = (toPaddedBinary (fromEnum c) 8) : chunksToBin cs
-    chunksToBin ((BinaryChunk v b):cs) = (toPaddedBinary v b) : chunksToBin cs
-
-    toPaddedBinary :: Integral a => a -> Int -> [Word8]
-    toPaddedBinary x padTo = let
-      x' = toBinary x []
-      padding = replicate (padTo - length x') 0
-      in if   (padTo - length x') < 0
-         then drop (abs $ padTo - length x') x'
-         else padding ++ x'
-
-    toBinary :: Integral a => a -> [Word8] -> [Word8]
-    toBinary 0 [] = [0]
-    toBinary 0 bs = bs
-    toBinary x bs = toBinary (x `div` 2) (fromIntegral x `mod` 2 : bs)
-
-    asBytes :: [Word8] -> [[Word8]]
-    asBytes [] = []
-    asBytes xs = (take 8 xs) : (asBytes $ drop 8 xs)
-
-    fromBinary :: [Word8] -> Word8
-    fromBinary bs = let
-      withPowers = zip bs (reverse [0..7])
-      in foldr1 (+) (map (\(b,p) -> b * 2^p) withPowers)
+-- fromChunks :: [Chunk] -> IO B.ByteString
+-- fromChunks cs = do
+--     let bits = foldr getBits 0 cs
+--     i <- combineChunks cs bits
+--     w8s <- reverse <$> createWord8s i
+--     -- return guard: when >=8 leading zeroes are randomly generated,
+--     -- createWord8s behaves improperly by stripping them - add them back in here
+--     return $ if   length w8s /= bits `div` 8
+--              then B.pack $ (replicate ((bits `div` 8) - length w8s) 0) ++ w8s
+--              else B.pack w8s
+--
+--     where
+--         getBits :: Chunk -> Int -> Int
+--         getBits (CharChunk _)     z = 8 + z
+--         getBits (BinaryChunk _ b) z = b + z
+--
+--         combineChunks :: [Chunk] -> Int -> IO Integer
+--         combineChunks [] _ = return 0
+--         combineChunks cs 0 = case cs of [BinaryChunk _ 0] -> return 0
+--                                         _ -> error $ "ran out of bits" ++ show cs
+--         combineChunks ((CharChunk c):cs) bs = do
+--             let i = ((fromIntegral . chrToWord8) c) `shiftL` (bs - 8)
+--             rest <- combineChunks cs (bs - 8)
+--             return $ i + rest
+--         combineChunks ((BinaryChunk v b):cs) bs = do
+--             let i = (fromIntegral $ v .&. (2^b - 1)) `shiftL` (bs - b)
+--             rest <- combineChunks cs (bs - b)
+--             return $ i + rest
+--
+--         -- Outcome will need to be reversed
+--         createWord8s :: Integer -> IO [Word8]
+--         createWord8s 0 = return []
+--         createWord8s i = do
+--             let w = fromIntegral $ i .&. 255
+--             rest <- createWord8s (i `shiftR` 8)
+--             return (w:rest)
 
 sampleSize = 100 -- used for "cycle" testing - generate, serialize, parse
 
@@ -193,6 +156,13 @@ myTupleTest_got = fromCL $ myTuple_serialize (1, 10)
 myTupleTest
   = TestCase (myTupleTest_expected @=? myTupleTest_got)
 
+myTupleCycleTest_name = "MyTuple Cycle"
+myTupleCycleTest = do
+  ts <- replicateM sampleSize myTuple_genM
+  let ts_serialized = map ((map word8ToChr) . fromChunks' . fromCL . myTuple_serialize) ts
+  let ts_parsed = map (fst . fst . myTuple_parseS) ts_serialized
+  return $ all (== True) (map (\(x,y) -> x == y) (zip ts ts_parsed))
+
 
 [pads| type Byte = Bits8 8 |]
 
@@ -201,23 +171,29 @@ byteTest_expected = [(BinaryChunk 254) 8]
 byteTest_got = fromCL $ byte_serialize (254 :: Byte)
 byteTest = TestCase (byteTest_expected @=? byteTest_got)
 
-
-[pads| type JustAChar = Char |]
-
-justACharTest_name = "JustAChar"
-justACharTest_expected = [CharChunk 'a']
-justACharTest_got = fromCL $ justAChar_serialize 'a'
-justACharTest
-  = TestCase (justACharTest_expected @=? justACharTest_got)
+byteCycleTest_name = "Byte Cycle"
+byteCycleTest = do
+  ts <- (filter (/= (chrToWord8 '\n'))) <$> replicateM sampleSize byte_genM
+  let ts_serialized = map ((map word8ToChr) . fromChunks' . fromCL . byte_serialize) ts
+  let ts_parsed = map (fst . fst . byte_parseS) ts_serialized
+  return $ all (== True) (map (\(x,y) -> x == y) (zip ts ts_parsed))
 
 
-[pads| type TwoBytes = (Byte, Byte) |]
+[pads| type TwoBytes = (Byte, Byte)
+       type TwoBytesP = partition TwoBytes using none |] -- TODO
 
 twoBytesTest_name = "TwoBytes"
 twoBytesTest_expected = [(BinaryChunk 0) 8, (BinaryChunk 122) 8]
 twoBytesTest_got = fromCL $ twoBytes_serialize ((0, 122) :: TwoBytes)
 twoBytesTest
   = TestCase (twoBytesTest_expected @=? twoBytesTest_got)
+
+twoBytesCycleTest_name = "TwoBytes Cycle"
+twoBytesCycleTest = do
+  ts <- replicateM sampleSize twoBytes_genM
+  let ts_serialized = map ((map word8ToChr) . fromChunks' . fromCL . twoBytes_serialize) ts
+  let ts_parsed = map (fst . fst . twoBytesP_parseS) ts_serialized
+  return $ all (== True) (map (\(x,y) -> x == y) (zip ts ts_parsed))
 
 -- Nested tuple
 [pads| type TupleN = (Int, ',', (Int,':',Int), ';', Int) |]
@@ -258,9 +234,8 @@ sepTermListTest
   = TestCase (sepTermListTest_expected @=? sepTermListTest_got)
 
 sepTermListBytesTest_name = "SepTermList Bytes"
-sepTermListBytesTest_expected = B.pack [10, 124, 5, 88]
-sepTermListBytesTest_got
-  = (unsafePerformIO $ (fromChunks $ sepTermListTest_got))
+sepTermListBytesTest_expected = [10, 124, 5, 88]
+sepTermListBytesTest_got = fromChunks' sepTermListTest_got
 sepTermListBytesTest
   = TestCase (sepTermListBytesTest_expected @=? sepTermListBytesTest_got)
 
@@ -283,21 +258,17 @@ pixelTest
   = TestCase (pixelTest_expected @=? pixelTest_got)
 
 pixelBytesTest_name = "Pixel Bytes"
-pixelBytesTest_expected = B.pack [255, 129, 0, 17]
-pixelBytesTest_got
-  = (unsafePerformIO $ (fromChunks $ (pixelTest_got)))
+pixelBytesTest_expected = [255, 129, 0, 17]
+pixelBytesTest_got = fromChunks' pixelTest_got
 pixelBytesTest
   = TestCase (pixelBytesTest_expected @=? pixelBytesTest_got)
 
 pixelCycleTest_name = "Pixel Cycle"
-pixelCycleTest_invariant = do
+pixelCycleTest = do
   ps <- replicateM sampleSize pixel_genM
-  ps_cs <- mapM (fromChunks . fromCL . pixel_serialize) ps
-  let ps_s = map ((map word8ToChr) . B.unpack) ps_cs
-  let ps_p = map (fst . fst . pixelNone_parseS) ps_s
-  return $ all (\(x,y) -> x == y) (zip ps ps_p)
-pixelCycleTest
-  = TestCase (assert pixelCycleTest_invariant)
+  let ps_serialized = map ((map word8ToChr) . fromChunks' . fromCL . pixel_serialize) ps
+  let ps_parsed = map (fst . fst . pixelNone_parseS) ps_serialized
+  return $ all (\(x,y) -> x == y) (zip ps ps_parsed)
 
 -- Constants in records
 [pads| data Constants = Constants { var1 :: Int
@@ -510,9 +481,11 @@ tests = TestList [ charTest_name              ~: charTest
                  , myStringCTest_name         ~: myStringCTest
                  , myStringCCycleTest_name    ~: myStringCCycleTest
                  , myTupleTest_name           ~: myTupleTest
+                 , myTupleCycleTest_name      ~: myTupleCycleTest
                  , byteTest_name              ~: byteTest
-                 , justACharTest_name         ~: justACharTest
+                 , byteCycleTest_name         ~: byteCycleTest
                  , twoBytesTest_name          ~: twoBytesTest
+                 , twoBytesCycleTest_name     ~: twoBytesCycleTest
                  , nestedTupleTest_name       ~: nestedTupleTest
                  , regularListTest_name       ~: regularListTest
                  , sepListTest_name           ~: sepListTest
