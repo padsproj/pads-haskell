@@ -43,7 +43,7 @@ import qualified Data.Map as M
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import Control.Monad
-import Language.Haskell.TH.Syntax (lift)
+import Language.Haskell.TH.Syntax --(lift, Name, NameFlavour(..), OccName)
 import qualified System.Random.MWC as MWC
 import qualified Debug.Trace as D
 
@@ -111,11 +111,12 @@ genPadsDecl derivation pd@(PadsDeclNew name args pat branch derives) = do
   parseS <- genPadsParseS name args pat
   printFL <- genPadsNewPrintFL name args pat branch
   genM <- genPadsNewGenM name args pat branch
+  serialize <- genPadsNewSerialize name args pat branch
   def <- genPadsNewDef name args pat branch
   let instances = mkPadsInstance name args (fmap patType pat)
   let sigs = mkPadsSignature name args (fmap patType pat)
   ast <- astDecl name pd
-  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ genM ++ def ++ instances ++ sigs
+  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ genM ++ serialize ++ def ++ instances ++ sigs
 
 genPadsDecl derivation pd@(PadsDeclObtain name args padsTy exp) = do
   let mdDec = mkObtainMDDecl name args padsTy
@@ -490,7 +491,6 @@ genPadsDataGenM name args patM padsData = do
   let body = genGenData padsData
   mkGeneratorFunction name args patM body
 
--- | TODO: test
 genPadsNewGenM :: UString -> [LString] -> (Maybe Pat) -> BranchInfo -> Q [Dec]
 genPadsNewGenM name args patM branch = do
   exp <- genGenBranchInfo branch
@@ -732,31 +732,46 @@ mkParseTyvar v = VarE (mkVarParserName v) -- should gensym these, but probably o
 
 genGenTy :: PadsTy -> Q Exp
 genGenTy pty = case pty of
-  PConstrain pat ty exp   -> genGenConstrain (return pat) ty (return exp)
-  PTransform src dest exp -> [| return $ error "genGenTy: PTransform unimplemented" |]
+  PConstrain pat ty exp   -> genGenConstrain pat ty exp
+  PTransform src dest exp -> [| (return :: a -> IO a) $ error "genGenTy: PTransform unimplemented" |]
   PList ty sep term       -> genGenList ty sep term
   PPartition ty exp       -> genGenTy ty
   PValue exp ty           -> genGenValue exp
   PApp tys argE           -> genGenTyApp tys argE
   PTuple tys              -> genGenTuple tys
   PExpression exp         -> [| return $(return exp) |]
-  PTycon c                -> return $ mkGenTycon c
+  PTycon c                -> mkGenTycon c
   PTyvar v                -> return $ mkGenTyvar v
 
 
 -- | Generate code that uses the runtime function 'untilM' to generate random
--- examples of data until one satisfies the constraint.
-genGenConstrain :: Q Pat -> PadsTy -> Q Exp -> Q Exp
+-- examples of data until one satisfies the constraint. If a predicate
+-- requires that the variable in question be exactly equal to a value,
+-- untilM is bypassed and that value is assigned directly.
+-- 
+-- e.g. constrain tcpDstPort :: Bits16 16 <| tcpDstPort == 22 |> will avoid
+-- creating new 16-bit values until one happens to be equal to 22, and will
+-- instead assign the literal 22 to tcpDstPort.
+genGenConstrain :: Pat -> PadsTy -> Exp -> Q Exp
 genGenConstrain pat pty e = do
   name <- newName "x"
   orig <- bindS (varP name) (genGenTy pty)
-  gen  <- bindS pat [| $(dyn "untilM") $(lamE [pat] e) (const $(genGenTy pty)) $(varE name) |]
-  pat' <- pat
-  ret  <- noBindS [| return $(fromVarP pat') |]
+  let pat' = return pat; e' = return e
+  let (VarE x) = fromVarP pat
+  let xName = nameBase x
+  gen <- case e of
+    (UInfixE (VarE (Name (OccName x)    NameS))
+             (VarE (Name (OccName "==") NameS))
+             y)                                  -> bindS pat' [| return $(return y) |]
+    (UInfixE y
+             (VarE (Name (OccName "==") NameS))
+             (VarE (Name (OccName x)    NameS))) -> bindS pat' [| return $(return y) |]
+    _ -> bindS pat' [| untilM $(lamE [pat'] e') (const $(genGenTy pty)) recLimit $(varE name) |]
+  ret  <- noBindS [| return $(return $ fromVarP pat) |]
   return $ DoE [orig,gen,ret]
   where
-    fromVarP :: Pat -> Q Exp
-    fromVarP (VarP x) = varE x
+    fromVarP :: Pat -> Exp
+    fromVarP (VarP x) = VarE x
 
 -- | Generate a list representing a Pads list type. We ignore the separator and
 -- PadsTy termination condition here and include them in the data during
@@ -793,9 +808,9 @@ genGenTyApp tys expM = do
   return (foldl1 AppE (tys' ++ Maybe.maybeToList expM))
 
 -- | Basically same as mkParseTycon, but the name that results is different.
-mkGenTycon :: QString -> Exp
-mkGenTycon [c] = VarE (mkTyGeneratorName c)
-mkGenTycon x   = error $ "mkGenTycon: " ++ show x -- TODO: EOF and EOR, see mkParseTycon
+mkGenTycon :: QString -> Q Exp
+mkGenTycon [c] = varE (mkTyGeneratorName c)
+mkGenTycon x   = [| error $ "mkGenTycon: " ++ show x |] -- TODO: EOF and EOR, see mkParseTycon
 
 mkGenTyvar :: String -> Exp
 mkGenTyvar v = VarE (mkVarGeneratorName v)
@@ -978,6 +993,11 @@ genPadsDataSerialize name args patM padsData = do
   body <- genSerializeData padsData ((Just . VarE . mkName) sArgName)
   return [mkSerializerFunction name args patM body]
 
+genPadsNewSerialize :: UString -> [LString] -> Maybe Pat -> BranchInfo -> Q [Dec]
+genPadsNewSerialize name args pat branch = do
+  exp <- genSerializeUnion [branch] ((Just . VarE . mkName) sArgName)
+  return [mkSerializerFunction name args pat exp]
+
 mkSerializerFunction :: UString -> [LString] -> Maybe Pat -> Exp -> Dec
 mkSerializerFunction name args patM body =
   FunD serializerName [Clause (serializerArgs ++ [(VarP . mkName) sArgName]) (NormalB body) []]
@@ -991,14 +1011,14 @@ genSerializeData (PSwitch exp pbs) rep = genSerializeSwitch exp pbs rep
 
 genSerializeUnion :: [BranchInfo] -> Maybe Exp -> Q Exp
 genSerializeUnion bs (Just rep) = do
-  matches <- concat <$> mapM (genSerializeBranchInfo False) bs
+  matches <- concat <$> mapM genSerializeBranchInfo bs
   return $ CaseE rep matches
 genSerializeUnion bs _ = error "genSerializeUnion: in progress"
 
 -- | Dispatch to the appripriate function based on the type of BranchInfo.
-genSerializeBranchInfo :: Bool -> BranchInfo -> Q [Match]
-genSerializeBranchInfo doDef (BRecord c fields predM) = genSerializeRecord c fields predM
-genSerializeBranchInfo doDef (BConstr c args predM) = genSerializeConstr doDef c args predM
+genSerializeBranchInfo :: BranchInfo -> Q [Match]
+genSerializeBranchInfo (BRecord c fields predM) = genSerializeRecord c fields predM
+genSerializeBranchInfo (BConstr c args predM) = genSerializeConstr c args predM
 
 
 genSerializeRecord :: UString -> [FieldInfo] -> Maybe Exp -> Q [Match]
@@ -1023,8 +1043,8 @@ genSerializeRecord recName fields predM = do
     app s Nothing  t = if hasRep t then s `appE` (genDefTy t) else s
 
 
-genSerializeConstr :: Bool -> String -> [ConstrArg] -> Maybe Exp -> Q [Match]
-genSerializeConstr _ name args predM = do
+genSerializeConstr :: String -> [ConstrArg] -> Maybe Exp -> Q [Match]
+genSerializeConstr name args predM = do
   let tys = [ty | (_,ty) <- args]
   let tys' = map (flip genSerializeTy Nothing) tys
   names <- sequence [newName "x" | ty <- (filter hasRep tys)]
@@ -1096,7 +1116,7 @@ genSerializeList ty sepM termM r = do
               Nothing  -> (LamE lamArgs $ LetE letDecs (VarE cs''))
 
 genSerializePartition :: PadsTy -> Exp -> (Maybe Exp) -> Q Exp
-genSerializePartition ty exp r = [| error "genSerializeTy: PPartition unimplemented" |]
+genSerializePartition ty exp r = genSerializeTy ty r --[| error "genSerializeTy: PPartition unimplemented" |]
 
 -- | PValues are stored in a parse result but do not appear in the original
 -- data. Relying on all serializations being concatenated, where each
@@ -1153,12 +1173,13 @@ genSerializeExp exp _ = [| exp_serialize $(return exp) |] --error "genSerializeE
 genSerializeTycon :: QString -> (Maybe Exp) -> Q Exp
 genSerializeTycon [c] (Just rep) = return $ AppE ((VarE . mkTySerializerName) c) rep
 genSerializeTycon [c] Nothing    = return $       (VarE . mkTySerializerName) c
-genSerializeTycon c _ = [| error $ "genSerializeTy: qualified names unsupported: " ++ c |]
+genSerializeTycon c _ = [| error $ "genSerializeTy: qualified names unsupported: " ++ (concat c) |]
 
 -- | A PTyvar is represented according to mkTySerializerVarName, where the
 -- resultant name will stand for a serializer the user must provide.
 genSerializeTyvar :: String -> (Maybe Exp) -> Q Exp
-genSerializeTyvar s r = return $ VarE $ mkTySerializerVarName s
+genSerializeTyvar s (Just rep) = return $ (VarE $ mkTySerializerVarName s) `AppE` rep
+genSerializeTyvar s Nothing    = return $ (VarE $ mkTySerializerVarName s)
 
 -------------------------------------------------------------------------------
 -- Generating Printing Function from a Declaration

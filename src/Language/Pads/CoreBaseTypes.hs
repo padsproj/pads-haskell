@@ -940,7 +940,7 @@ data Chunk = CharChunk   Char
            | BinaryChunk { val :: Integer, bits :: Int }
     deriving (Eq, Show, Lift)
 
--- | fromChunks' provides a translation from Chunks to a list of bytes. It
+-- | fromChunks provides a translation from Chunks to a list of bytes. It
 -- accomplishes this in time linear to the length of the list of Chunks. It
 -- converts each chunk into "binary" (a list of 1's and 0's) the splits that
 -- into "bytes" (lists of length 8 each) to simplify combination in non-byte-
@@ -952,14 +952,14 @@ data Chunk = CharChunk   Char
 -- represent binary but in union with the way the parsing engine handles non-
 -- byte-aligned data.
 -- TODO: probably make this take a CList to improve abstraction
-fromChunks' :: [Chunk] -> [Word8]
-fromChunks' cs = let
+fromChunks :: [Chunk] -> [Word8]
+fromChunks cs = let
   bits = concat $ chunksToBin cs
   toPad = case (8 - ((length bits) `mod` 8)) of 8 -> 0; x -> x
   padding = replicate toPad 0
   binary = asBytes $ bits ++ padding
   in if   (length (bits ++ padding) `mod` 8) /= 0
-     then error "fromChunks': bug in binary conversion"
+     then error "fromChunks: bug in binary conversion"
      else map fromBinary binary
   where
     chunksToBin :: [Chunk] -> [[Word8]]
@@ -1277,17 +1277,14 @@ mkStr c = "'" ++ [c] ++ "'"
 
 recLimit = 10000
 
-infix 4 ===
-
-(===) :: Eq a => a -> a -> Bool
-x === y = x == y
-
 untilM :: Monad m => (a -> Bool) -> (a -> m a) -> Integer -> a -> m a
 untilM p f i z = do
-  when (i <= 0) (error $ "untilM: recursion too deep. If you want to increase "
-                      ++ "the recursion limit, edit it (currently set to "
-                      ++ show recLimit
-                      ++ " and bound to 'recLimit' in CoreBaseTypes.hs)")
+  when (i <= 0) (error $ "untilM: recursion too deep. Your description probably "
+                      ++ "contains a (too-)narrow constraint to efficiently "
+                      ++ "generate data that satisfies it. To increase "
+                      ++ "the recursion limit ('recLimit' in CoreBaseTypes.hs), "
+                      ++ "currently set to " ++ show recLimit
+                      ++ ", edit it and try again.")
   let b = p z
   if b
     then return z
