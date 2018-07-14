@@ -2,17 +2,8 @@
     MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
     DeriveDataTypeable, ScopedTypeVariables #-}
 module IntPair where
-import Language.Pads.Source
-import Language.Pads.Errors 
-import Language.Pads.Generic
-import Language.Pads.MetaData
-import Language.Pads.CoreBaseTypes
-import Language.Pads.Quote
-import Language.Pads.RegExp
-import qualified Language.Pads.BaseTypes as BT
 
-
-import Language.Pads.PadsParser
+import Language.Pads.Padsc
 
 
 import Data.Data
@@ -25,9 +16,9 @@ import Data.Word
 
 [pads| 
 
-type IntPair a = (BT.Line Int,":",a)
+type IntPair a = (Line Int,":",a)
 
-type Line a = (a, "||")
+--type Line a = (a, "||")
 
 
 data MyVoid = Myvoid Void

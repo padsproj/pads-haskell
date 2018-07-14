@@ -104,12 +104,15 @@ tests:
     - mtl >= 2.2.2
     - random >= 1.1
 
-  # Add more Examples like this one if you want to run tests separately from Main.hs:
-  small:
-    main: examples/Small.hs
+  # Add more examples like this one if you want to run tests separately from
+  # examples/Main.hs: (should your module be named something other than Main,
+  # the -main-is flag will be necessary):
+  gen:
+    main: src/Language/Pads/DataGen/GenTesting.hs
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -main-is Language.Pads.DataGen.GenTesting
     dependencies:
     - pads-haskell
