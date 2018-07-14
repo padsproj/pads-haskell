@@ -28,7 +28,7 @@ import           Data.ByteString.Internal
 import qualified Data.ByteString.Char8 as C
 
 import Language.Pads.PadsPrinter
-import Language.Pads.DataGen.Rand
+import Language.Pads.DataGen.Generation
 
 import Language.Haskell.TH as TH
 import Language.Haskell.TH.Syntax
@@ -47,9 +47,6 @@ import Control.Monad
 import Control.Monad.Reader
 import System.Random.MWC
 import System.IO.Unsafe (unsafePerformIO)
-
-{-# NOINLINE gen #-}
-!gen = unsafePerformIO createSystemRandom
 
 
 -- | Metadata type for a PADS Char
@@ -80,31 +77,10 @@ char_printFL (c,bmd) = addString [c]
 char_genM :: M Char
 char_genM = randLetter --gen = randLetter gen
 
+char_serialize :: Char -> CList
 char_serialize c = toCL [CharChunk c]
 
 ---------------------------------------------
-
-type CharNB = Char
-type CharNB_md = Base_md
-
-charNB_parseM :: PadsParser (CharNB, Base_md)
-charNB_parseM =
-    handleEOF def "CharNB" $
-    handleEOR def "CharNB" $ do
-        c <- takeBitsP 8
-        returnClean (S.word8ToChr (fromIntegral c :: Word8))
-
-charNB_def :: Char
-charNB_def = char_def
-
-charNB_printFL :: PadsPrinter (CharNB, md)
-charNB_printFL (c, bmd) = addString [c]
-
-charNB_genM :: M Char
-charNB_genM = char_genM
-
-
------------------------------------------------------------------
 
 type BitBool = Bool
 type BitBool_md = Base_md
@@ -159,8 +135,8 @@ bitField_genM i = do
   gen <- ask
   liftIO $ (toInteger . floor) <$> uniformR (0::Double,2^i::Double) gen
 
---bitField_serialize :: Integral a => a -> BitField -> CList
-bitField_serialize b v = toCL [BinaryChunk v b]
+bitField_serialize :: Integral a => a -> BitField -> CList
+bitField_serialize b v = toCL [BinaryChunk v (fromIntegral b)]
 
 
 type Bits8 = Word8
@@ -561,23 +537,6 @@ string_serialize s = toCL $ map CharChunk s
 
 -----------------------------------------------------------------
 
-type StringNB = String
-type StringNB_md = Base_md
-
-stringNB_parseM :: PadsParser (String, Base_md)
-stringNB_parseM = do
-    str <- drainSourceNBP
-    returnClean str
-
-stringNB_def = string_def
-
-stringNB_printFL :: PadsPrinter (String, Base_md)
-stringNB_printFL = string_printFL
-
-stringNB_genM :: M StringNB
-stringNB_genM = string_genM
-
------------------------------------------------------------------
 
 newtype Text = Text S.RawStream
   deriving (Eq, Show, Data, Typeable, Ord)
@@ -668,27 +627,6 @@ stringC_serialize c s = (string_serialize s) `cApp` (toCL [CharChunk c])
 
 -----------------------------------------------------------------
 
-type StringCNB = String
-type StringCNB_md = Base_md
-
-stringCNB_parseM :: Char -> PadsParser (StringCNB, Base_md)
-stringCNB_parseM c =
-    handleEOF (stringCNB_def c) "StringCNB" $
-    handleEOR (stringCNB_def c) "StringCNB" $ do
-        str <- satisfyNBP (\c' -> c /= c')
-        returnClean str
-
-stringCNB_def :: Char -> StringCNB
-stringCNB_def = stringC_def
-
-stringCNB_printFL :: Char -> PadsPrinter (StringCNB, Base_md)
-stringCNB_printFL = stringC_printFL
-
-stringCNB_genM :: Char -> M StringCNB
-stringCNB_genM = stringC_genM
-
-
------------------------------------------------------------------
 
 -- | string of fixed length
 type StringFW = String
@@ -713,33 +651,9 @@ stringFW_printFL n (str, bmd)  = addString (take n str)
 stringFW_genM :: Int -> M StringFW
 stringFW_genM i = replicateM i randLetter
 
+stringFW_serialize :: Int -> StringFW -> CList
 stringFW_serialize _ = string_serialize
 
-
------------------------------------------------------------------
-
-type StringFWNB = String
-type StringFWNB_md = Base_md
-
-stringFWNB_parseM :: Int -> PadsParser (StringFW, Base_md)
-stringFWNB_parseM 0 = returnClean ""
-stringFWNB_parseM n =
-    handleEOF (stringFWNB_def n) "StringFWNB" $
-    handleEOR (stringFWNB_def n) "StringFWNB" $ do
-        str <- takeBytesNBP n
-        let str' = map S.word8ToChr (B.unpack str)
-        if (length str') == n
-            then returnClean str'
-            else returnError (stringFWNB_def n) (E.Insufficient (length str') n)
-
-stringFWNB_def :: Int -> StringFW
-stringFWNB_def n = replicate n 'X'
-
-stringFWNB_printFL :: Int -> PadsPrinter (StringFW, Base_md)
-stringFWNB_printFL = stringFW_printFL
-
-stringFWNB_genM :: Int -> M StringFWNB
-stringFWNB_genM = stringFW_genM
 
 -----------------------------------------------------------------
 
@@ -765,6 +679,9 @@ stringVW_genM :: Int -> M StringVW
 stringVW_genM i = do
   i' <- intBound_genM 0 i
   replicateM i' randLetter
+
+stringVW_serialize :: Int -> StringVW -> CList
+stringVW_serialize i s = string_serialize s
 
 ---- string of variable length (end if EOR)
 --type StringVW = String
@@ -925,6 +842,131 @@ stringPESC_serialize :: (Bool, (Char, [Char])) -> StringPESC -> CList
 stringPESC_serialize _ _ = error "stringPESC_serialize: unimplemented"
 
 -----------------------------------------------------------------
+-- Non-byte-aligned (NB) types
+
+
+type CharNB = Char
+type CharNB_md = Base_md
+
+charNB_parseM :: PadsParser (CharNB, Base_md)
+charNB_parseM =
+    handleEOF def "CharNB" $
+    handleEOR def "CharNB" $ do
+        c <- takeBitsP 8
+        returnClean (S.word8ToChr (fromIntegral c :: Word8))
+
+charNB_def :: Char
+charNB_def = char_def
+
+charNB_printFL :: PadsPrinter (CharNB, md)
+charNB_printFL (c, bmd) = addString [c]
+
+charNB_genM :: M Char
+charNB_genM = char_genM
+
+charNB_serialize :: CharNB -> CList
+charNB_serialize = char_serialize
+
+-----------------------------------------------------------------
+
+
+type StringNB = String
+type StringNB_md = Base_md
+
+stringNB_parseM :: PadsParser (String, Base_md)
+stringNB_parseM = do
+    str <- drainSourceNBP
+    returnClean str
+
+stringNB_def = string_def
+
+stringNB_printFL :: PadsPrinter (String, Base_md)
+stringNB_printFL = string_printFL
+
+stringNB_genM :: M StringNB
+stringNB_genM = string_genM
+
+-----------------------------------------------------------------
+
+type StringCNB = String
+type StringCNB_md = Base_md
+
+stringCNB_parseM :: Char -> PadsParser (StringCNB, Base_md)
+stringCNB_parseM c =
+    handleEOF (stringCNB_def c) "StringCNB" $
+    handleEOR (stringCNB_def c) "StringCNB" $ do
+        str <- satisfyNBP (\c' -> c /= c')
+        returnClean str
+
+stringCNB_def :: Char -> StringCNB
+stringCNB_def = stringC_def
+
+stringCNB_printFL :: Char -> PadsPrinter (StringCNB, Base_md)
+stringCNB_printFL = stringC_printFL
+
+stringCNB_genM :: Char -> M StringCNB
+stringCNB_genM = stringC_genM
+
+stringCNB_serialize :: Char -> StringC -> CList
+stringCNB_serialize = stringC_serialize
+
+
+-----------------------------------------------------------------
+
+type StringFWNB = String
+type StringFWNB_md = Base_md
+
+stringFWNB_parseM :: Int -> PadsParser (StringFW, Base_md)
+stringFWNB_parseM 0 = returnClean ""
+stringFWNB_parseM n =
+    handleEOF (stringFWNB_def n) "StringFWNB" $
+    handleEOR (stringFWNB_def n) "StringFWNB" $ do
+        str <- takeBytesNBP n
+        let str' = map S.word8ToChr (B.unpack str)
+        if (length str') == n
+            then returnClean str'
+            else returnError (stringFWNB_def n) (E.Insufficient (length str') n)
+
+stringFWNB_def :: Int -> StringFW
+stringFWNB_def n = replicate n 'X'
+
+stringFWNB_printFL :: Int -> PadsPrinter (StringFW, Base_md)
+stringFWNB_printFL = stringFW_printFL
+
+stringFWNB_genM :: Int -> M StringFWNB
+stringFWNB_genM = stringFW_genM
+
+stringFWNB_serialize :: Int -> StringFWNB -> CList
+stringFWNB_serialize _ = string_serialize
+
+-----------------------------------------------------------------
+
+type BytesNB = S.RawStream
+type BytesNB_md = Base_md
+
+bytesNB_parseM :: Int -> PadsParser (BytesNB, BytesNB_md)
+bytesNB_parseM n =
+    handleEOF (def1 n) "BytesNB" $
+    handleEOR (def1 n) "BytesNB" $ do
+        bytes <- takeBytesNBP n
+        if B.length bytes == n
+            then returnClean bytes
+            else returnError (def1 n) (E.Insufficient (B.length bytes) n)
+
+bytesNB_printFL :: Int -> PadsPrinter (BytesNB, BytesNB_md)
+bytesNB_printFL = bytes_printFL
+
+bytesNB_def :: Int -> BytesNB
+bytesNB_def = bytes_def
+
+bytesNB_genM :: Int -> M BytesNB
+bytesNB_genM = bytes_genM
+
+bytesNB_serialize :: Int -> BytesNB -> CList
+bytesNB_serialize = bytes_serialize
+
+-----------------------------------------------------------------
+
 
 -- | Chunks represent an abstraction of literal data, and allow for easy
 -- consumption and concatenation into one ByteString/Word8 (TODO) list of data, which
@@ -942,50 +984,49 @@ data Chunk = CharChunk   Char
 
 -- | fromChunks provides a translation from Chunks to a list of bytes. It
 -- accomplishes this in time linear to the length of the list of Chunks. It
--- converts each chunk into "binary" (a list of 1's and 0's) the splits that
+-- converts each chunk into "bits" (a list of 1's and 0's), then splits that
 -- into "bytes" (lists of length 8 each) to simplify combination in non-byte-
 -- aligned cases.
 -- When the data does not add up to a multiple of full bytes, the resultant
 -- binary can be thought of as being "left-aligned," e.g. a description of just
--- 3 bits of data would result in a byte where the 3 *most* significant bits
--- are the ones that get described, somewhat in opposition to the way Chunks
--- represent binary but in union with the way the parsing engine handles non-
--- byte-aligned data.
--- TODO: probably make this take a CList to improve abstraction
+-- 3 bits of data would result in a byte where the 3 most significant bits
+-- are the relevant ones, somewhat in opposition to the way Chunks represent
+-- binary but in harmony with the way the parsing engine handles non-byte-
+-- aligned data.
 fromChunks :: [Chunk] -> [Word8]
 fromChunks cs = let
-  bits = concat $ chunksToBin cs
+  bits = concat $ chunksToBits cs
   toPad = case (8 - ((length bits) `mod` 8)) of 8 -> 0; x -> x
   padding = replicate toPad 0
-  binary = asBytes $ bits ++ padding
+  bytes = asBytes $ bits ++ padding
   in if   (length (bits ++ padding) `mod` 8) /= 0
      then error "fromChunks: bug in binary conversion"
-     else map fromBinary binary
+     else map fromBytes bytes
   where
-    chunksToBin :: [Chunk] -> [[Word8]]
-    chunksToBin [] = []
-    chunksToBin ((CharChunk c):cs)     = (toPaddedBinary (fromEnum c) 8) : chunksToBin cs
-    chunksToBin ((BinaryChunk v b):cs) = (toPaddedBinary v            b) : chunksToBin cs
+    chunksToBits :: [Chunk] -> [[Word8]]
+    chunksToBits [] = []
+    chunksToBits ((CharChunk c):cs)     = (toPaddedBits (fromEnum c) 8) : chunksToBits cs
+    chunksToBits ((BinaryChunk v b):cs) = (toPaddedBits v            b) : chunksToBits cs
 
-    toPaddedBinary :: Integral a => a -> Int -> [Word8]
-    toPaddedBinary x padTo = let
-      x' = toBinary x []
+    toPaddedBits :: Integral a => a -> Int -> [Word8]
+    toPaddedBits x padTo = let
+      x' = toBits x []
       padding = replicate (padTo - length x') 0
       in if   (padTo - length x') < 0
          then drop (abs $ padTo - length x') x'
          else padding ++ x'
 
-    toBinary :: Integral a => a -> [Word8] -> [Word8]
-    toBinary 0 [] = [0]
-    toBinary 0 bs = bs
-    toBinary x bs = toBinary (x `div` 2) (fromIntegral x `mod` 2 : bs)
+    toBits :: Integral a => a -> [Word8] -> [Word8]
+    toBits 0 [] = [0]
+    toBits 0 bs = bs
+    toBits x bs = toBits (x `div` 2) (fromIntegral x `mod` 2 : bs)
 
     asBytes :: [Word8] -> [[Word8]]
     asBytes [] = []
     asBytes xs = (take 8 xs) : (asBytes $ drop 8 xs)
 
-    fromBinary :: [Word8] -> Word8
-    fromBinary bs = let
+    fromBytes :: [Word8] -> Word8
+    fromBytes bs = let
       withPowers = zip bs (reverse [0..7])
       in foldr1 (+) (map (\(b,p) -> b * 2^p) withPowers)
 
@@ -1250,27 +1291,6 @@ instance Pads1 Int Bytes Bytes_md where
   printFL1 = bytes_printFL
   def1 i = bytes_def i
 
-
-type BytesNB = S.RawStream
-type BytesNB_md = Base_md
-
-bytesNB_parseM :: Int -> PadsParser (BytesNB, BytesNB_md)
-bytesNB_parseM n =
-    handleEOF (def1 n) "BytesNB" $
-    handleEOR (def1 n) "BytesNB" $ do
-        bytes <- takeBytesNBP n
-        if B.length bytes == n
-            then returnClean bytes
-            else returnError (def1 n) (E.Insufficient (B.length bytes) n)
-
-bytesNB_printFL :: Int -> PadsPrinter (BytesNB, BytesNB_md)
-bytesNB_printFL = bytes_printFL
-
-bytesNB_def :: Int -> BytesNB
-bytesNB_def = bytes_def
-
-bytesNB_genM :: Int -> M BytesNB
-bytesNB_genM = bytes_genM
 
 {- Helper functions -}
 mkStr c = "'" ++ [c] ++ "'"

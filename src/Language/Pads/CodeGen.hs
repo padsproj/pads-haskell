@@ -31,7 +31,7 @@ import Language.Pads.TH
 import qualified Language.Pads.Errors as E
 import qualified Language.Pads.Source as S
 import Language.Pads.PadsPrinter
-import Language.Pads.DataGen.Rand
+import Language.Pads.DataGen.Generation
 
 import Language.Haskell.TH
 -- import Language.Haskell.TH.Syntax
@@ -733,7 +733,7 @@ mkParseTyvar v = VarE (mkVarParserName v) -- should gensym these, but probably o
 genGenTy :: PadsTy -> Q Exp
 genGenTy pty = case pty of
   PConstrain pat ty exp   -> genGenConstrain pat ty exp
-  PTransform src dest exp -> [| (return :: a -> IO a) $ error "genGenTy: PTransform unimplemented" |]
+  PTransform src dest exp -> [| (return :: a -> M a) $ error "genGenTy: PTransform unimplemented" |]
   PList ty sep term       -> genGenList ty sep term
   PPartition ty exp       -> genGenTy ty
   PValue exp ty           -> genGenValue exp
@@ -741,14 +741,14 @@ genGenTy pty = case pty of
   PTuple tys              -> genGenTuple tys
   PExpression exp         -> [| return $(return exp) |]
   PTycon c                -> mkGenTycon c
-  PTyvar v                -> return $ mkGenTyvar v
+  PTyvar v                -> mkGenTyvar v
 
 
 -- | Generate code that uses the runtime function 'untilM' to generate random
 -- examples of data until one satisfies the constraint. If a predicate
 -- requires that the variable in question be exactly equal to a value,
 -- untilM is bypassed and that value is assigned directly.
--- 
+--
 -- e.g. constrain tcpDstPort :: Bits16 16 <| tcpDstPort == 22 |> will avoid
 -- creating new 16-bit values until one happens to be equal to 22, and will
 -- instead assign the literal 22 to tcpDstPort.
@@ -757,15 +757,17 @@ genGenConstrain pat pty e = do
   name <- newName "x"
   orig <- bindS (varP name) (genGenTy pty)
   let pat' = return pat; e' = return e
-  let (VarE x) = fromVarP pat
-  let xName = nameBase x
+  let (VarE x) = fromVarP pat; xName = nameBase x
   gen <- case e of
-    (UInfixE (VarE (Name (OccName x)    NameS))
-             (VarE (Name (OccName "==") NameS))
-             y)                                  -> bindS pat' [| return $(return y) |]
-    (UInfixE y
-             (VarE (Name (OccName "==") NameS))
-             (VarE (Name (OccName x)    NameS))) -> bindS pat' [| return $(return y) |]
+    (UInfixE
+      (VarE (Name (OccName var)  NameS))
+      (VarE (Name (OccName "==") NameS))
+      y) | var == xName -> bindS pat' [| return $(return y) |]
+    (UInfixE
+      y
+      (VarE (Name (OccName "==") NameS))
+      (VarE (Name (OccName var)  NameS)))
+        | var == xName -> bindS pat' [| return $(return y) |]
     _ -> bindS pat' [| untilM $(lamE [pat'] e') (const $(genGenTy pty)) recLimit $(varE name) |]
   ret  <- noBindS [| return $(return $ fromVarP pat) |]
   return $ DoE [orig,gen,ret]
@@ -782,7 +784,7 @@ genGenList pty sep term =
     (_, Just (LLen l)) -> [| sequence $ replicate $(return l) $(genGenTy pty) |]
     _ -> do
       name <- newName "n"
-      bind <- bindS (varP name) [| $(dyn "intBound_genM") 0 100 |]
+      bind <- bindS (varP name) [| $(dyn "intBound_genM") 0 5000 |]
       ret  <- noBindS [| sequence $ replicate $(varE name) $(genGenTy pty) |]
       return $ DoE (bind : [ret])
 
@@ -809,11 +811,15 @@ genGenTyApp tys expM = do
 
 -- | Basically same as mkParseTycon, but the name that results is different.
 mkGenTycon :: QString -> Q Exp
-mkGenTycon [c] = varE (mkTyGeneratorName c)
-mkGenTycon x   = [| error $ "mkGenTycon: " ++ show x |] -- TODO: EOF and EOR, see mkParseTycon
+mkGenTycon [c] = (varE . mkTyGeneratorName) c
+mkGenTycon c = let
+  modName = (qName . init) c
+  genName = (nameBase . mkTyGeneratorName . last) c
+  in (varE . mkName) (modName ++ "." ++ genName)
+-- TODO: EOF and EOR, see mkParseTycon
 
-mkGenTyvar :: String -> Exp
-mkGenTyvar v = VarE (mkVarGeneratorName v)
+mkGenTyvar :: String -> Q Exp
+mkGenTyvar v = varE (mkVarGeneratorName v)
 
 -------------------------------------------------------------------------------
 -- * Generating Parsers from Union/Switch Expressions
@@ -909,7 +915,7 @@ genGenRecord c fields pred = do
   doStmts <- sequence $ map genGenField fields
   let labels = map mkName $ Maybe.catMaybes $ [label | (label,(_,ty),_) <- fields, hasRep ty]
   let conLabs = applyE (ConE (mkConstrName c) : map VarE labels)
-  returnStmt <- [| return ($(return conLabs)) |]
+  returnStmt <- [| (return :: a -> M a) ($(return conLabs)) |]
   return $ DoE (concat doStmts ++ [NoBindS returnStmt])
 
 -- | Generate the generator for a field of a Pads record; each one becomes a
@@ -932,7 +938,7 @@ genGenConstr c args pred = do
   binds <- sequence [bindS (varP n) ty | (n,ty) <- zip names tys']
   let constructor = (conE . mkName) c
   let toreturn = foldl1 appE (constructor : (map varE names))
-  ret <- noBindS [| return $toreturn |]
+  ret <- noBindS [| (return :: a -> M a) $toreturn |]
   return $ DoE (binds ++ [ret])
 
 -------------------------------------------------------------------------------
@@ -1047,10 +1053,10 @@ genSerializeConstr :: String -> [ConstrArg] -> Maybe Exp -> Q [Match]
 genSerializeConstr name args predM = do
   let tys = [ty | (_,ty) <- args]
   let tys' = map (flip genSerializeTy Nothing) tys
-  names <- sequence [newName "x" | ty <- (filter hasRep tys)]
+  names <- sequence [newName "x" | ty <- tys]
   let params = [varE n | n <- names]
-  let apps = listE [s `appE` p | (s,p) <- zip tys' params]
-  matchPat  <- conP (mkName name) [varP n | n <- names]
+  let apps = listE [if hasRep t then s `appE` p else s | (s,p,t) <- zip3 tys' params tys]
+  matchPat  <- conP (mkName name) [varP n | (n, t) <- zip names tys, hasRep t]
   matchBody <- normalB $ [| concatCs $apps |]
   return [Match matchPat matchBody []]
 
@@ -1166,14 +1172,19 @@ genSerializeTuple tys r = do
 -- characters, and strings, and will serialize them appropriately.
 genSerializeExp :: Exp -> (Maybe Exp) -> Q Exp
 genSerializeExp exp _ = [| exp_serialize $(return exp) |] --error "genSerializeExp: unexpected representation" --appE [| exp_serialize $(return exp) |] (return rep)
---genSerializeExp exp Nothing    = [| exp_serialize |]
 
 -- | A PTycon is represented according to mkTySerializerName, where the
 -- resultant name will be an in-scope runtime serializer.
 genSerializeTycon :: QString -> (Maybe Exp) -> Q Exp
-genSerializeTycon [c] (Just rep) = return $ AppE ((VarE . mkTySerializerName) c) rep
-genSerializeTycon [c] Nothing    = return $       (VarE . mkTySerializerName) c
-genSerializeTycon c _ = [| error $ "genSerializeTy: qualified names unsupported: " ++ (concat c) |]
+genSerializeTycon [c] r = case r of
+  (Just rep) -> return $ AppE ((VarE . mkTySerializerName) c) rep
+  Nothing    -> return $       (VarE . mkTySerializerName) c
+genSerializeTycon  c  r = let
+  modName = (qName . init) c
+  genName = (nameBase . mkTySerializerName . last) c
+  in case r of
+    (Just rep) -> return $ AppE ((VarE . mkName) (modName ++ "." ++ genName)) rep
+    Nothing    -> return $       (VarE . mkName) (modName ++ "." ++ genName)
 
 -- | A PTyvar is represented according to mkTySerializerVarName, where the
 -- resultant name will stand for a serializer the user must provide.

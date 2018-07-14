@@ -31,6 +31,7 @@ module Language.Pads.Padsc (
      module Language.Pads.BaseTypes,
      module Language.Pads.Pretty,
      module Language.Pads.PadsPrinter,
+     module Language.Pads.DataGen.Generation,
      module Data.Data,
      module Data.List,
      ppr, pretty
@@ -49,6 +50,7 @@ import Language.Pads.Syntax
 import Language.Pads.BaseTypes
 import Language.Pads.Pretty
 import Language.Pads.PadsPrinter
+import Language.Pads.DataGen.Generation
 
 import Data.Data
 import Data.List
