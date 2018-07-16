@@ -45,7 +45,6 @@ import Text.PrettyPrint.Mainland.Class
 
 import Control.Monad
 import Control.Monad.Reader
-import System.Random.MWC
 import System.IO.Unsafe (unsafePerformIO)
 
 
@@ -74,8 +73,8 @@ instance Pads1 () Char Base_md where
 char_printFL :: PadsPrinter (Char, md)
 char_printFL (c,bmd) = addString [c]
 
-char_genM :: M Char
-char_genM = randLetter --gen = randLetter gen
+char_genM :: PadsGen Char
+char_genM = randLetter
 
 char_serialize :: Char -> CList
 char_serialize c = toCL [CharChunk c]
@@ -97,7 +96,7 @@ bitBool_def = False
 bitBool_printFL :: PadsPrinter (BitBool, md)
 bitBool_printFL (bb,bbmd) = fshow bb
 
-bitBool_genM :: M BitBool
+bitBool_genM :: PadsGen BitBool
 bitBool_genM = randElem [False,True]
 
 bitBool_serialize :: BitBool -> CList
@@ -130,10 +129,8 @@ bitField_def _ = 0
 bitField_printFL :: Integral a => a -> PadsPrinter (BitField, md)
 bitField_printFL _ (x, xmd) = fshow x
 
-bitField_genM :: Integral a => a -> M BitField
-bitField_genM i = do
-  gen <- ask
-  liftIO $ (toInteger . floor) <$> uniformR (0::Double,2^i::Double) gen
+bitField_genM :: Integral a => a -> PadsGen BitField
+bitField_genM x = randIntegerBound (2^x - 1)
 
 bitField_serialize :: Integral a => a -> BitField -> CList
 bitField_serialize b v = toCL [BinaryChunk v (fromIntegral b)]
@@ -157,10 +154,8 @@ bits8_def _ = 0
 bits8_printFL  :: Integral a => a -> PadsPrinter (Bits8, md)
 bits8_printFL  _ (x, xmd) = fshow x
 
-bits8_genM :: Integral a => a -> M Bits8
-bits8_genM x = do
-  gen <- ask
-  liftIO $ uniformR (0 :: Bits8, (2^x)-1 :: Bits8) gen
+bits8_genM :: Integral a => a -> PadsGen Bits8
+bits8_genM x = randNumBound (2^x - 1)
 
 bits8_serialize :: Int -> Bits8 -> CList
 bits8_serialize b v = toCL [BinaryChunk (fromIntegral v) b]
@@ -184,10 +179,8 @@ bits16_def _ = 0
 bits16_printFL :: Integral a => a -> PadsPrinter (Bits16, md)
 bits16_printFL _ (x, xmd) = fshow x
 
-bits16_genM :: Integral a => a -> M Bits16
-bits16_genM x = do
-  gen <- ask
-  liftIO $ uniformR (0 :: Bits16, (2^x)-1 :: Bits16) gen
+bits16_genM :: Integral a => a -> PadsGen Bits16
+bits16_genM x = randNumBound (2^x - 1)
 
 bits16_serialize :: Int -> Bits16 -> CList
 bits16_serialize b v = toCL [BinaryChunk (fromIntegral v) b]
@@ -211,10 +204,8 @@ bits32_def _ = 0
 bits32_printFL :: Integral a => a -> PadsPrinter (Bits32, md)
 bits32_printFL _ (x, xmd) = fshow x
 
-bits32_genM :: Integral a => a -> M Bits32
-bits32_genM x = do
-  gen <- ask
-  liftIO $ uniformR (0 :: Bits32, (2^x)-1 :: Bits32) gen
+bits32_genM :: Integral a => a -> PadsGen Bits32
+bits32_genM x = randNumBound (2^x - 1)
 
 bits32_serialize :: Int -> Bits32 -> CList
 bits32_serialize b v = toCL [BinaryChunk (fromIntegral v) b]
@@ -238,10 +229,8 @@ bits64_def _ = 0
 bits64_printFL :: Integral a => a -> PadsPrinter (Bits64, md)
 bits64_printFL _ (x, xmd) = fshow x
 
-bits64_genM :: Integral a => a -> M Bits64
-bits64_genM x = do
-  gen <- ask
-  liftIO $ uniformR (0 :: Bits64, (2^x)-1 :: Bits64) gen
+bits64_genM :: Integral a => a -> PadsGen Bits64
+bits64_genM x = randNumBound (2^x - 1)
 
 bits64_serialize :: Int -> Bits64 -> CList
 bits64_serialize b v = toCL [BinaryChunk (fromIntegral v) b]
@@ -278,13 +267,8 @@ instance Pads1 () Int Base_md where
 int_printFL :: PadsPrinter (Int, Base_md)
 int_printFL (i, bmd) = fshow i
 
-int_genM :: M Int
-int_genM = randInt
-
-intBound_genM :: Int -> Int -> M Int
-intBound_genM x y = do
-  gen <- ask
-  liftIO $ uniformR (x, y) gen
+int_genM :: PadsGen Int
+int_genM = randNum
 
 int_serialize :: Int -> CList
 int_serialize i = toCL $ map CharChunk $ show i
@@ -321,8 +305,8 @@ instance Pads1 () Integer Base_md where
 integer_printFL :: PadsPrinter (Integer, Base_md)
 integer_printFL (i, bmd) = fshow i
 
-integer_genM :: M Integer
-integer_genM = fromIntegral <$> int_genM
+integer_genM :: PadsGen Integer
+integer_genM = randInteger
 
 integer_serialize :: Integer -> CList
 integer_serialize i = toCL $ map CharChunk $ show i
@@ -382,10 +366,8 @@ instance Pads1 () Float Base_md where
 float_printFL :: PadsPrinter (Float, Base_md)
 float_printFL (d, bmd) = fshow d
 
-float_genM :: M Float
-float_genM = do
-  gen <- ask
-  liftIO $ uniformR (0,1000000000000000) gen
+float_genM :: PadsGen Float
+float_genM = randNum
 
 float_serialize :: Float -> CList
 float_serialize f = toCL $ map CharChunk $ show f
@@ -445,10 +427,8 @@ instance Pads1 () Double Base_md where
 double_printFL :: PadsPrinter (Double, Base_md)
 double_printFL (d, bmd) = fshow d
 
-double_genM :: M Double
-double_genM = do
-  gen <- ask
-  liftIO $ uniformR (0,1000000000000000) gen
+double_genM :: PadsGen Double
+double_genM = randNum
 
 double_serialize :: Double -> CList
 double_serialize d = toCL $ map CharChunk $ show d
@@ -470,7 +450,7 @@ try_printFL p _ = printNothing
 try_def :: a -> Try a
 try_def d = d
 
-try_genM :: M a -> M (Try a)
+try_genM :: PadsGen a -> PadsGen (Try a)
 try_genM g = g >>= return
 
 --try_serialize :: Try a -> CList
@@ -499,8 +479,8 @@ digit_def = 0
 digit_printFL :: PadsPrinter (Digit, Base_md)
 digit_printFL (i, bmd) = fshow i
 
-digit_genM :: M Digit
-digit_genM = intBound_genM 0 9
+digit_genM :: PadsGen Digit
+digit_genM = randNumBound 9
 
 digit_serialize :: Digit -> CList
 digit_serialize d = toCL $ map CharChunk $ show d
@@ -529,7 +509,7 @@ instance Pads1 () String Base_md where
 string_printFL :: PadsPrinter (String, Base_md)
 string_printFL (str, bmd) = addString str
 
-string_genM :: M String
+string_genM :: PadsGen String
 string_genM = stringVW_genM 100
 
 string_serialize :: String -> CList
@@ -563,7 +543,7 @@ instance Pads1 () Text Base_md where
 text_printFL :: PadsPrinter (Text, Base_md)
 text_printFL (Text str, bmd) = addBString str
 
-text_genM :: M Text
+text_genM :: PadsGen Text
 text_genM = Text <$> B.pack <$> (map S.chrToWord8) <$> stringVW_genM 500
 
 text_serialize :: Text -> CList
@@ -617,9 +597,9 @@ stringC_def c = ""
 stringC_printFL :: Char -> PadsPrinter (StringC, Base_md)
 stringC_printFL c (str, bmd) = addString str
 
-stringC_genM :: Char -> M StringC
+stringC_genM :: Char -> PadsGen StringC
 stringC_genM c = do
-  i <- intBound_genM 0 100
+  i <- randNumBound 500
   replicateM i (randLetterExcluding c)
 
 stringC_serialize :: Char -> StringC -> CList
@@ -648,7 +628,7 @@ stringFW_def n = replicate n 'X'
 stringFW_printFL :: Int -> PadsPrinter (StringFW, Base_md)
 stringFW_printFL n (str, bmd)  = addString (take n str)
 
-stringFW_genM :: Int -> M StringFW
+stringFW_genM :: Int -> PadsGen StringFW
 stringFW_genM i = replicateM i randLetter
 
 stringFW_serialize :: Int -> StringFW -> CList
@@ -675,10 +655,10 @@ stringVW_def n = replicate n 'X'
 stringVW_printFL :: Int -> PadsPrinter (StringVW, Base_md)
 stringVW_printFL n (str, bmd)  = addString (take n str)
 
-stringVW_genM :: Int -> M StringVW
-stringVW_genM i = do
-  i' <- intBound_genM 0 i
-  replicateM i' randLetter
+stringVW_genM :: Int -> PadsGen StringVW
+stringVW_genM x = do
+  i <- randNumBound x
+  replicateM i randLetter
 
 stringVW_serialize :: Int -> StringVW -> CList
 stringVW_serialize i s = string_serialize s
@@ -726,7 +706,7 @@ stringME_printFL :: RE -> PadsPrinter (StringME, Base_md)
 stringME_printFL re (str, bmd) = addString str
            -- We're not likely to check that str matches re
 
-stringME_genM :: RE -> M StringME
+stringME_genM :: RE -> PadsGen StringME
 stringME_genM = error "stringME_genM unimplemented"
 
 stringME_serialize :: RE -> StringME -> CList
@@ -756,7 +736,7 @@ stringSE_def (REd re d) = d
 stringSE_printFL :: RE -> PadsPrinter (StringSE, Base_md)
 stringSE_printFL re (str, bmd) = addString str
 
-stringSE_genM :: RE -> M StringSE
+stringSE_genM :: RE -> PadsGen StringSE
 stringSE_genM _ = error "stringSE_genM unimplemented"
 
 stringSE_serialize :: RE -> StringSE -> CList
@@ -783,7 +763,7 @@ stringP_def _ = ""
 stringP_printFL :: (Char -> Bool) -> PadsPrinter (StringP, Base_md)
 stringP_printFL p (str, bmd) = addString str
 
-stringP_genM :: (Char -> Bool) -> M StringP
+stringP_genM :: (Char -> Bool) -> PadsGen StringP
 stringP_genM _ = error "stringP_genM unimplemented"
 
 stringP_serialize :: (Char -> Bool) -> StringP -> CList
@@ -835,7 +815,7 @@ stringPESC_printFL (_, (escape, stops)) (str, bmd) =
       newStr =  concat (map replace str)
   in addString newStr
 
-stringPESC_genM :: (Bool, (Char, [Char])) -> M StringPESC
+stringPESC_genM :: (Bool, (Char, [Char])) -> PadsGen StringPESC
 stringPESC_genM _ = error "stringPESC_genM: unimplemented"
 
 stringPESC_serialize :: (Bool, (Char, [Char])) -> StringPESC -> CList
@@ -861,7 +841,7 @@ charNB_def = char_def
 charNB_printFL :: PadsPrinter (CharNB, md)
 charNB_printFL (c, bmd) = addString [c]
 
-charNB_genM :: M Char
+charNB_genM :: PadsGen CharNB
 charNB_genM = char_genM
 
 charNB_serialize :: CharNB -> CList
@@ -883,7 +863,7 @@ stringNB_def = string_def
 stringNB_printFL :: PadsPrinter (String, Base_md)
 stringNB_printFL = string_printFL
 
-stringNB_genM :: M StringNB
+stringNB_genM :: PadsGen StringNB
 stringNB_genM = string_genM
 
 -----------------------------------------------------------------
@@ -904,7 +884,7 @@ stringCNB_def = stringC_def
 stringCNB_printFL :: Char -> PadsPrinter (StringCNB, Base_md)
 stringCNB_printFL = stringC_printFL
 
-stringCNB_genM :: Char -> M StringCNB
+stringCNB_genM :: Char -> PadsGen StringCNB
 stringCNB_genM = stringC_genM
 
 stringCNB_serialize :: Char -> StringC -> CList
@@ -933,7 +913,7 @@ stringFWNB_def n = replicate n 'X'
 stringFWNB_printFL :: Int -> PadsPrinter (StringFW, Base_md)
 stringFWNB_printFL = stringFW_printFL
 
-stringFWNB_genM :: Int -> M StringFWNB
+stringFWNB_genM :: Int -> PadsGen StringFWNB
 stringFWNB_genM = stringFW_genM
 
 stringFWNB_serialize :: Int -> StringFWNB -> CList
@@ -959,7 +939,7 @@ bytesNB_printFL = bytes_printFL
 bytesNB_def :: Int -> BytesNB
 bytesNB_def = bytes_def
 
-bytesNB_genM :: Int -> M BytesNB
+bytesNB_genM :: Int -> PadsGen BytesNB
 bytesNB_genM = bytes_genM
 
 bytesNB_serialize :: Int -> BytesNB -> CList
@@ -1153,7 +1133,7 @@ eOR_def = ()
 eof_printFL :: (EOF,Base_md) -> FList
 eof_printFL = const eofLit_printFL
 
-eOR_genM :: M EOR
+eOR_genM :: PadsGen EOR
 eOR_genM = return eOR_def
 
 eOR_serialize :: CList
@@ -1164,7 +1144,7 @@ eOF_printFL = eof_printFL
 eOF_def :: EOF
 eOF_def = ()
 
-eOF_genM :: M EOF
+eOF_genM :: PadsGen EOF
 eOF_genM = return eOF_def
 
 eOF_serialize :: CList
@@ -1197,7 +1177,7 @@ instance Pads1 () Void Base_md where
 void_printFL :: PadsPrinter (Void,Base_md)
 void_printFL v = nil
 
-void_genM :: M Void
+void_genM :: PadsGen Void
 void_genM = return void_def
 
 void_serialize :: CList
@@ -1275,11 +1255,10 @@ bytes_printFL n (bs, bmd) =
 bytes_def :: Int -> Bytes
 bytes_def i = B.pack $ replicate i (0::Word8)
 
-bytes_genM :: Int -> M Bytes
+bytes_genM :: Int -> PadsGen Bytes
 bytes_genM i = do
-  gen <- ask
-  w8s <- liftIO $ replicateM i $ uniformR (1 :: Word8, 255 :: Word8) gen
-  return $ B.pack w8s --B.pack <$> (map S.chrToWord8) <$> (stringFW_genM i)
+  w8s <- replicateM i $ randNumBound (255 :: Word8)
+  return $ B.pack w8s
 
 bytes_serialize :: Int -> Bytes -> CList
 bytes_serialize _ bs = toCL $ map (CharChunk . S.word8ToChr) $ B.unpack bs

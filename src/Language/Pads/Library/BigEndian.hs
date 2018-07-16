@@ -29,17 +29,38 @@ bToi8sbh :: Span -> (Bytes, Base_md) -> (Data.Int.Int8, Base_md)
 bToi8sbh p (bytes,md) = (fromIntegral (bytes `B.index` 0), md)
 i8Tobsbh (i,md) = (B.singleton (fromIntegral i), md)
 
+int8_genM :: PadsGen Int8
+int8_genM = randNum
+
+int8_serialize :: Int8 -> CList
+int8_serialize = toCL . (Prelude.map CharChunk) . show
+
+
+
 -- | type Int16 : signed byte high, 16-bit, signed integers
 type Int16 = Data.Int.Int16
 [pads|  obtain Int16 from Bytes 2 using <| (bToi16sbh,i16sbhTob) |> |]
 bToi16sbh p (bs,md) = (bytesToInt16 SBH bs, md)
 i16sbhTob (i,md) = (int16ToBytes SBH i, md)
 
+int16_genM :: PadsGen Int16
+int16_genM = randNum
+
+int16_serialize :: Int16 -> CList
+int16_serialize = toCL . (Prelude.map CharChunk) . show
+
+
 -- | type Int32 : signed byte high, 32-bit, signed integers
 type Int32 = Data.Int.Int32
 [pads| obtain Int32 from Bytes 4 using <| (bToi32sbh,i32sbhTob) |> |]
 bToi32sbh p (bs,md) = (bytesToInt32 SBH bs, md)
 i32sbhTob (i,md) = (int32ToBytes SBH i, md)
+
+int32_genM :: PadsGen Int32
+int32_genM = randNum
+
+int32_serialize :: Int32 -> CList
+int32_serialize = error "serialization unimplemented"
 
 
 -- * Unsigned Integers (aka Words)
@@ -49,11 +70,23 @@ type Word8 = Data.Word.Word8
 bTow8 p (bytes,md) = (bytes `B.index` 0, md)
 w8Tob (i,md) = (B.singleton i, md)
 
+word8_genM :: PadsGen Word8
+word8_genM = randNum
+
+word8_serialize :: Word8 -> CList
+word8_serialize = error "serialization unimplemented"
+
 -- | type Word16 : signed byte high, 16-bit, unsigned integers
 type Word16 = Data.Word.Word16
 [pads| obtain Word16 from Bytes 2 using <| (bTow16sbh,w16sbhTob) |> |]
 bTow16sbh p (bs,md) = (bytesToWord16 SBH bs, md)
 w16sbhTob (i,md) = (word16ToBytes SBH i, md)
+
+word16_genM :: PadsGen Word16
+word16_genM = randNum
+
+word16_serialize :: Word16 -> CList
+word16_serialize = error "serialization unimplemented"
 
 -- | type Word32 : signed byte high, 32-bit, unsigned integers
 type Word32 = Data.Word.Word32
@@ -61,3 +94,8 @@ type Word32 = Data.Word.Word32
 bTow32sbh p (bs,md) = (bytesToWord32 SBH bs, md)
 w32sbhTob (i,md) = (word32ToBytes SBH i, md)
 
+word32_genM :: PadsGen Word32
+word32_genM = randNum
+
+word32_serialize :: Word32 -> CList
+word32_serialize = error "serialization unimplemented"

@@ -733,7 +733,7 @@ mkParseTyvar v = VarE (mkVarParserName v) -- should gensym these, but probably o
 genGenTy :: PadsTy -> Q Exp
 genGenTy pty = case pty of
   PConstrain pat ty exp   -> genGenConstrain pat ty exp
-  PTransform src dest exp -> [| (return :: a -> M a) $ error "genGenTy: PTransform unimplemented" |]
+  PTransform src dest exp -> [| (return :: a -> PadsGen a) $ error "genGenTy: PTransform unimplemented" |]
   PList ty sep term       -> genGenList ty sep term
   PPartition ty exp       -> genGenTy ty
   PValue exp ty           -> genGenValue exp
@@ -784,7 +784,7 @@ genGenList pty sep term =
     (_, Just (LLen l)) -> [| sequence $ replicate $(return l) $(genGenTy pty) |]
     _ -> do
       name <- newName "n"
-      bind <- bindS (varP name) [| $(dyn "intBound_genM") 0 5000 |]
+      bind <- bindS (varP name) [| randNumBound 5000 |]
       ret  <- noBindS [| sequence $ replicate $(varE name) $(genGenTy pty) |]
       return $ DoE (bind : [ret])
 
@@ -900,7 +900,7 @@ genGenUnion bs =
       index <- newName "index"
       dos <- newName "dos"
       bindList <- letS [valD (varP dos) (normalB (listE bs')) []]
-      bindIndex <- bindS (varP index) [| intBound_genM 0 (length $(varE dos) - 1) |]
+      bindIndex <- bindS (varP index) [| randNumBound (length $(varE dos) - 1) |]
       indexList <- noBindS [| $(varE dos) !! $(varE index) |]
       return $ DoE [bindList,bindIndex,indexList]
 
@@ -915,7 +915,7 @@ genGenRecord c fields pred = do
   doStmts <- sequence $ map genGenField fields
   let labels = map mkName $ Maybe.catMaybes $ [label | (label,(_,ty),_) <- fields, hasRep ty]
   let conLabs = applyE (ConE (mkConstrName c) : map VarE labels)
-  returnStmt <- [| (return :: a -> M a) ($(return conLabs)) |]
+  returnStmt <- [| (return :: a -> PadsGen a) ($(return conLabs)) |]
   return $ DoE (concat doStmts ++ [NoBindS returnStmt])
 
 -- | Generate the generator for a field of a Pads record; each one becomes a
@@ -938,7 +938,7 @@ genGenConstr c args pred = do
   binds <- sequence [bindS (varP n) ty | (n,ty) <- zip names tys']
   let constructor = (conE . mkName) c
   let toreturn = foldl1 appE (constructor : (map varE names))
-  ret <- noBindS [| (return :: a -> M a) $toreturn |]
+  ret <- noBindS [| (return :: a -> PadsGen a) $toreturn |]
   return $ DoE (binds ++ [ret])
 
 -------------------------------------------------------------------------------
