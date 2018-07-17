@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts, TypeFamilies, TemplateHaskell, QuasiQuotes, DeriveDataTypeable, ScopedTypeVariables, MultiParamTypeClasses,
-    FlexibleInstances, TypeSynonymInstances, UndecidableInstances #-}
+    FlexibleInstances, TypeSynonymInstances, UndecidableInstances, LambdaCase #-}
 {-# OPTIONS_HADDOCK prune #-}
 {-|
   Module      : Language.Pads.BaseTypes
@@ -26,6 +26,7 @@ import Language.Pads.CoreBaseTypes
 import Language.Pads.Quote
 import Language.Pads.RegExp
 import Language.Pads.PadsPrinter
+import Language.Pads.DataGen.Generation
 import Data.Time
 --import System.Locale as Locale
 import Text.PrettyPrint.Mainland (text)
@@ -61,19 +62,22 @@ m2pm :: (Maybe a, Maybe_md a_md) -> (PMaybe a, PMaybe_md a_md)
 m2pm (Just x, md) = (PJust x, md)
 m2pm (Nothing,md) = (PNothing,md)
 
+maybe_genM :: PadsGen a -> PadsGen (Maybe a)
+maybe_genM x = pMaybe_genM x >>= (\case PJust a  -> return $ Just a
+                                        PNothing -> return $ Nothing)
 
 [pads|
 type Lit   (x::String) = (Void, x)
 type LitRE (x::RE)     = (Void, x)
 |]
 
-[pads| obtain Bool from Bytes 1 using <|(bTobl,blTob)|> |]
--- | Bytes to Bool
-bTobl :: Span -> (Bytes,Bytes_md) -> (Bool,Bool_md)
-bTobl p (bytes,md) = (fromIntegral (bytes `B.index` 0)==(1::Int), md)
--- | Bool to Bytes
-blTob :: (Bool,Bool_md) -> (Bytes,Bytes_md)
-blTob (b,md) = (B.singleton (if b then 1 else 0), md)
+[pads| obtain Bool from Bits8 1 using <| (bits8ToBool, boolToBits8) |> generator bitBool_genM |]
+
+bits8ToBool :: Span -> (Bits8, Bits8_md) -> (Bool, Bool_md)
+bits8ToBool _ (b, md) = (b == 1, md)
+
+boolToBits8 :: (Bool, Bool_md) -> (Bits8, Bits8_md)
+boolToBits8 (b, md) = ((fromIntegral . fromEnum) b, md)
 
 
 [pads| type DateFSE (fmt :: String, se :: RE) = obtain UTCTime from StringSE se using <| (strToUTC fmt, utcToStr fmt) |>

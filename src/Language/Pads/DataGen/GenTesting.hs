@@ -526,6 +526,40 @@ hexCycleTest = do
   let hs_parsed = map (fst . fst . hex_parseS) hs_serialized
   return $ hs == hs_parsed
 
+-- Test serialization from obtain decs (relies on their conversion functions)
+littleInt8Test_name = "LE Int8"
+littleInt8Test_expected = [CharChunk (word8ToChr 1)]
+littleInt8Test_got = fromCL $ LE.int8_serialize 1
+littleInt8Test = TestCase (littleInt8Test_expected @=? littleInt8Test_got)
+
+littleInt16Test_name = "LE Int16"
+littleInt16Test_expected = [CharChunk (word8ToChr 0), CharChunk (word8ToChr 1)]
+littleInt16Test_got = fromCL $ LE.int16_serialize 256
+littleInt16Test = TestCase (littleInt16Test_expected @=? littleInt16Test_got)
+
+littleInt32Test_name = "LE Int32"
+littleInt32Test_expected
+  = [CharChunk (word8ToChr 1), CharChunk (word8ToChr 1),
+     CharChunk (word8ToChr 1), CharChunk (word8ToChr 0)]
+littleInt32Test_got = fromCL $ LE.int32_serialize 65793
+littleInt32Test = TestCase (littleInt32Test_expected @=? littleInt32Test_got)
+
+bigInt8Test_name = "BE Int8"
+bigInt8Test_expected = [CharChunk (word8ToChr 253)]
+bigInt8Test_got = fromCL $ BE.int8_serialize 253
+bigInt8Test = TestCase (bigInt8Test_expected @=? bigInt8Test_got)
+
+bigInt16Test_name = "BE Int16"
+bigInt16Test_expected = [CharChunk (word8ToChr 1), CharChunk (word8ToChr 0)]
+bigInt16Test_got = fromCL $ BE.int16_serialize 256
+bigInt16Test = TestCase (bigInt16Test_expected @=? bigInt16Test_got)
+
+bigInt32Test_name = "BE Int32"
+bigInt32Test_expected
+  = [CharChunk (word8ToChr 0), CharChunk (word8ToChr 1),
+     CharChunk (word8ToChr 1), CharChunk (word8ToChr 1)]
+bigInt32Test_got = fromCL $ BE.int32_serialize 65793
+bigInt32Test = TestCase (bigInt32Test_expected @=? bigInt32Test_got)
 
 fI = fromIntegral
 
@@ -745,6 +779,13 @@ tests = TestList [ charTest_name              ~: charTest
                  , paramSerTest_name          ~: paramSerTest
                  , paramGenTest_name          ~: paramGenTest
                  , hexObtainTest_name         ~: hexObtainTest
+                 , hexCycleTest_name          ~: hexCycleTest
+                 , littleInt8Test_name        ~: littleInt8Test
+                 , littleInt16Test_name       ~: littleInt16Test
+                 , littleInt32Test_name       ~: littleInt32Test
+                 , bigInt8Test_name           ~: bigInt8Test
+                 , bigInt16Test_name          ~: bigInt16Test
+                 , bigInt32Test_name          ~: bigInt32Test
                  , pCAPCycleTest_name         ~: pCAPCycleTest
                  , emptyChunksTest_name       ~: emptyChunksTest
                  , charChunksTest_name        ~: charChunksTest
