@@ -801,7 +801,7 @@ genGenList pty sep term =
     (_, Just (LLen l)) -> [| sequence $ replicate $(return l) $(genGenTy pty) |]
     _ -> do
       name <- newName "n"
-      bind <- bindS (varP name) [| randNumBound 5000 |]
+      bind <- bindS (varP name) [| randNumBound 25 |]
       ret  <- noBindS [| sequence $ replicate $(varE name) $(genGenTy pty) |]
       return $ DoE (bind : [ret])
 
