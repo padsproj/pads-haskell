@@ -43,8 +43,8 @@ data PadsDecl
 
     -- | A pads declaration for obtaining one type after parsing it from another, e.g.:
     --
-    -- > [pads| obtain         Foo     x y z   from   Int    using <|(fncn,inverse)|> |]
-             |  PadsDeclObtain String [String]        PadsTy          Exp
+    -- > [pads| obtain         Foo     x y z   from   Int    using <|(fncn,inverse)|> generator <|gen|> |]
+             |  PadsDeclObtain String [String]        PadsTy          Exp                       (Maybe Exp)
    deriving (Eq, Data, Typeable, Show, Lift, Generic)
 
 -- | AST form of a pads type, as notably used to the right hand side of an
@@ -58,7 +58,7 @@ data PadsTy
   -- | AST form of "transform @'PadsTy'@ => @'PadsTy'@ using @'Exp'@" e.g.:
   --
   -- > [pads| transform StringFW 1 => Char using <|(head, list1)|> |]
-    | PTransform PadsTy PadsTy Exp
+    | PTransform PadsTy PadsTy Exp (Maybe Exp)
 
   -- | AST form of a list of some @'PadsTy'@ type, comes with two optional attributes e.g.:
   -- "[ @'PadsTy'@ | @'PadsTy'@ ] terminator @'TermCond'@"

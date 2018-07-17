@@ -82,7 +82,7 @@ library:
     - Language.Pads.Library.BinaryUtilities
     - Language.Pads.Library.LittleEndian
     - Language.Pads.Library.Native
-    - Language.Pads.DataGen.GenTesting
+    - Language.Pads.DataGen.Generation
 
 tests:
   examples:

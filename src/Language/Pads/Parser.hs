@@ -95,7 +95,8 @@ obtainDecl
        ; (id,env) <- declLHS
        ; reservedOp "from"; rhs <- ptype env
        ; reserved "using"; exp <- expression
-       ; return (PadsDeclObtain id env rhs exp)
+       ; genM <- obtainGen
+       ; return (PadsDeclObtain id env rhs exp genM)
        } <?> "Pads transform type"
 
 declLHS
@@ -142,8 +143,11 @@ obtain env
   = do { reserved "obtain"; dst <- ptype env
        ; reservedOp "from"; src <- ptype env
        ; reserved "using"; exp <- expression
-       ; return (PTransform src dst exp)
+       ; genM <- obtainGen
+       ; return (PTransform src dst exp genM)
        } <?> "Pads transform type"
+
+obtainGen = optionMaybe (do {reservedOp "generator"; expression >>= return})
 
 partition :: Env -> Parser PadsTy
 partition env

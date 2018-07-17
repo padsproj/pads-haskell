@@ -66,7 +66,7 @@ make_pads_asts = let
     mpa pd@(PadsDeclType n _ _ _)     = [| ($(litE $ stringL n), $(lift pd)) |]
     mpa pd@(PadsDeclData n _ _ _ _)   = [| ($(litE $ stringL n), $(lift pd)) |]
     mpa pd@(PadsDeclNew n _ _ _ _)    = [| ($(litE $ stringL n), $(lift pd)) |]
-    mpa pd@(PadsDeclObtain n _ _ _)   = [| ($(litE $ stringL n), $(lift pd)) |]
+    mpa pd@(PadsDeclObtain n _ _ _ _) = [| ($(litE $ stringL n), $(lift pd)) |]
   in listE . (map mpa)
 
 -- | Top level code gen function from Pads decls to Haskell decls with the
@@ -118,15 +118,17 @@ genPadsDecl derivation pd@(PadsDeclNew name args pat branch derives) = do
   ast <- astDecl name pd
   return $ dataDecs ++ parseM ++ parseS ++ printFL ++ genM ++ serialize ++ def ++ instances ++ sigs
 
-genPadsDecl derivation pd@(PadsDeclObtain name args padsTy exp) = do
+genPadsDecl derivation pd@(PadsDeclObtain name args padsTy exp genM) = do
   let mdDec = mkObtainMDDecl name args padsTy
   parseM  <- genPadsObtainParseM name args padsTy exp
   parseS  <- genPadsParseS name args Nothing
   printFL <- genPadsObtainPrintFL name args padsTy exp
+  genM <- genPadsObtainGenM name args padsTy exp genM
+  serialize <- genPadsObtainSerialize name args padsTy exp
   def <- genPadsObtainDef name args padsTy exp
   let sigs = mkPadsSignature name args Nothing
   ast <- astDecl name pd
-  return $ mdDec ++ parseM ++ parseS ++ printFL ++ def ++ sigs
+  return $ mdDec ++ parseM ++ parseS ++ printFL ++ genM ++ serialize ++ def ++ sigs
 
 -- | A Haskell declaration containing the literal Pads AST representation of a
 -- Pads description (the syntax of Pads encoded as Haskell data constructors)
@@ -269,7 +271,7 @@ mkRepTy ::  PadsTy -> Type
 mkRepTy ty = case ty of
   PPartition pty exp          -> mkRepTy pty
   PConstrain pat pty exp      -> mkRepTy pty
-  PTransform tySrc tyDest exp -> mkRepTy tyDest
+  PTransform tySrc tyDest exp _ -> mkRepTy tyDest
   PList ty sep term           -> ListT `AppT` mkRepTy ty
   PValue exp pty              -> mkRepTy pty
   PApp tys expM               -> foldl1 AppT [mkRepTy ty | ty <- tys, hasRep ty]
@@ -300,7 +302,7 @@ mkMDTy :: Bool -> PadsTy -> Type
 mkMDTy isMeta ty = case ty of
   PPartition pty exp      -> mkMDTy isMeta pty
   PConstrain pat pty exp  -> mkMDTy isMeta pty
-  PTransform src dest exp -> mkMDTy isMeta dest
+  PTransform src dest exp _ -> mkMDTy isMeta dest
   PList ty sep term       -> mkTupleT [ConT ''Base_md, ListT `AppT` mkMDTy isMeta ty]
   PValue exp pty          -> mkMDTy isMeta pty
   PApp tys expM           -> foldl1 AppT [mkMDTy isMeta ty | ty <- tys] --MD , hasRep ty]
@@ -458,7 +460,7 @@ genPadsNewParseM name args patM branch = do
 -- | Pads Obtain declaration flavour of the "_parseM" function.
 genPadsObtainParseM :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
 genPadsObtainParseM name args padsTy exp = do
-  let body = genParseTy (PTransform padsTy (PTycon [name]) exp)
+  let body = genParseTy (PTransform padsTy (PTycon [name]) exp Nothing)
   mkParserFunction name args Nothing body
 
 -- | Construct the declaration for a function which monadically parses a Pads
@@ -496,6 +498,10 @@ genPadsNewGenM name args patM branch = do
   exp <- genGenBranchInfo branch
   mkGeneratorFunction name args patM (return exp)
 
+genPadsObtainGenM :: UString -> [LString] -> PadsTy -> Exp -> Maybe Exp -> Q [Dec]
+genPadsObtainGenM name _ _ _ (Just gen) = mkGeneratorFunction name [] Nothing (return gen)
+genPadsObtainGenM _    _ _ _ Nothing    = return []
+
 mkGeneratorFunction :: UString -> [LString] -> Maybe Pat -> Q Exp -> Q [Dec]
 mkGeneratorFunction name args patM body
   = sequence [fun]
@@ -532,7 +538,7 @@ genPadsParseS name args patM = do
 genParseTy :: PadsTy -> Q Exp
 genParseTy pty = case pty of
     PConstrain pat ty exp   -> genParseConstrain (return pat) ty (return exp)
-    PTransform src dest exp -> genParseTyTrans src dest (return exp)
+    PTransform src dest exp _ -> genParseTyTrans src dest (return exp)
     PList ty sep term       -> genParseList ty sep term
     PPartition ty exp       -> genParsePartition ty exp
     PValue exp ty           -> genParseValue exp
@@ -645,7 +651,7 @@ findPTyVars ptys = let
     varTs' t          = varTs t
 
     varTs (PConstrain _ t _) = varTs' t
-    varTs (PTransform t1 t2 _) = varTs' t1 ++ varTs' t2
+    varTs (PTransform t1 t2 _ _) = varTs' t1 ++ varTs' t2
     varTs (PList t1 (Just t2) _) = varTs' t1 ++ varTs' t2
     varTs (PList t1 Nothing _) = varTs' t1
     varTs (PPartition t _) = varTs' t
@@ -732,16 +738,16 @@ mkParseTyvar v = VarE (mkVarParserName v) -- should gensym these, but probably o
 
 genGenTy :: PadsTy -> Q Exp
 genGenTy pty = case pty of
-  PConstrain pat ty exp   -> genGenConstrain pat ty exp
-  PTransform src dest exp -> [| (return :: a -> PadsGen a) $ error "genGenTy: PTransform unimplemented" |]
-  PList ty sep term       -> genGenList ty sep term
-  PPartition ty exp       -> genGenTy ty
-  PValue exp ty           -> genGenValue exp
-  PApp tys argE           -> genGenTyApp tys argE
-  PTuple tys              -> genGenTuple tys
-  PExpression exp         -> [| return $(return exp) |]
-  PTycon c                -> mkGenTycon c
-  PTyvar v                -> mkGenTyvar v
+  PConstrain pat ty exp        -> genGenConstrain pat ty exp
+  PTransform src dest exp genM -> genGenTransform src dest exp genM
+  PList ty sep term            -> genGenList ty sep term
+  PPartition ty exp            -> genGenTy ty
+  PValue exp ty                -> genGenValue exp
+  PApp tys argE                -> genGenTyApp tys argE
+  PTuple tys                   -> genGenTuple tys
+  PExpression exp              -> [| return $(return exp) |]
+  PTycon c                     -> mkGenTycon c
+  PTyvar v                     -> mkGenTyvar v
 
 
 -- | Generate code that uses the runtime function 'untilM' to generate random
@@ -774,6 +780,17 @@ genGenConstrain pat pty e = do
   where
     fromVarP :: Pat -> Exp
     fromVarP (VarP x) = VarE x
+
+-- |
+genGenTransform :: PadsTy -> PadsTy -> Exp -> Maybe Exp -> Q Exp
+genGenTransform src dest exp genM = case genM of
+  Just g  -> return g
+  Nothing -> [| (return $
+                 error  $ "genGenTy: PTransform unimplemented. You likely arrived "
+                       ++ "at this error by having an \"obtain\" declaration/expression "
+                       ++ "in your description. If so, you can provide your own "
+                       ++ "generation function f by appending \" generator f\" "
+                       ++ "to it.") :: PadsGen a |]
 
 -- | Generate a list representing a Pads list type. We ignore the separator and
 -- PadsTy termination condition here and include them in the data during
@@ -1004,6 +1021,12 @@ genPadsNewSerialize name args pat branch = do
   exp <- genSerializeUnion [branch] ((Just . VarE . mkName) sArgName)
   return [mkSerializerFunction name args pat exp]
 
+genPadsObtainSerialize :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
+genPadsObtainSerialize name args padsTy exp = do
+  let trans = PTransform padsTy (PTycon [name]) exp Nothing
+  e <- genSerializeTy trans ((Just . VarE . mkName) sArgName)
+  return [mkSerializerFunction name args Nothing e]
+
 mkSerializerFunction :: UString -> [LString] -> Maybe Pat -> Exp -> Dec
 mkSerializerFunction name args patM body =
   FunD serializerName [Clause (serializerArgs ++ [(VarP . mkName) sArgName]) (NormalB body) []]
@@ -1019,7 +1042,7 @@ genSerializeUnion :: [BranchInfo] -> Maybe Exp -> Q Exp
 genSerializeUnion bs (Just rep) = do
   matches <- concat <$> mapM genSerializeBranchInfo bs
   return $ CaseE rep matches
-genSerializeUnion bs _ = error "genSerializeUnion: in progress"
+genSerializeUnion bs Nothing = error "genSerializeUnion: expected rep"
 
 -- | Dispatch to the appripriate function based on the type of BranchInfo.
 genSerializeBranchInfo :: BranchInfo -> Q [Match]
@@ -1034,17 +1057,9 @@ genSerializeRecord recName fields predM = do
   let serialized = [app s n t | (s,n,t) <- zip3 serializers namesM tys]
   casePat  <- conP (mkName recName) (map (varP . mkName) (Maybe.catMaybes namesM))
   caseBody <- normalB [| concatCs $(listE serialized) |]
---   let fNamesM = map (\(n, _,    _) -> n)  fields
---   let fTys    = map (\(_,(_,ty),_) -> ty) fields
---   let fSerializers = map (flip genSerializeTy Nothing) fTys
---   let serialized = [s `appE` nameOrDef n t | (s,n,t) <- zip3 fSerializers fNamesM fTys]
---   casePat  <- conP (mkName recName) (map (varP . mkName) (Maybe.catMaybes fNamesM))
---   caseBody <- normalB [| concatCs $(listE serialized) |]
   return [Match casePat caseBody []]
   where
-    -- nameOrDef :: Maybe String -> PadsTy -> Q Exp
-    -- nameOrDef (Just name) _ = (varE . mkName) name
-    -- nameOrDef Nothing     t = genDefTy t
+    app :: Q Exp -> Maybe String -> PadsTy -> Q Exp
     app s (Just n) t = s
     app s Nothing  t = if hasRep t then s `appE` (genDefTy t) else s
 
@@ -1071,16 +1086,16 @@ genSerializeSwitch _ pbs r = genSerializeUnion (map snd pbs) r
 -- apply the serializer it creates to the variable standing for the Haskell data
 -- representation - usually "rep" in generated code.
 genSerializeTy :: PadsTy -> (Maybe Exp) -> Q Exp
-genSerializeTy (PConstrain pat ty exp) r   = genSerializeConstrain pat ty exp r
-genSerializeTy (PTransform src dest exp) r = genSerializeTransform src dest exp r
-genSerializeTy (PList ty sepM termM) r     = genSerializeList ty sepM termM r
-genSerializeTy (PPartition ty exp) r       = genSerializePartition ty exp r
-genSerializeTy (PValue exp ty) r           = genSerializeValue exp ty r
-genSerializeTy (PApp tys expM) r           = genSerializeApp tys expM r
-genSerializeTy (PTuple tys) r              = genSerializeTuple tys r
-genSerializeTy (PExpression exp) r         = genSerializeExp exp r
-genSerializeTy (PTycon c) r                = genSerializeTycon c r
-genSerializeTy (PTyvar v) r                = genSerializeTyvar v r
+genSerializeTy (PConstrain pat ty exp) r     = genSerializeConstrain pat ty exp r
+genSerializeTy (PTransform src dest exp _) r = genSerializeTransform src dest exp r
+genSerializeTy (PList ty sepM termM) r       = genSerializeList ty sepM termM r
+genSerializeTy (PPartition ty exp) r         = genSerializePartition ty exp r
+genSerializeTy (PValue exp ty) r             = genSerializeValue exp ty r
+genSerializeTy (PApp tys expM) r             = genSerializeApp tys expM r
+genSerializeTy (PTuple tys) r                = genSerializeTuple tys r
+genSerializeTy (PExpression exp) r           = genSerializeExp exp r
+genSerializeTy (PTycon c) r                  = genSerializeTycon c r
+genSerializeTy (PTyvar v) r                  = genSerializeTyvar v r
 
 -- | At the serialization stage, already existing data cannot be constrained,
 -- unlike in the generation stage. Here we merely pass the type back into
@@ -1088,8 +1103,16 @@ genSerializeTy (PTyvar v) r                = genSerializeTyvar v r
 genSerializeConstrain :: Pat -> PadsTy -> Exp -> (Maybe Exp) -> Q Exp
 genSerializeConstrain _ ty _ r = genSerializeTy ty r
 
+-- | Serialization of a PTransform PadsTy requires only a thin skin atop the
+-- functions provided for converting between types.
 genSerializeTransform :: PadsTy -> PadsTy -> Exp -> (Maybe Exp) -> Q Exp
-genSerializeTransform _ _ _ _ = [| error "genSerializeTy: PTransform unimplemented" |]
+genSerializeTransform src dest (TupE [srcToDest,destToSrc]) r = do
+  let srcSerializer = genSerializeTy src Nothing
+  let destToSrc' = [| \x -> $(return destToSrc) (x, undefined) |]
+  let serializer = [| $srcSerializer . fst . $destToSrc' |]
+  case r of
+    Just rep -> [| $serializer $(return rep) |]
+    Nothing  -> [| $serializer               |]
 
 -- | Create a serializer for a PList, which will intersperse separators and
 -- incorporate terminating conditions as necessary.
@@ -1223,7 +1246,7 @@ genPadsNewPrintFL name args patM branch = do
 genPadsObtainPrintFL :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
 genPadsObtainPrintFL name args padsTy exp = do
   let rm = [mkName "rep", mkName "md"]
-  body  <- genPrintTy (PTransform padsTy (PTycon [name]) exp) $ Just $ TupE (map VarE rm)
+  body  <- genPrintTy (PTransform padsTy (PTycon [name]) exp Nothing) $ Just $ TupE (map VarE rm)
   return [mkPrinterFunction name args rm Nothing body]
 
 -- | Make the function declaration for the "lazy function list" printer with the
@@ -1244,7 +1267,7 @@ mkPrinterFunction name args rm patM body =
 -- translated.
 genPrintTy :: PadsTy -> Maybe Exp -> Q Exp
 genPrintTy (PConstrain pat ty exp) rm   = genPrintTy ty rm  -- XXX: doesn't check the constraint; ideally we should change @printFL@ to account for possible printing errors
-genPrintTy (PTransform src dest exp) rm = genPrintTrans src exp rm
+genPrintTy (PTransform src dest exp _) rm = genPrintTrans src exp rm
 genPrintTy (PList ty sepM termM) rm     = genPrintList ty sepM termM >>= applyPrintTy rm
 genPrintTy (PPartition ty exp) rm       = [| (error "genPrintTy PPartition not implemented") |] --genPrintPartition ty exp rm
 genPrintTy (PApp tys expM) rm           = genPrintTyApp tys expM >>= applyPrintTy rm
@@ -1501,7 +1524,7 @@ genPadsNewDef name args patM branch = do
 -- | Generate the Pads default value for a Pads obtain declaration.
 genPadsObtainDef :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
 genPadsObtainDef name args padsTy exp = do
-  body  <- genDefTy (PTransform padsTy (PTycon [name]) exp)
+  body  <- genDefTy (PTransform padsTy (PTycon [name]) exp Nothing)
   return [mkDefFunction name args Nothing body]
 
 -- | Generate the Pads default value as a function declaration of the form
@@ -1519,7 +1542,7 @@ mkDefFunction name args patM body =
 -- | Generate the default Haskell value for some Pads type.
 genDefTy :: PadsTy -> Q Exp
 genDefTy (PConstrain pat ty exp)   = genDefTy ty  -- XXX: doesn't check the constraint; ideally we should change @printFL@ to account for possible printing errors
-genDefTy (PTransform src dest exp) = do
+genDefTy (PTransform src dest exp _) = do
   defSrc <- genDefTy src
   srcToDest <- [| \rep -> fst $ (fst $(return exp)) S.zeroSpan (rep,(error "TODO defaultMd")) |] -- XXX: fix this undefined, it kind of requires defaultMd to be defined inductively over Pads types as well...
   return $ AppE srcToDest defSrc

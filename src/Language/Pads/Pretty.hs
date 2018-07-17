@@ -88,7 +88,7 @@ isAtomicTy _                = False
 
 instance Pretty PadsTy where
     ppr (PConstrain pat ty exp)  = text "constrain" <+> ppr pat <+> text "::"  <+> ppr ty  <+> text "where" <+> ppr exp
-    ppr (PTransform sty dty exp) = text "transform" <+> ppr sty <+> text "=>" <+> ppr dty <+> text "using" <+> ppr exp
+    ppr (PTransform sty dty exp _) = text "transform" <+> ppr sty <+> text "=>" <+> ppr dty <+> text "using" <+> ppr exp
     ppr (PList itemTy sepTy termTy) = ppr_padsList itemTy sepTy termTy
     ppr (PValue exp ty) = text "value" <+> ppr exp <+> text "::"  <+> ppr ty
     ppr (PApp argTys expArgOpt) = spread (map ppr_alpha argTys) <> ppr_opt expArgOpt
