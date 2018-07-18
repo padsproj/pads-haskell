@@ -28,7 +28,7 @@ import           Data.ByteString.Internal
 import qualified Data.ByteString.Char8 as C
 
 import Language.Pads.PadsPrinter
-import Language.Pads.DataGen.Generation
+import Language.Pads.Generation
 
 import Language.Haskell.TH as TH
 import Language.Haskell.TH.Syntax

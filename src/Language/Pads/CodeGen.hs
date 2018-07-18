@@ -31,11 +31,10 @@ import Language.Pads.TH
 import qualified Language.Pads.Errors as E
 import qualified Language.Pads.Source as S
 import Language.Pads.PadsPrinter
-import Language.Pads.DataGen.Generation
+import Language.Pads.Generation
 
 import Language.Haskell.TH
 -- import Language.Haskell.TH.Syntax
--- import qualified GHC.Types as GHC
 
 import Data.Data
 import Data.Char

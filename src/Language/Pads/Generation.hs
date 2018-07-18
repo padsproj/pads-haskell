@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Language.Pads.DataGen.Generation where
+module Language.Pads.Generation where
 
 import Control.Monad.Reader hiding (lift)
 import Control.Monad.IO.Class

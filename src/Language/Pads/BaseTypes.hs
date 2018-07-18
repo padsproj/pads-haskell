@@ -26,7 +26,7 @@ import Language.Pads.CoreBaseTypes
 import Language.Pads.Quote
 import Language.Pads.RegExp
 import Language.Pads.PadsPrinter
-import Language.Pads.DataGen.Generation
+import Language.Pads.Generation
 import Data.Time
 --import System.Locale as Locale
 import Text.PrettyPrint.Mainland (text)
