@@ -21,7 +21,6 @@ import           Data.Time.Clock.POSIX (getPOSIXTime)
 import           Data.Word
 
 import           Control.Monad
-import           GHC.Generics
 import           Numeric (showHex, readHex)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
@@ -31,7 +30,6 @@ import           Test.HUnit hiding (test)
 import           Language.Pads.Padsc
 import qualified Language.Pads.Library.LittleEndian as LE
 import qualified Language.Pads.Library.BigEndian    as BE
-import           Language.Pads.DataGen.GenTestingTH
 
 sampleSize = 100 -- used for "cycle" testing - generate, serialize, parse
 
@@ -63,10 +61,11 @@ intCycleTest = do
   return $ xs == xs_parsed
 
 -- Purely for parsers that ignore default newline record discipline
-[pads| type Bits8N  = partition Bits8 8 using none
-       type Bits16N = partition Bits16 16 using none
-       type Bits32N = partition Bits32 32 using none
-       type Bits64N = partition Bits64 64 using none |]
+[pads| type Bits8N   = partition Bits8  8  using none
+       type Bits16N  = partition Bits16 16 using none
+       type Bits32N  = partition Bits32 32 using none
+       type Bits64N  = partition Bits64 64 using none
+       type BitBoolN = partition BitBool   using none |]
 bits8Test_name = "Bits8"
 bits8Test_expected = [98]
 bits8Test_got = (fromChunks $ (fromCL $ ((bits8_serialize 8) 98)))
@@ -130,6 +129,18 @@ bits64CycleTest = do
   let xs_serialized = map ((map word8ToChr) . fromChunks . fromCL . (bits64_serialize 64)) xs
   let xs_parsed = map (fst . fst . (parseStringInput bits64N_parseM)) xs_serialized
   return $ xs == xs_parsed
+
+bitBoolTest_name = "BitBool"
+bitBoolTest_expected = [128]
+bitBoolTest_got = (fromChunks . fromCL . bitBool_serialize) True
+bitBoolTest = TestCase (bitBoolTest_expected @=? bitBoolTest_got)
+
+bitBoolCycleTest_name = "BitBool Cycle"
+bitBoolCycleTest = do
+  bs <- replicateM sampleSize (runGen bitBool_genM)
+  let bs_serialized = map ((map word8ToChr) . fromChunks . fromCL . bitBool_serialize) bs
+  let bs_parsed = map (fst . fst . (parseStringInput bitBoolN_parseM)) bs_serialized
+  return $ bs == bs_parsed
 
 -- | Use BitField generator and serializer but BitField50 parser to avoid record
 -- discipline problems
@@ -383,13 +394,14 @@ myConstr4NoArgsTest_got
 myConstr4NoArgsTest
   = TestCase (myConstr4NoArgsTest_expected @=? myConstr4NoArgsTest_got)
 
--- myConstrCycleTest_name = "MyConstr Cycle"
--- myConstrCycleTest = do
---   cs <- replicateM sampleSize myConstr_genM
---   let cs_serialized = map ((map word8ToChr) . fromChunks . fromCL . myConstr_serialize) cs
---   let cs_parsed = map (fst . fst . myConstr_parseS) cs_serialized
---   return $ cs == cs_parsed
--- Parsing of MyConstr2,3,4 seems strange, test fails on account of parsing
+-- This test fails on account of odd parsing behavior - it's included here as a
+-- cautionary tale but excluded from the list of tests
+myConstrCycleTest_name = "MyConstr Cycle"
+myConstrCycleTest = do
+  cs <- replicateM sampleSize (runGen (myConstr_genM int_genM))
+  let cs_serialized = map ((map word8ToChr) . fromChunks . fromCL . (myConstr_serialize int_serialize)) cs
+  let cs_parsed = map (fst . fst . (myConstr_parseS int_parseM)) cs_serialized
+  return $ cs == cs_parsed
 
 -- Test use of type variables and newtype
 [pads| data MyList a = MyCons a (MyList a)
@@ -526,39 +538,46 @@ hexCycleTest = do
   let hs_parsed = map (fst . fst . hex_parseS) hs_serialized
   return $ hs == hs_parsed
 
--- Test serialization from obtain decs (relies on their conversion functions)
+-- Test serialization from obtain decs (relies on their conversion functions),
+-- along with creation of qualified serializer names (e.g. LE.int16_serialize)
+[pads| type MyLEInt8 = LE.Int8 |]
 littleInt8Test_name = "LE Int8"
 littleInt8Test_expected = [CharChunk (word8ToChr 1)]
-littleInt8Test_got = fromCL $ LE.int8_serialize 1
+littleInt8Test_got = fromCL $ myLEInt8_serialize 1
 littleInt8Test = TestCase (littleInt8Test_expected @=? littleInt8Test_got)
 
+[pads| type MyLEInt16 = LE.Int16 |]
 littleInt16Test_name = "LE Int16"
 littleInt16Test_expected = [CharChunk (word8ToChr 0), CharChunk (word8ToChr 1)]
-littleInt16Test_got = fromCL $ LE.int16_serialize 256
+littleInt16Test_got = fromCL $ myLEInt16_serialize 256
 littleInt16Test = TestCase (littleInt16Test_expected @=? littleInt16Test_got)
 
+[pads| type MyLEInt32 = LE.Int32 |]
 littleInt32Test_name = "LE Int32"
 littleInt32Test_expected
   = [CharChunk (word8ToChr 1), CharChunk (word8ToChr 1),
      CharChunk (word8ToChr 1), CharChunk (word8ToChr 0)]
-littleInt32Test_got = fromCL $ LE.int32_serialize 65793
+littleInt32Test_got = fromCL $ myLEInt32_serialize 65793
 littleInt32Test = TestCase (littleInt32Test_expected @=? littleInt32Test_got)
 
+[pads| type MyBEInt8 = BE.Int8 |]
 bigInt8Test_name = "BE Int8"
 bigInt8Test_expected = [CharChunk (word8ToChr 253)]
-bigInt8Test_got = fromCL $ BE.int8_serialize 253
+bigInt8Test_got = fromCL $ myBEInt8_serialize 253
 bigInt8Test = TestCase (bigInt8Test_expected @=? bigInt8Test_got)
 
+[pads| type MyBEInt16 = BE.Int16 |]
 bigInt16Test_name = "BE Int16"
 bigInt16Test_expected = [CharChunk (word8ToChr 1), CharChunk (word8ToChr 0)]
-bigInt16Test_got = fromCL $ BE.int16_serialize 256
+bigInt16Test_got = fromCL $ myBEInt16_serialize 256
 bigInt16Test = TestCase (bigInt16Test_expected @=? bigInt16Test_got)
 
+[pads| type MyBEInt32 = BE.Int32 |]
 bigInt32Test_name = "BE Int32"
 bigInt32Test_expected
   = [CharChunk (word8ToChr 0), CharChunk (word8ToChr 1),
      CharChunk (word8ToChr 1), CharChunk (word8ToChr 1)]
-bigInt32Test_got = fromCL $ BE.int32_serialize 65793
+bigInt32Test_got = fromCL $ myBEInt32_serialize 65793
 bigInt32Test = TestCase (bigInt32Test_expected @=? bigInt32Test_got)
 
 fI = fromIntegral
@@ -738,6 +757,8 @@ tests = TestList [ charTest_name              ~: charTest
                  , bits32CycleTest_name       ~: bits32CycleTest
                  , bits64Test_name            ~: bits64Test
                  , bits64CycleTest_name       ~: bits64CycleTest
+                 , bitBoolTest_name           ~: bitBoolTest
+                 , bitBoolCycleTest_name      ~: bitBoolCycleTest
                  , bitFieldCycleTest_name     ~: bitFieldCycleTest
                  , bytesTest_name             ~: bytesTest
                  , myStringCTest_name         ~: myStringCTest
