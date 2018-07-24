@@ -15,11 +15,13 @@ module GenTesting where
 
 import           Data.Bits
 import qualified Data.ByteString as B
+import           Data.Char (isDigit)
 import           Data.Maybe (fromJust)
 import           Data.Time.Clock.POSIX (getPOSIXTime)
 import           Data.Word
 
 import           Control.Monad
+import           Control.Monad.State as ST
 import           Numeric (showHex, readHex)
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
@@ -248,8 +250,8 @@ constrainedStringTest
 
 constrainedGenTest_name = "Constrained Generation"
 constrainedGenTest = do
-  s <- (runGen cString_genM)
-  return $ take 2 s == "cc"
+  ss <- replicateM 5 (runGen cString_genM)
+  return $ all (== "cc") (map (take 2) ss)
 
 -- PLists of several forms
 -- TODO: terminator LLen
@@ -393,8 +395,8 @@ myConstr4NoArgsTest_got
 myConstr4NoArgsTest
   = TestCase (myConstr4NoArgsTest_expected @=? myConstr4NoArgsTest_got)
 
--- This test fails on account of odd parsing behavior - it's included here as a
--- cautionary tale but excluded from the list of tests
+-- NB: This test fails on account of odd parsing behavior - it's included here
+-- as an example but excluded from the actual list of tests
 myConstrCycleTest_name = "MyConstr Cycle"
 myConstrCycleTest = do
   cs <- replicateM sampleSize (runGen (myConstr_genM int_genM))
@@ -402,11 +404,9 @@ myConstrCycleTest = do
   let cs_parsed = map (fst . fst . (myConstr_parseS int_parseM)) cs_serialized
   return $ cs == cs_parsed
 
--- Test use of type variables and newtype
+-- Test use of type variables
 [pads| data MyList a = MyCons a (MyList a)
-                     | MyNil Void
-
-       newtype NT = NT Int |]
+                     | MyNil Void |]
 
 myListEmptyTest_name = "MyList Empty"
 myListEmptyTest_expected = []
@@ -431,6 +431,8 @@ myListCycleTest = do
   let ls_serialized = map ((map word8ToChr) . fromChunks . fromCL . (myList_serialize char_serialize)) ls
   let ls_parsed = map (fst . fst . (myList_parseS char_parseM)) ls_serialized
   return $ ls == ls_parsed
+
+[pads| newtype NT = NT Int |]
 
 nTTest_name = "NewType"
 nTTest_expected = [CharChunk '3']
@@ -579,7 +581,46 @@ bigInt32Test_expected
 bigInt32Test_got = fromCL $ myBEInt32_serialize 65793
 bigInt32Test = TestCase (bigInt32Test_expected @=? bigInt32Test_got)
 
+
+-- Custom field-specific generators within a record
+[pads| data WithGens = WithGens {
+         wg1 :: [Int | ' '] generator <| fst <$> runStateT myGen 0 |> ,
+         ' ',
+         wg2 :: Char,
+         ' ',
+         wg3 :: Int generator <| return 0 |> } |]
+
+-- NB: 'randNumBetween 0 100' will result in test failure when empty lists are
+-- generated, thanks to odd parsing behavior for separated lists:
+--
+-- [pads| type IntsNoSep = [Int]
+--        type IntsSep   = [Int | ' '] |]
+-- (fst . fst . intsNoSep_parseS) "" == []
+-- (fst . fst . intsSep_parseS) "" == [0]
+myGen :: StateT Int PadsGen [Int]
+myGen = (ST.lift $ randNumBetween 1 100) >>= (flip replicateM increment)
+  where
+    increment = do
+      x <- get
+      put (x + 1)
+      return x
+
+withGensTest_name = "Field Generators"
+withGensTest = do
+  wgs <- replicateM sampleSize (runGen withGens_genM)
+  let wgs_serialized = map ((map word8ToChr) . fromChunks . fromCL . withGens_serialize) wgs
+  let wgs_parsed = map (fst . fst . withGens_parseS) wgs_serialized
+  return $ wgs == wgs_parsed
+
+
+-- Large example, very heavy on bit-level values with custom generators
+-- Lots of record nesting and parameterization, with some arithmetic for lengths
+
+fI :: (Integral a, Num b) => a -> b
 fI = fromIntegral
+
+mtu :: Num a => a
+mtu = 1460
 
 [pads|
   type Bytes' (x :: Int) = Bytes <| max 0 x |>
@@ -587,87 +628,28 @@ fI = fromIntegral
   type PCAP = partition (PCAPHeader, [Packet]) using none
 
   data PCAPHeader = PCAPHeader {
-      constrain pchMagicNum   :: Bits32 32 where <| pchMagicNum == 0xa1b2c3d4 |>,
-      constrain pchVersionMaj :: Bits16 16 where <| pchVersionMaj == 2 |>,
-      constrain pchVersionMin :: Bits16 16 where <| pchVersionMin == 4 |> ,
-      constrain pchThisZone   :: Bits32 32 where <| pchThisZone == 0 |>,
-      constrain pchSigFigs    :: Bits32 32 where <| pchSigFigs == 0 |>,
-      pchSnapLen              :: Bits32 32,
-      constrain pchNetwork    :: Bits32 32 where <| pchNetwork == 1 |>
+      pchMagicNum   :: Bits32 32 generator <| return 0xa1b2c3d4 |>,
+      pchVersionMaj :: Bits16 16 generator <| return 2 |>,
+      pchVersionMin :: Bits16 16 generator <| return 4 |> ,
+      pchThisZone   :: Bits32 32 generator <| return 0 |>,
+      pchSigFigs    :: Bits32 32 generator <| return 0 |>,
+      pchSnapLen    :: Bits32 32,
+      pchNetwork    :: Bits32 32 generator <| return 1 |>
   }
-
-  type PacketN = partition Packet using none
-  type Packets = partition [Packet] using none
 
   data Packet = Packet {
-      --constrain tsSec   :: Bits32 32 where <| tsSec == (floor $ unsafePerformIO getPOSIXTime) |>,
-      tsSec             :: Bits32 32,
-      constrain tsUsec  :: Bits32 32 where <| tsUsec <= 999999999 |>,
-                           Bits32 21,
-      constrain inclLen :: Bits16 11 where <| inclLen >= 60 && inclLen <= 1514 |>,
-                           Bits32 21,
-      constrain origLen :: Bits16 11 where <| origLen == inclLen |>,
-      body              :: Ethernet inclLen
+      tsSec   :: Bits32 32 generator <| liftIO $ floor <$> getPOSIXTime |>,
+      tsUsec  :: Bits32 32 generator <| randNumBound 999999999 |>,
+      inclLen :: Bits32 32 generator <| return $ mtu + 54 |>,
+      origLen :: Bits32 32 generator <| return inclLen |>,
+      body    :: Ethernet inclLen
   }
 
-  data Ethernet (inclLen :: Bits16) = Ethernet {
-    ethDst            :: MacAddr,
-    ethSrc            :: MacAddr,
-    constrain ethType :: Bits16 16 where <| ethType == 2048 |>,
-    ethPayload        :: EthPayload <| (ethType, inclLen) |>
-    --ethCRC            :: Bits32 32
-  }
-
-  data EthPayload (ethType :: Bits16, inclLen :: Bits16) = case ethType of
-    2048 -> IPV4 {
-      constrain ipv4Version  :: Bits8 4 where <| ipv4Version == 4 |>,
-      constrain ipv4IHL      :: Bits8 4 where <| ipv4IHL == 5 |>,
-      ipv4DSCP               :: Bits8 6,
-      ipv4ECN                :: Bits8 2,
-      constrain ipv4TotLen   :: Bits16 16 where <| ipv4TotLen == (max 0 $ (fromIntegral inclLen) - 14) |>,
-      ipv4ID                 :: Bits16 16,
-      ipv4Flags              :: IPV4Flags,
-      constrain ipv4FragOff  :: Bits16 13 where <| ipv4FragOff == 0 |>,
-      ipv4TTL                :: Bits8 8,
-      constrain ipv4Protocol :: Bits8 8 where <| ipv4Protocol == 6 |>,
-      ipv4Cksum              :: Bits16 16,
-      ipv4Src                :: Bits32 32,
-      ipv4Dst                :: Bits32 32,
-      ipv4Opts               :: Bytes <| 4 * (max 0 $ (fI ipv4IHL) - 5) |>,
-      ipv4Payload            :: IPV4Payload <| (ipv4Protocol, ipv4IHL, ipv4TotLen) |>
-    }
-
-  data IPV4Flags = IPV4Flags {
-    constrain ipv4Res :: BitBool where <| ipv4Res == False |>,
-    ipv4DF            :: BitBool,
-    constrain ipv4MF  :: BitBool where <| ipv4MF == False |>
-  }
-
-  data IPV4Payload (prot :: Bits8, ipv4IHL :: Bits8, totLen :: Bits16) = TCP {
-    tcpSrc                :: Bits16 16,
-    constrain tcpDst      :: Bits16 16 where <| tcpDst == 80 |>,
-    tcpSeq                :: Bits32 32,
-    tcpAck                :: Bits32 32,
-    constrain tcpOffset   :: Bits8 4 where <| tcpOffset == 5 |>,
-    constrain tcpReserved :: Bits8 3 where <| tcpReserved == 0 |>,
-    tcpFlags              :: TCPFlags,
-    tcpWindow             :: Bits16 16,
-    tcpCksum              :: Bits16 16,
-    tcpUrgPtr             :: Bits16 16,
-    tcpOptions            :: Bytes <| 4 * (max 0 $ (fI tcpOffset) - 5) |>,
-    tcpPayload            :: Bytes' <| (fromIntegral totLen) - (fromIntegral $ (tcpOffset * 4) + (ipv4IHL * 4)) |>
-  }
-
-  data TCPFlags = TCPFlags {
-    tcpNS  :: BitBool,
-    tcpCWR :: BitBool,
-    tcpECE :: BitBool,
-    tcpURG :: BitBool,
-    tcpACK :: BitBool,
-    tcpPSH :: BitBool,
-    constrain tcpRST :: BitBool where <| tcpRST == False |>,
-    tcpSYN :: BitBool,
-    tcpFIN :: BitBool
+  data Ethernet (inclLen :: Bits32) = Ethernet {
+    ethDst     :: MacAddr,
+    ethSrc     :: MacAddr,
+    ethType    :: Bits16 16 generator <| return 2048 |>,
+    ethPayload :: EthPayload <| (ethType, inclLen) |>
   }
 
   data MacAddr = MacAddr {
@@ -677,6 +659,58 @@ fI = fromIntegral
     m4           :: Bits8 8,
     m5           :: Bits8 8,
     m6           :: Bits8 8
+  }
+
+  data EthPayload (ethType :: Bits16, inclLen :: Bits32) = case ethType of
+    2048 -> IPV4 {
+      ipv4Version  :: Bits8 4 generator <| return 4 |>,
+      ipv4IHL      :: Bits8 4 generator <| return 5 |>,
+      ipv4DSCP     :: Bits8 6,
+      ipv4ECN      :: Bits8 2,
+      ipv4TotLen   :: Bits16 16 generator <| return (max 0 $ (fI inclLen) - 14) |>,
+      ipv4ID       :: Bits16 16,
+      ipv4Flags    :: IPV4Flags,
+      ipv4FragOff  :: Bits16 13 generator <| return 0 |>,
+      ipv4TTL      :: Bits8 8,
+      ipv4Protocol :: Bits8 8 generator <| return 6 |>,
+      ipv4Cksum    :: Bits16 16,
+      ipv4Src      :: Bits32 32,
+      ipv4Dst      :: Bits32 32,
+      ipv4Opts     :: Bytes <| 4 * (max 0 $ (fI ipv4IHL) - 5) |>,
+      ipv4Payload  :: IPV4Payload <| (ipv4Protocol, ipv4IHL, ipv4TotLen) |>
+    }
+
+  data IPV4Flags = IPV4Flags {
+    ipv4Res :: BitBool generator <| return False |>,
+    ipv4DF  :: BitBool,
+    ipv4MF  :: BitBool generator <| return False |>
+  }
+
+  data IPV4Payload (prot :: Bits8, ipv4IHL :: Bits8, totLen :: Bits16) = TCP {
+    tcpSrc      :: Bits16 16 generator <| randElem [22,23,53,80,143,443] |>,
+    tcpDst      :: Bits16 16,
+    tcpSeq      :: Bits32 32,
+    tcpAck      :: Bits32 32,
+    tcpOffset   :: Bits8 4 generator <| return 5 |>,
+    tcpReserved :: Bits8 3 generator <| return 0 |>,
+    tcpFlags    :: TCPFlags,
+    tcpWindow   :: Bits16 16,
+    tcpCksum    :: Bits16 16,
+    tcpUrgPtr   :: Bits16 16,
+    tcpOptions  :: Bytes <| 4 * (max 0 $ (fI tcpOffset) - 5) |>,
+    tcpPayload  :: Bytes' <| (fI totLen) - (fI $ (tcpOffset * 4) + (ipv4IHL * 4)) |>
+  }
+
+  data TCPFlags = TCPFlags {
+    tcpNS  :: BitBool,
+    tcpCWR :: BitBool,
+    tcpECE :: BitBool,
+    tcpURG :: BitBool,
+    tcpACK :: BitBool,
+    tcpPSH :: BitBool,
+    tcpRST :: BitBool generator <| return False |>,
+    tcpSYN :: BitBool,
+    tcpFIN :: BitBool
   }
 |]
 
@@ -690,7 +724,7 @@ pCAPCycleTest = do
 writePCAP :: IO ()
 writePCAP = do
   pcap <- runGen pCAP_genM
-  B.writeFile "test2.pcap" $ (B.pack . fromChunks . fromCL . pCAP_serialize) pcap
+  B.writeFile "data/fakePackets.pcap" $ (B.pack . fromChunks . fromCL . pCAP_serialize) pcap
 
 
 -------------------------------------------------------------------------------
@@ -748,6 +782,7 @@ tests = TestList [ charTest_name              ~: charTest
                  , intTest_name               ~: intTest
                  , intCycleTest_name          ~: intCycleTest
                  , bits8Test_name             ~: bits8Test
+                 , bits8CycleTest_name        ~: bits8CycleTest
                  , bits8MisalignedTest_name   ~: bits8MisalignedTest
                  , bits16Test_name            ~: bits16Test
                  , bits16CycleTest_name       ~: bits16CycleTest
@@ -806,6 +841,7 @@ tests = TestList [ charTest_name              ~: charTest
                  , bigInt8Test_name           ~: bigInt8Test
                  , bigInt16Test_name          ~: bigInt16Test
                  , bigInt32Test_name          ~: bigInt32Test
+                 , withGensTest_name          ~: withGensTest
                  , pCAPCycleTest_name         ~: pCAPCycleTest
                  , emptyChunksTest_name       ~: emptyChunksTest
                  , charChunksTest_name        ~: charChunksTest
