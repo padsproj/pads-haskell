@@ -972,9 +972,11 @@ genGenList pty sep term =
     (_, Just (LLen l)) -> [| sequence $ replicate $(return l) $(genGenTy pty) |]
     _ -> do
       name <- newName "n"
-      bind <- bindS (varP name) [| randNumBound 25 |]
+      bind <- bindS (varP name) [| randNumBound generatedListLengthLimit |]
       ret  <- noBindS [| sequence $ replicate $(varE name) $(genGenTy pty) |]
       return $ DoE (bind : [ret])
+  where
+    generatedListLengthLimit = 100
 
 -- | All variables on which a PValue statement depends will be in scope at this
 -- point, so the expression can be returned and evaluated at runtime.

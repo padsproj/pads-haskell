@@ -42,6 +42,7 @@ dependencies:
 - bytestring >= 0.10 && < 0.11
 - byteorder >= 1.0.4 && < 1.1
 - containers >= 0.5.10 && < 0.6
+- ghc-prim
 - haskell-src-meta >= 0.8 && < 0.9 # Parsing Haskell code inside of a PADS description
 - HUnit >= 1.6 && < 1.7
 - mainland-pretty >= 0.6.1 && < 0.7

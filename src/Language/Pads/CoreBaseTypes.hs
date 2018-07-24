@@ -707,7 +707,11 @@ stringME_printFL re (str, bmd) = addString str
            -- We're not likely to check that str matches re
 
 stringME_genM :: RE -> PadsGen StringME
-stringME_genM = error "stringME_genM unimplemented"
+stringME_genM _
+  = error $ "stringME_genM unimplemented: consider using the workaround \"type "
+         ++ "XYZ = obtain StringME (RE) from StringME (RE) using <| "
+         ++ "(const id, id) |> generator (gen)\" in your description to "
+         ++ "provide your own regex-specific generator."
 
 stringME_serialize :: RE -> StringME -> CList
 stringME_serialize _ s = string_serialize s
@@ -737,7 +741,11 @@ stringSE_printFL :: RE -> PadsPrinter (StringSE, Base_md)
 stringSE_printFL re (str, bmd) = addString str
 
 stringSE_genM :: RE -> PadsGen StringSE
-stringSE_genM _ = error "stringSE_genM unimplemented"
+stringSE_genM r
+  = error $ "stringSE_genM unimplemented: consider using the workaround \"type "
+         ++ "XYZ = obtain StringSE (" ++ show r ++ ") from StringSE ("
+         ++ show r ++ ") using <| (const id, id) |> generator (gen)\" in your "
+         ++ "description to provide your own regex-specific generator."
 
 stringSE_serialize :: RE -> StringSE -> CList
 stringSE_serialize _ s = string_serialize s
@@ -764,7 +772,12 @@ stringP_printFL :: (Char -> Bool) -> PadsPrinter (StringP, Base_md)
 stringP_printFL p (str, bmd) = addString str
 
 stringP_genM :: (Char -> Bool) -> PadsGen StringP
-stringP_genM _ = error "stringP_genM unimplemented"
+stringP_genM _
+  = error $ "stringP_genM unimplemented: consider using the workaround \"type "
+         ++ "XYZ = obtain StringP (pred) from StringP (pred) using <| "
+         ++ "(const id, id) |> generator (gen)\" in your description to "
+         ++ "provide your own predicate-specific generator."
+
 
 stringP_serialize :: (Char -> Bool) -> StringP -> CList
 stringP_serialize _ s = string_serialize s
@@ -819,7 +832,7 @@ stringPESC_genM :: (Bool, (Char, [Char])) -> PadsGen StringPESC
 stringPESC_genM _ = error "stringPESC_genM: unimplemented"
 
 stringPESC_serialize :: (Bool, (Char, [Char])) -> StringPESC -> CList
-stringPESC_serialize _ _ = error "stringPESC_serialize: unimplemented"
+stringPESC_serialize _ s = string_serialize s
 
 -----------------------------------------------------------------
 -- Non-byte-aligned (NB) types
@@ -1031,7 +1044,7 @@ fromCL cl = cl []
 class ExpSerialize a where
   exp_serialize :: a -> CList
 
--- TODO: fix overlapping
+-- TODO: fix overlapping, look into similar extensions
 instance {-# OVERLAPPING #-} ExpSerialize Char where
   exp_serialize = char_serialize
 
@@ -1042,7 +1055,7 @@ instance {-# OVERLAPPING #-} ExpSerialize RE where
   exp_serialize _ = string_serialize "RegEx Literal" -- TODO
 
 instance (Num a, Show a) => ExpSerialize a where
-  exp_serialize x = toCL $ map CharChunk $ show x --int_serialize
+  exp_serialize x = toCL $ map CharChunk $ show x
 
 -----------------------------------------------------------------
 
