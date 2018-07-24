@@ -60,7 +60,7 @@ argIsCon con arg = case arg of
   PExpression (TH.LitE (TH.StringL str)) -> con == str
   otherwise -> False
 
-ppr_fieldInfo (varOpt, constrArg, expOpt)
+ppr_fieldInfo (varOpt, constrArg, expOpt, _)
    =  (case varOpt of Nothing -> empty ; Just var ->  (text var) <+> (text "::") <> space)
    <>  ppr_constrArg constrArg
    <>  ppr_optPred expOpt

@@ -164,7 +164,7 @@ data BranchInfo
   deriving (Eq, Data, Typeable, Show, Lift, Generic)
 
 -- | Individual field of a pads record, "@'String'@ :: @'ConstrArg'@ where @'Exp'@"
-type FieldInfo = (Maybe String, ConstrArg, Maybe Exp)
+type FieldInfo = (Maybe String, ConstrArg, Maybe Exp, Maybe Exp)
 type ConstrArg = (PadsStrict, PadsTy)
 
 -- | A hold-over resulting from a deprecation moving from an older version of template-haskell.

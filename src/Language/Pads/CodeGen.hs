@@ -201,7 +201,7 @@ mkRepUnion (BRecord c fields expM) = recC (mkConstrName c) lreps
                     (mkName l)
                     (bangType (mkStrict strict)
                               (return $ mkRepTy ty))
-                | (Just l,(strict,ty),_) <- fields, hasRep ty]
+                | (Just l,(strict,ty),_,_) <- fields, hasRep ty]
 
 -- | Make the 'Con' metadata constructor definition for an individual branch of
 -- a Pads type, which gets used to create the Haskell data type declaration for
@@ -214,7 +214,7 @@ mkMDUnion (BRecord c fields expM) = do
   { let lmds = [ do { fn <- genLabMDName "m" lM
                     ; varBangType fn (bangType (mkStrict NotStrict) (return $ mkMDTy False ty))
                     }
-               | (lM,(_,ty),_) <- fields
+               | (lM,(_,ty),_,_) <- fields
                ]
   ; recC (mkConstrIMDName c) lmds
   }
@@ -760,11 +760,11 @@ genParseRecord :: UString -> [FieldInfo] -> (Maybe Exp) -> Q (Dec,Exp)
 genParseRecord c fields pred = do
   c_md <- newName (strToLower c)
   let con_md = buildConstr_md c_md (ConE (mkConstrIMDName c))
-                     [ty | (_,(_,ty),_) <- fields]
-  labMDs  <- sequence [genLabMDName "x" l | (l,(_,_),_) <- fields]
+                     [ty | (_,(_,ty),_,_) <- fields]
+  labMDs  <- sequence [genLabMDName "x" l | (l,(_,_),_,_) <- fields]
   let fnMDLabs  = applyE $ map VarE (c_md : labMDs)
   doStmts <- sequence $ [genParseField f xn | (f,xn) <- zip fields labMDs]
-  let labs = [mkName lab | (Just lab,(_,ty),_) <- fields, hasRep ty]
+  let labs = [mkName lab | (Just lab,(_,ty),_,_) <- fields, hasRep ty]
   let conLabs = applyE (ConE (mkConstrName c) : map VarE labs)
   returnStmt <- [| return ($(return conLabs),$(return fnMDLabs)) |]
   return (con_md, DoE (concat doStmts ++ [NoBindS returnStmt]))
@@ -776,7 +776,7 @@ genLabMDName s Nothing    = liftM mangleName (newName s)
 
 -- | Generate the parser for a field of a Pads record.
 genParseField :: FieldInfo -> Name -> Q [Stmt]
-genParseField (labM, (strict, ty), expM) xn = do
+genParseField (labM, (strict, ty), expM,_) xn = do
   let parseTy = (case expM of
                     Nothing  -> genParseTy ty
                     Just exp -> genParseRecConstrain labP (varP xn) ty (return exp))
@@ -875,7 +875,7 @@ genGenBranchInfo (BConstr c args   pred) = genGenConstr c args   pred
 genGenRecord :: UString -> [FieldInfo] -> (Maybe Exp) -> Q Exp
 genGenRecord c fields pred = do
   doStmts <- sequence $ map genGenField fields
-  let labels = map mkName $ Maybe.catMaybes $ [label | (label,(_,ty),_) <- fields, hasRep ty]
+  let labels = map mkName $ Maybe.catMaybes $ [label | (label,(_,ty),_,_) <- fields, hasRep ty]
   let conLabs = applyE (ConE (mkConstrName c) : map VarE labels)
   returnStmt <- [| (return :: a -> PadsGen a) ($(return conLabs)) |]
   return $ DoE (concat doStmts ++ [NoBindS returnStmt])
@@ -883,10 +883,10 @@ genGenRecord c fields pred = do
 -- | Generate the generator for a field of a Pads record; each one becomes a
 -- binding statement in a haskell do-expression.
 genGenField :: FieldInfo -> Q [Stmt]
-genGenField (labM, (strict, ty), expM) = do
+genGenField (labM, (strict, ty), expM, genM) = do
   let labP  = case labM of Nothing  -> wildP
                            Just lab -> varP $ mkName lab
-  let genTy = case expM of Nothing  -> genGenTy ty
+  let genTy = case expM of Nothing  -> case genM of Just gen -> return gen; _ -> genGenTy ty
                            Just exp -> [| error "genGenField: parameterization via expression unsupported" |]
   sequence [bindS labP genTy]
 
@@ -1070,7 +1070,7 @@ genSerializeBranchInfo (BConstr c args predM) = genSerializeConstr c args predM
 -- to bring all names of variables into scope
 genSerializeRecord :: UString -> [FieldInfo] -> Maybe Exp -> Q [Match]
 genSerializeRecord recName fields predM = do
-  let (namesM, tys) = unzip (map (\(n,(_,t),_) -> (n,t)) fields)
+  let (namesM, tys) = unzip (map (\(n,(_,t),_,_) -> (n,t)) fields)
   let serializers = map (\(n,t) -> genSerializeTy t ((VarE . mkName) <$> n)) (zip namesM tys)
   let serialized = [app s n t | (s,n,t) <- zip3 serializers namesM tys]
   casePat  <- conP (mkName recName) (map (varP . mkName) (Maybe.catMaybes namesM))
@@ -1455,7 +1455,7 @@ genPrintRecord :: UString -> [FieldInfo] -> Maybe Exp -> Q [Match]
 genPrintRecord (mkName -> recName) fields predM = do
   (repEs, repPs) <- getPEforFields (\t -> genDefTy t >>= \def -> return $ SigE def (mkRepTy t)) (return . getBranchNameL) fields
   (mdEs,  mdPs)  <- getPEforFields (return . SigE (VarE 'myempty) . mkMDTy False) (return . getBranchMDNameL) fields
-  let ptys = map (\(n,(_,ty),p) -> ty) fields
+  let ptys = map (\(n,(_,ty),p,_) -> ty) fields
   let ty_rep_mds = zip3 ptys repEs mdEs
   expE <- mapM (\(ty,r,m) -> genPrintTy ty $ Just $ TupE [r,m]) ty_rep_mds
   let printItemsE = ListE expE
@@ -1468,7 +1468,7 @@ genPrintRecord (mkName -> recName) fields predM = do
 
 -- | Get the printer expression for an individual field of a record.
 getPEforField :: (PadsTy -> Q Exp) -> (String -> Q Name) -> FieldInfo -> Q (Exp, Maybe FieldPat)
-getPEforField def mkFieldNm (nameOpt, (strict,pty), optPred) = case nameOpt of
+getPEforField def mkFieldNm (nameOpt, (strict,pty), optPred, _) = case nameOpt of
   Nothing -> def pty >>= \d -> return (d,Nothing)
   Just str -> do
     name <- mkFieldNm str
@@ -1488,10 +1488,10 @@ getPEforFields def mkFieldNm fields = do
 -- for a Pads value constructor.
 genPrintConstr :: Bool -> String -> [ConstrArg] -> (Maybe Exp) -> Q [Match]
 genPrintConstr doDef (mkName -> recName) args predM = do
-  let fields = map (\c -> (Just "arg",c,Nothing)) args
+  let fields = map (\c -> (Just "arg",c,Nothing,Nothing)) args
   (repEs, repPs) <- getPEforFields (\t -> genDefTy t >>= \def -> return $ SigE def (mkRepTy t)) newName fields
   (mdEs,  mdPs)  <- getPEforFields (return . SigE (VarE 'myempty) . mkMDTy False) newName fields
-  let ptys = map (\(n,(s,ty),p) -> ty) fields
+  let ptys = map (\(n,(s,ty),p,_) -> ty) fields
 
   let genBody mdEs = (do
       { let genTyRepMd = (\(ty,r,m) -> if hasRep ty then return (ty,r,m) else genDefTy ty >>= (\def -> return (ty,SigE def (mkRepTy ty),m)))
@@ -1603,7 +1603,7 @@ genDefBranchInfo (BConstr c args pred) = do
   reps <- sequence $ [genDefTy ty | (strict,ty) <- args, hasRep ty]
   return $ foldl1 AppE (ConE (mkConstrName c):reps)
 genDefBranchInfo (BRecord c fields expM) = do
-  reps <- sequence $ [liftM (l,) (genDefTy ty) | (Just l,(strict,ty),_) <- fields, hasRep ty]
+  reps <- sequence $ [liftM (l,) (genDefTy ty) | (Just l,(strict,ty),_,_) <- fields, hasRep ty]
 
   let lets = flip map reps $ \(lab,def) -> ValD (VarP $ mkName lab) (NormalB def) []
   return $ LetE lets $ foldl1 AppE (ConE (mkConstrName c):map (VarE . mkName . fst) reps)
