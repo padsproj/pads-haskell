@@ -31,12 +31,14 @@ module Language.Pads.Padsc (
      module Language.Pads.BaseTypes,
      module Language.Pads.Pretty,
      module Language.Pads.PadsPrinter,
+     module Language.Pads.Generation,
      module Data.Data,
+     module Data.List,
      ppr, pretty
   )
   where
 
-import Language.Pads.Source
+import Language.Pads.Source hiding (take, span, head, tail)
 import Language.Pads.RegExp
 import Language.Pads.Errors  hiding (msg)
 import Language.Pads.PadsParser
@@ -48,12 +50,13 @@ import Language.Pads.Syntax
 import Language.Pads.BaseTypes
 import Language.Pads.Pretty
 import Language.Pads.PadsPrinter
+import Language.Pads.Generation
 
 import Data.Data
+import Data.List
 import Text.PrettyPrint.Mainland hiding (line,  dot)
 import Text.PrettyPrint.Mainland.Class
 
 {- Fix these should be reexported -}
 -- parseAllS = Language.Pads.PadsParser.parseAllS
 numErrors = Language.Pads.MetaData.numErrors
-

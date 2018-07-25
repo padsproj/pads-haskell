@@ -31,7 +31,7 @@
 
 <constrain>  ::= "constrain" <haskell-pat> "::" <ptype> <predic>
 
-<obtain>     ::= "obtain" <ptype> "from" <ptype> "using" <expression>
+<obtain>     ::= "obtain" <ptype> "from" <ptype> "using" <expression> <gen>?
 
 <partition>  ::= "partition" <ptype> "using" <expression>
 
@@ -65,9 +65,9 @@
 
 <record>     ::= "{" <field> ("," <field>)* "}"
 
-<field>       ::= <lower> "::" <ftype> <predic>? 
-             \alt  <lower> "=" "value" <expression> "::" <ftype> <predic>?
-             \alt  <ftype> <predic>?
+<field>       ::= <lower> "::" <ftype> <predic>? <gen>?
+             \alt  <lower> "=" "value" <expression> "::" <ftype> <predic>? <gen>?
+             \alt  <ftype> <predic>? <gen>?
 
 <ftype>      ::= "!" <atype> | <ptype>
 
@@ -80,6 +80,8 @@
 <literal>    ::= <charLit> | <reLit> | <stringLit> | <intLit> | <qualLower> | <qualUpper>
 
 <predic> ::= "where" <expression>
+
+<gen>        ::= "generator" <expression>
 
 <expression> ::= <h-exp> | <literal>
 

@@ -31,9 +31,10 @@ import Language.Pads.TH
 import qualified Language.Pads.Errors as E
 import qualified Language.Pads.Source as S
 import Language.Pads.PadsPrinter
+import Language.Pads.Generation
 
-import Language.Haskell.TH 
---import Language.Haskell.Syntax
+import Language.Haskell.TH
+-- import Language.Haskell.TH.Syntax
 
 import Data.Data
 import Data.Char
@@ -41,11 +42,11 @@ import qualified Data.Map as M
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 import Control.Monad
-import Language.Haskell.TH.Syntax (lift)
-
+import Language.Haskell.TH.Syntax --(lift, Name, NameFlavour(..), OccName)
+import qualified System.Random.MWC as MWC
 import qualified Debug.Trace as D
 
--- | 
+-- |
 type BString = S.RawStream
 
 -- | A function passed into the code generator which gets called on data type
@@ -64,7 +65,7 @@ make_pads_asts = let
     mpa pd@(PadsDeclType n _ _ _)     = [| ($(litE $ stringL n), $(lift pd)) |]
     mpa pd@(PadsDeclData n _ _ _ _)   = [| ($(litE $ stringL n), $(lift pd)) |]
     mpa pd@(PadsDeclNew n _ _ _ _)    = [| ($(litE $ stringL n), $(lift pd)) |]
-    mpa pd@(PadsDeclObtain n _ _ _)   = [| ($(litE $ stringL n), $(lift pd)) |]
+    mpa pd@(PadsDeclObtain n _ _ _ _) = [| ($(litE $ stringL n), $(lift pd)) |]
   in listE . (map mpa)
 
 -- | Top level code gen function from Pads decls to Haskell decls with the
@@ -83,42 +84,50 @@ genPadsDecl derivation pd@(PadsDeclType name args pat padsTy) = do
   parseM  <- genPadsParseM name args pat padsTy
   parseS  <- genPadsParseS name args pat
   printFL <- genPadsPrintFL name args pat padsTy
+  genM    <- genPadsGenM name args pat padsTy
+  serialize <- genPadsSerialize name args pat padsTy
   def <- genPadsDef name args pat padsTy
   let sigs = mkPadsSignature name args (fmap patType pat)
   ast <- astDecl name pd
-  return $ typeDecs ++ parseM ++ parseS ++ printFL ++ def ++ sigs
+  return $ typeDecs ++ parseM ++ parseS ++ printFL ++ genM ++ serialize ++ def ++ sigs
 
 genPadsDecl derivation pd@(PadsDeclData name args pat padsData derives) = do
   dataDecs <- mkDataRepMDDecl derivation name args padsData derives
-  parseM <- genPadsDataParseM name args pat padsData 
+  parseM <- genPadsDataParseM name args pat padsData
   parseS <- genPadsParseS name args pat
   printFL <- genPadsDataPrintFL name args pat padsData
+  genM <- genPadsDataGenM name args pat padsData
+  serialize <- genPadsDataSerialize name args pat padsData
   def <- genPadsDataDef name args pat padsData
   let instances = mkPadsInstance name args (fmap patType pat)
   let sigs = mkPadsSignature name args (fmap patType pat)
   ast <- astDecl name pd
-  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
+  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ genM ++ serialize ++ def ++ instances ++ sigs
 
 genPadsDecl derivation pd@(PadsDeclNew name args pat branch derives) = do
   dataDecs <- mkNewRepMDDecl derivation name args branch derives
-  parseM <- genPadsNewParseM name args pat branch 
+  parseM <- genPadsNewParseM name args pat branch
   parseS <- genPadsParseS name args pat
   printFL <- genPadsNewPrintFL name args pat branch
+  genM <- genPadsNewGenM name args pat branch
+  serialize <- genPadsNewSerialize name args pat branch
   def <- genPadsNewDef name args pat branch
   let instances = mkPadsInstance name args (fmap patType pat)
   let sigs = mkPadsSignature name args (fmap patType pat)
   ast <- astDecl name pd
-  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ def ++ instances ++ sigs
+  return $ dataDecs ++ parseM ++ parseS ++ printFL ++ genM ++ serialize ++ def ++ instances ++ sigs
 
-genPadsDecl derivation pd@(PadsDeclObtain name args padsTy exp) = do
+genPadsDecl derivation pd@(PadsDeclObtain name args padsTy exp genM) = do
   let mdDec = mkObtainMDDecl name args padsTy
   parseM  <- genPadsObtainParseM name args padsTy exp
   parseS  <- genPadsParseS name args Nothing
   printFL <- genPadsObtainPrintFL name args padsTy exp
+  genM <- genPadsObtainGenM name args padsTy exp genM
+  serialize <- genPadsObtainSerialize name args padsTy exp
   def <- genPadsObtainDef name args padsTy exp
   let sigs = mkPadsSignature name args Nothing
   ast <- astDecl name pd
-  return $ mdDec ++ parseM ++ parseS ++ printFL ++ def ++ sigs
+  return $ mdDec ++ parseM ++ parseS ++ printFL ++ genM ++ serialize ++ def ++ sigs
 
 -- | A Haskell declaration containing the literal Pads AST representation of a
 -- Pads description (the syntax of Pads encoded as Haskell data constructors)
@@ -192,20 +201,20 @@ mkRepUnion (BRecord c fields expM) = recC (mkConstrName c) lreps
                     (mkName l)
                     (bangType (mkStrict strict)
                               (return $ mkRepTy ty))
-                | (Just l,(strict,ty),_) <- fields, hasRep ty]
+                | (Just l,(strict,ty),_,_) <- fields, hasRep ty]
 
 -- | Make the 'Con' metadata constructor definition for an individual branch of
 -- a Pads type, which gets used to create the Haskell data type declaration for
 -- the metadata of a Pads type.
 mkMDUnion :: BranchInfo -> Q Con
 mkMDUnion (BConstr c args expM) = normalC (mkConstrIMDName c) mds
-  where   
+  where
     mds = [bangType (mkStrict NotStrict) (return $ mkMDTy False ty) | (_,ty) <- args] --MD , hasRep ty]
 mkMDUnion (BRecord c fields expM) = do
   { let lmds = [ do { fn <- genLabMDName "m" lM
                     ; varBangType fn (bangType (mkStrict NotStrict) (return $ mkMDTy False ty))
                     }
-               | (lM,(_,ty),_) <- fields
+               | (lM,(_,ty),_,_) <- fields
                ]
   ; recC (mkConstrIMDName c) lmds
   }
@@ -260,20 +269,20 @@ mkObtainMDDecl name args ty
 mkRepTy ::  PadsTy -> Type
 mkRepTy ty = case ty of
   PPartition pty exp          -> mkRepTy pty
-  PConstrain pat pty exp      -> mkRepTy pty 
-  PTransform tySrc tyDest exp -> mkRepTy tyDest 
+  PConstrain pat pty exp      -> mkRepTy pty
+  PTransform tySrc tyDest exp _ -> mkRepTy tyDest
   PList ty sep term           -> ListT `AppT` mkRepTy ty
-  PValue exp pty              -> mkRepTy pty 
+  PValue exp pty              -> mkRepTy pty
   PApp tys expM               -> foldl1 AppT [mkRepTy ty | ty <- tys, hasRep ty]
   PTuple tys                  -> mkRepTuple tys
   PExpression _               -> ConT ''()
   PTycon c                    -> ConT (mkRepQName c)
-  PTyvar v                    -> VarT (mkName v)  
+  PTyvar v                    -> VarT (mkName v)
 
 -- | Make the template haskell 'Type' corresponding to a tuple consisting of the
 -- given pads types given in list form at compile time '[PadsTy]'.
 mkRepTuple :: [PadsTy] -> Type
-mkRepTuple tys = case reps of  
+mkRepTuple tys = case reps of
     []     -> ConT ''()
     [ty]   -> ty
     (t:ts) -> mkTupleT reps
@@ -291,24 +300,24 @@ mkRepTuple tys = case reps of
 mkMDTy :: Bool -> PadsTy -> Type
 mkMDTy isMeta ty = case ty of
   PPartition pty exp      -> mkMDTy isMeta pty
-  PConstrain pat pty exp  -> mkMDTy isMeta pty 
-  PTransform src dest exp -> mkMDTy isMeta dest 
+  PConstrain pat pty exp  -> mkMDTy isMeta pty
+  PTransform src dest exp _ -> mkMDTy isMeta dest
   PList ty sep term       -> mkTupleT [ConT ''Base_md, ListT `AppT` mkMDTy isMeta ty]
-  PValue exp pty          -> mkMDTy isMeta pty 
+  PValue exp pty          -> mkMDTy isMeta pty
   PApp tys expM           -> foldl1 AppT [mkMDTy isMeta ty | ty <- tys] --MD , hasRep ty]
   PTuple tys              -> mkMDTuple isMeta tys
   PExpression _           -> ConT ''Base_md
   PTycon c                -> ConT (mkMDQName c)
   PTyvar v                -> if isMeta
     then AppT (ConT ''Meta) (VarT $ mkName v)
-    else VarT (mkName $ v ++ "_md")  
+    else VarT (mkName $ v ++ "_md")
 
 -- | Make the template haskell 'Type' corresponding to a Haskell tuple type
 -- consisting of the metadata types for the given Pads types '[PadsTy]'.
 mkMDTuple :: Bool -> [PadsTy] -> Type
-mkMDTuple isMeta tys = case mds of  
+mkMDTuple isMeta tys = case mds of
     []     -> ConT ''Base_md
-    [m]    -> mkTupleT [ConT ''Base_md, m] 
+    [m]    -> mkTupleT [ConT ''Base_md, m]
     (m:ms) -> mkTupleT [ConT ''Base_md, mkTupleT mds]
   where
     mds = [mkMDTy isMeta ty | ty <- tys] --MD , hasRep ty]
@@ -335,7 +344,7 @@ mkMDTuple isMeta tys = case mds of
 mkPadsInstance :: UString -> [LString] -> Maybe Type -> [Dec]
 mkPadsInstance str args mb@(Nothing)
   = buildInst mb str args (ConT ''Pads1 `AppT` TupleT 0)
-mkPadsInstance str args mb@(Just ety) 
+mkPadsInstance str args mb@(Just ety)
   = buildInst mb str args (ConT ''Pads1 `AppT` ety)
 
 -- | See 'mkPadsInstance' above.
@@ -356,7 +365,7 @@ buildInst mb str args pads =
   md_ty   = applyT (ConT (mkMDName str) : map snd argpairs)
   meta_ty   = applyT (ConT (mkMDName str) : metas)
   parsePP_method = FunD 'parsePP1 [Clause mbarg (NormalB (applyE (VarE (mkTyParserName str) : [VarE 'parsePP | a <- args]))) []]
-  printFL_method = 
+  printFL_method =
     if str == "Entry"
       then FunD 'printFL1 [Clause mbarg (NormalB $ VarE $ mkName "undefined") []]
       else FunD 'printFL1 [Clause mbarg (NormalB (applyE (VarE (mkTyPrinterName str) : [VarE 'printFL | a <- args]))) []]
@@ -386,7 +395,7 @@ buildInst mb str args pads =
 mkPadsSignature :: UString -> [LString] -> Maybe Type -> [Dec]
 mkPadsSignature str args mb@(Nothing)
   = buildSignature mb str args (ConT ''Pads)
-mkPadsSignature str args mb@(Just ety) 
+mkPadsSignature str args mb@(Just ety)
   = buildSignature mb str args (ConT ''Pads1 `AppT` ety)
 
 -- | See 'mkPadsSignature' above.
@@ -430,19 +439,19 @@ buildSignature mb str args pads =
 -- | Construct the function body and resulting declaration of the "_parseM"
 -- function for a given 'PadsTy' type declaration.
 genPadsParseM :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
-genPadsParseM name args patM padsTy = do 
+genPadsParseM name args patM padsTy = do
   let body = genParseTy padsTy
   mkParserFunction name args patM body
 
 -- | 'PadsData' data declaration flavour of the "_parseM" function.
-genPadsDataParseM :: UString -> [LString] -> (Maybe Pat) -> PadsData -> Q [Dec] 
-genPadsDataParseM name args patM padsData = do 
+genPadsDataParseM :: UString -> [LString] -> (Maybe Pat) -> PadsData -> Q [Dec]
+genPadsDataParseM name args patM padsData = do
   let body = genParseData padsData
   mkParserFunction name args patM body
 
 -- | 'BranchInfo' new type declaration flavour of the "_parseM" function.
-genPadsNewParseM :: UString -> [LString] -> (Maybe Pat) -> BranchInfo -> Q [Dec] 
-genPadsNewParseM name args patM branch = do 
+genPadsNewParseM :: UString -> [LString] -> (Maybe Pat) -> BranchInfo -> Q [Dec]
+genPadsNewParseM name args patM branch = do
   (dec,exp) <- genParseBranchInfo branch
   let body = letE [return dec] (return exp)
   mkParserFunction name args patM body
@@ -450,7 +459,7 @@ genPadsNewParseM name args patM branch = do
 -- | Pads Obtain declaration flavour of the "_parseM" function.
 genPadsObtainParseM :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
 genPadsObtainParseM name args padsTy exp = do
-  let body = genParseTy (PTransform padsTy (PTycon [name]) exp)
+  let body = genParseTy (PTransform padsTy (PTycon [name]) exp Nothing)
   mkParserFunction name args Nothing body
 
 -- | Construct the declaration for a function which monadically parses a Pads
@@ -470,13 +479,13 @@ mkParserFunction name args patM body
 -- | Construct the "_parseS" function at compile time such that it makes a call
 -- to 'parseStringInput' at runtime.
 genPadsParseS :: UString -> [LString] -> Maybe Pat -> Q [Dec]
-genPadsParseS name args patM = do 
+genPadsParseS name args patM = do
   { body <- [| parseStringInput $(return parserWithArgs) |]
   ; return [ FunD (mkTyParserSName name) [Clause parserArgs (NormalB body) []] ]
   }
   where
     parserWithArgs = foldl1 AppE (VarE parserName : map patToExp parserArgs)
-    parserName     = mkTyParserName name    
+    parserName     = mkTyParserName name
     parserArgs     = map (VarP . mkVarParserName) args ++ Maybe.maybeToList patM
 
 -------------------------------------------------------------------------------
@@ -491,7 +500,7 @@ genPadsParseS name args patM = do
 genParseTy :: PadsTy -> Q Exp
 genParseTy pty = case pty of
     PConstrain pat ty exp   -> genParseConstrain (return pat) ty (return exp)
-    PTransform src dest exp -> genParseTyTrans src dest (return exp)
+    PTransform src dest exp _ -> genParseTyTrans src dest (return exp)
     PList ty sep term       -> genParseList ty sep term
     PPartition ty exp       -> genParsePartition ty exp
     PValue exp ty           -> genParseValue exp
@@ -500,6 +509,7 @@ genParseTy pty = case pty of
     PExpression exp         -> genParseExp exp
     PTycon c                -> return $ mkParseTycon c
     PTyvar v                -> return $ mkParseTyvar v
+
 
 -- | Simply generate a call to the runtime system function 'parseConstraint'
 -- where the first argument is a Haskell expression spliced directly into the
@@ -510,6 +520,7 @@ genParseConstrain :: Q Pat -> PadsTy -> Q Exp -> Q Exp
 genParseConstrain patQ ty expQ = [| parseConstraint $(genParseTy ty) $pred |]
   where
     pred = lamE [patQ, varP (mkName "md")] expQ
+
 
 -- | Simply generate a call to the runtime system function 'parseTransform'
 -- where the first argument is the spliced-in-place parser for the "source" Pads
@@ -527,13 +538,14 @@ genParseTyTrans src dest expQ
 -- given separator Pads type and the desired termination condition 'TermCond'.
 genParseList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> Q Exp
 genParseList ty sep term =
-  case (sep,term) of 
+  case (sep,term) of
     (Nothing,  Nothing)          -> [| parseListNoSepNoTerm $(genParseTy ty) |]
     (Just sep, Nothing)          -> [| parseListSepNoTerm $(genParseTy sep) $(genParseTy ty) |]
     (Nothing,  Just (LLen lenE)) -> [| parseListNoSepLength $(return lenE) $(genParseTy ty) |]
     (Just sep, Just (LLen lenE)) -> [| parseListSepLength $(genParseTy sep) $(return lenE) $(genParseTy ty) |]
     (Nothing,  Just (LTerm term))-> [| parseListNoSepTerm $(genParseTy term) $(genParseTy ty) |]
     (Just sep, Just (LTerm term))-> [| parseListSepTerm $(genParseTy sep) $(genParseTy term) $(genParseTy ty) |]
+
 
 -- | Simply generate a call to the runtime system function 'parsePartition'
 -- where the first argument is an expression for parsing the 'PadsTy' pads type
@@ -571,7 +583,7 @@ genParseTuple tys = do
   where
     vars_frep = [v | (v,t) <- zip vars_fmd tys, hasRep t]
     sigs_frep = [t | t <- tys, hasRep t]
-    vars_fmd  = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
+    vars_fmd  = [ mkName ("x"++show n) | n <- [1 .. length tys]]
 
 -- | Glom the generated parser for the given 'PadsTy' onto the given parser
 -- using the '=@=' and '=@' runtime system operators.
@@ -601,7 +613,7 @@ findPTyVars ptys = let
     varTs' t          = varTs t
 
     varTs (PConstrain _ t _) = varTs' t
-    varTs (PTransform t1 t2 _) = varTs' t1 ++ varTs' t2
+    varTs (PTransform t1 t2 _ _) = varTs' t1 ++ varTs' t2
     varTs (PList t1 (Just t2) _) = varTs' t1 ++ varTs' t2
     varTs (PList t1 Nothing _) = varTs' t1
     varTs (PPartition t _) = varTs' t
@@ -682,7 +694,7 @@ mkParseTycon c       = VarE (mkTyParserQName c)
 mkParseTyvar :: String -> Exp
 mkParseTyvar v = VarE (mkVarParserName v) -- should gensym these, but probably ok
 
--------------------------------------------------------------------------------
+
 -- * Generating Parsers from Union/Switch Expressions
 
 -- | A data declaration in pads is either a union or a switch expression -
@@ -732,10 +744,10 @@ genParseBranchInfo (BConstr c args pred) = do
 -- | Build the constructor function for tupling together the metadata results of
 -- parsing a bunch of Pads types.
 buildConstr_md :: Name -> Exp -> [PadsTy] -> Dec
-buildConstr_md fnMD conMD tys 
+buildConstr_md fnMD conMD tys
   = FunD fnMD [Clause (map VarP vars_fmd) (NormalB body) []]
   where
-    vars_fmd   = [ mkName ("x"++show n) | n <- [1 .. length tys]] 
+    vars_fmd   = [ mkName ("x"++show n) | n <- [1 .. length tys]]
     mdHeaders  = [ VarE 'get_md_header `AppE` VarE xi | xi <- vars_fmd ]
     body       = TupE [mkMergeBaseMDs mdHeaders, applyE (conMD : map VarE vars_conmd)]
     vars_conmd = vars_fmd --MD [v | (v,t) <- zip vars_fmd tys, hasRep t]
@@ -748,11 +760,11 @@ genParseRecord :: UString -> [FieldInfo] -> (Maybe Exp) -> Q (Dec,Exp)
 genParseRecord c fields pred = do
   c_md <- newName (strToLower c)
   let con_md = buildConstr_md c_md (ConE (mkConstrIMDName c))
-                     [ty | (_,(_,ty),_) <- fields]
-  labMDs  <- sequence [genLabMDName "x" l | (l,(_,_),_) <- fields] 
+                     [ty | (_,(_,ty),_,_) <- fields]
+  labMDs  <- sequence [genLabMDName "x" l | (l,(_,_),_,_) <- fields]
   let fnMDLabs  = applyE $ map VarE (c_md : labMDs)
   doStmts <- sequence $ [genParseField f xn | (f,xn) <- zip fields labMDs]
-  let labs = [mkName lab | (Just lab,(_,ty),_) <- fields, hasRep ty]
+  let labs = [mkName lab | (Just lab,(_,ty),_,_) <- fields, hasRep ty]
   let conLabs = applyE (ConE (mkConstrName c) : map VarE labs)
   returnStmt <- [| return ($(return conLabs),$(return fnMDLabs)) |]
   return (con_md, DoE (concat doStmts ++ [NoBindS returnStmt]))
@@ -764,8 +776,8 @@ genLabMDName s Nothing    = liftM mangleName (newName s)
 
 -- | Generate the parser for a field of a Pads record.
 genParseField :: FieldInfo -> Name -> Q [Stmt]
-genParseField (labM, (strict, ty), expM) xn = do
-  let parseTy = (case expM of 
+genParseField (labM, (strict, ty), expM,_) xn = do
+  let parseTy = (case expM of
                     Nothing  -> genParseTy ty
                     Just exp -> genParseRecConstrain labP (varP xn) ty (return exp))
   sequence $
@@ -782,28 +794,467 @@ genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred
   where
     pred = lamE [labP, xnP] exp
 
+
+-------------------------------------------------------------------------------
+-- * Generating generation functions
+
+-- * Generating Generator Declaration from Type / Data / New declarations
+
+-- These functions largely mirror the structure of the above "ParseM"
+-- functions, differing in the sort of function they output but sharing in
+-- common how they construct said function.
+
+-- | PadsDeclType generator declaration
+genPadsGenM :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
+genPadsGenM name args patM padsTy = do
+  let body = genGenTy padsTy
+  mkGeneratorFunction name args patM body
+
+-- | PadsDeclData generator declaration
+genPadsDataGenM :: UString -> [LString] -> (Maybe Pat) -> PadsData -> Q [Dec]
+genPadsDataGenM name args patM padsData = do
+  let body = genGenData padsData
+  mkGeneratorFunction name args patM body
+
+-- | PadsDeclNew generator declaration
+genPadsNewGenM :: UString -> [LString] -> (Maybe Pat) -> BranchInfo -> Q [Dec]
+genPadsNewGenM name args patM branch = do
+  exp <- genGenBranchInfo branch
+  mkGeneratorFunction name args patM (return exp)
+
+-- | PadsDeclObtain generator declaration - if the user provided a generator,
+-- it will be included. If not, the type will lack a generator. If the user
+-- includes a function conforming to the naming convention of a generator, i.e.
+-- "name_genM" for a PadsTy called "Name," it is redundant (and in fact
+-- erroneous) to include "generator name_genM," as this will result in an
+-- attempted redefinition of name_genM as itself.
+genPadsObtainGenM :: UString -> [LString] -> PadsTy -> Exp -> Maybe Exp -> Q [Dec]
+genPadsObtainGenM name _ _ _ (Just gen) = mkGeneratorFunction name [] Nothing (return gen)
+genPadsObtainGenM _    _ _ _ Nothing    = return []
+
+-- | Create the actual generator function declaration for any PadsDecl flavor
+mkGeneratorFunction :: UString -> [LString] -> Maybe Pat -> Q Exp -> Q [Dec]
+mkGeneratorFunction name args patM body
+  = sequence [fun]
+  where
+    fun = funD generatorName [clause generatorArgs (normalB body) []]
+    generatorName = mkTyGeneratorName name
+    generatorArgs = map (varP . mkVarGeneratorName) args ++ Maybe.maybeToList (return <$> patM)
+
+
+-- * Generating Generators from Union/Switch Expressions
+
+-- | Generate the generators for Pads data declarations.
+genGenData :: PadsData -> Q Exp
+genGenData (PUnion bs)       = genGenUnion bs
+genGenData (PSwitch exp pbs) = do
+  let matches = [match (return p) (normalB $ genGenBranchInfo b) [] | (p,b) <- pbs]
+  caseE (return exp) matches
+
+-- | Creates a runtime function which picks at random from  the generators for
+-- each branch of the union, all of which are created here.
+genGenUnion :: [BranchInfo] -> Q Exp
+genGenUnion bs =
+  case bs of
+    [b] -> genGenBranchInfo b
+    bs  -> do
+      let bs' = map genGenBranchInfo bs
+      index <- newName "index"
+      dos <- newName "dos"
+      bindList <- letS [valD (varP dos) (normalB (listE bs')) []]
+      bindIndex <- bindS (varP index) [| randNumBound (length $(varE dos) - 1) |]
+      indexList <- noBindS [| $(varE dos) !! $(varE index) |]
+      return $ DoE [bindList,bindIndex,indexList]
+
+-- | Dispatch to genGenRecord or genGenConstr
+genGenBranchInfo :: BranchInfo -> Q Exp
+genGenBranchInfo (BRecord c fields pred) = genGenRecord c fields pred
+genGenBranchInfo (BConstr c args   pred) = genGenConstr c args   pred
+
+-- | Generate the template Haskell code for generating a Pads record.
+genGenRecord :: UString -> [FieldInfo] -> (Maybe Exp) -> Q Exp
+genGenRecord c fields pred = do
+  doStmts <- sequence $ map genGenField fields
+  let labels = map mkName $ Maybe.catMaybes $ [label | (label,(_,ty),_,_) <- fields, hasRep ty]
+  let conLabs = applyE (ConE (mkConstrName c) : map VarE labels)
+  returnStmt <- [| (return :: a -> PadsGen a) ($(return conLabs)) |]
+  return $ DoE (concat doStmts ++ [NoBindS returnStmt])
+
+-- | Generate the generator for a field of a Pads record; each one becomes a
+-- binding statement in a haskell do-expression.
+genGenField :: FieldInfo -> Q [Stmt]
+genGenField (labM, (strict, ty), expM, genM) = do
+  let labP  = case labM of Nothing  -> wildP
+                           Just lab -> varP $ mkName lab
+  let genTy = case expM of Nothing  -> case genM of Just gen -> return gen; _ -> genGenTy ty
+                           Just exp -> [| error "genGenField: parameterization via expression unsupported" |]
+  sequence [bindS labP genTy]
+
+-- | Generate the generator for a PADS data constructor (BConstr format of
+-- BranchInfo).
+genGenConstr :: String -> [ConstrArg] -> Maybe Exp -> Q Exp
+genGenConstr c args pred = do
+  let tys  = [ty | (_,ty) <- args]
+  let tys' = map genGenTy (filter hasRep tys)
+  names <- sequence [newName "x" | ty <- tys']
+  binds <- sequence [bindS (varP n) ty | (n,ty) <- zip names tys']
+  let constructor = (conE . mkName) c
+  let toreturn = foldl1 appE (constructor : (map varE names))
+  ret <- noBindS [| (return :: a -> PadsGen a) $toreturn |]
+  return $ DoE (binds ++ [ret])
+
+-- * Generating Generator from Type Expression
+
+-- | Driver function for creating generators. Provided a PadsTy, it will return
+-- a generator customized to work with that particular type.
+genGenTy :: PadsTy -> Q Exp
+genGenTy pty = case pty of
+  PConstrain pat ty exp        -> genGenConstrain pat ty exp
+  PTransform src dest exp genM -> genGenTransform src dest exp genM
+  PList ty sep term            -> genGenList ty sep term
+  PPartition ty exp            -> genGenTy ty
+  PValue exp ty                -> genGenValue exp
+  PApp tys argE                -> genGenTyApp tys argE
+  PTuple tys                   -> genGenTuple tys
+  PExpression exp              -> [| return $(return exp) |]
+  PTycon c                     -> mkGenTycon c
+  PTyvar v                     -> mkGenTyvar v
+
+-- | Generate code that uses the runtime function 'untilM' to generate random
+-- examples of data until one satisfies the constraint. If a predicate
+-- requires that the variable in question be exactly equal to a value,
+-- untilM is bypassed and that value is assigned directly.
+--
+-- e.g. constrain tcpDstPort :: Bits16 16 <| tcpDstPort == 22 |> will avoid
+-- creating new 16-bit values until one happens to be equal to 22, and will
+-- instead assign the literal 22 to tcpDstPort.
+genGenConstrain :: Pat -> PadsTy -> Exp -> Q Exp
+genGenConstrain pat pty e = do
+  name <- newName "x"
+  orig <- bindS (varP name) (genGenTy pty)
+  let pat' = return pat; e' = return e
+  let (VarE x) = fromVarP pat; xName = nameBase x
+  gen <- case e of
+    (UInfixE
+      (VarE (Name (OccName var)  NameS))
+      (VarE (Name (OccName "==") NameS))
+      y) | var == xName -> bindS pat' [| return $(return y) |]
+    (UInfixE
+      y
+      (VarE (Name (OccName "==") NameS))
+      (VarE (Name (OccName var)  NameS)))
+        | var == xName -> bindS pat' [| return $(return y) |]
+    _ -> bindS pat' [| untilM $(lamE [pat'] e') (const $(genGenTy pty)) recLimit $(varE name) |]
+  ret  <- noBindS [| return $(return $ fromVarP pat) |]
+  return $ DoE [orig,gen,ret]
+  where
+    fromVarP :: Pat -> Exp
+    fromVarP (VarP x) = VarE x
+
+-- | If an optional generator is included in the quasiquoted PADS description,
+-- simply provide it. If not, fail with a (hopefully) helpful error message.
+genGenTransform :: PadsTy -> PadsTy -> Exp -> Maybe Exp -> Q Exp
+genGenTransform src dest exp genM = case genM of
+  Just g  -> return g
+  Nothing -> [| (return $
+                 error  $ "genGenTy: PTransform unimplemented. You likely arrived "
+                       ++ "at this error by having an \"obtain\" declaration/expression "
+                       ++ "in your description. If so, you can provide your own "
+                       ++ "generation function f by appending \" generator f\" "
+                       ++ "to it.") :: PadsGen a |]
+
+-- | Generate a list representing a Pads list type. We ignore the separator and
+-- PadsTy termination condition here and include them in the data during
+-- serialization.
+genGenList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> Q Exp
+genGenList pty sep term =
+  case (sep,term) of
+    (_, Just (LLen l)) -> [| sequence $ replicate $(return l) $(genGenTy pty) |]
+    _ -> do
+      name <- newName "n"
+      bind <- bindS (varP name) [| randNumBound 100 |]
+      ret  <- noBindS [| sequence $ replicate $(varE name) $(genGenTy pty) |]
+      return $ DoE (bind : [ret])
+
+-- | All variables on which a PValue statement depends will be in scope at this
+-- point, so the expression can be returned and evaluated at runtime.
+genGenValue :: Exp -> Q Exp
+genGenValue exp = [| return $(return exp) |]
+
+-- | Generate the generator for a Pads tuple
+genGenTuple :: [PadsTy] -> Q Exp
+genGenTuple [] = [| return () |]
+genGenTuple tys = do
+  tys'  <- mapM genGenTy (filter hasRep tys)
+  names <- sequence [newName "x" | t <- tys']
+  let stmts = [BindS (VarP n) t | (n,t) <- zip names tys']
+  ret <- noBindS [| return $(tupE (map varE names)) |]
+  return $ DoE (stmts ++ [ret])
+
+-- | Generate the generator for a Pads type application.
+genGenTyApp :: [PadsTy] -> Maybe Exp -> Q Exp
+genGenTyApp tys expM = do
+  tys' <- mapM genGenTy tys
+  return (foldl1 AppE (tys' ++ Maybe.maybeToList expM))
+
+-- | Basically same as mkParseTycon, but the name that results is different.
+mkGenTycon :: QString -> Q Exp
+mkGenTycon ["EOF"] = varE 'eOF_genM
+mkGenTycon ["EOR"] = varE 'eOR_genM
+mkGenTycon c = (varE . mkTyGeneratorQName) c
+
+-- | Basically same as mkParseTyvar, but the name that results is different.
+mkGenTyvar :: String -> Q Exp
+mkGenTyvar v = varE (mkVarGeneratorName v)
+
+
+-------------------------------------------------------------------------------
+-- * Generating Serialization Functions
+
+-- | Create the serializer for a PadsDeclType declaration
+genPadsSerialize :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
+genPadsSerialize name args patM padsTy = do
+  body <- genSerializeTy padsTy ((Just . VarE . mkName) "rep")
+  return [mkSerializerFunction name args patM body]
+
+-- | Create the serializer for a PadsDeclData declaration
+genPadsDataSerialize :: UString -> [LString] -> Maybe Pat -> PadsData -> Q [Dec]
+genPadsDataSerialize name args patM padsData = do
+  body <- genSerializeData padsData ((Just . VarE . mkName) "rep")
+  return [mkSerializerFunction name args patM body]
+
+-- | Create the serializer for a PadsDeclNew declaration
+genPadsNewSerialize :: UString -> [LString] -> Maybe Pat -> BranchInfo -> Q [Dec]
+genPadsNewSerialize name args pat branch = do
+  exp <- genSerializeUnion [branch] ((Just . VarE . mkName) "rep")
+  return [mkSerializerFunction name args pat exp]
+
+-- | Create the serializer for a PadsDeclObtain declaration
+genPadsObtainSerialize :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
+genPadsObtainSerialize name args padsTy exp = do
+  let trans = PTransform padsTy (PTycon [name]) exp Nothing
+  e <- genSerializeTy trans ((Just . VarE . mkName) "rep")
+  return [mkSerializerFunction name args Nothing e]
+
+-- | Create the function declaration for a serialization function
+mkSerializerFunction :: UString -> [LString] -> Maybe Pat -> Exp -> Dec
+mkSerializerFunction name args patM body =
+  FunD serializerName [Clause (serializerArgs ++ [(VarP . mkName) "rep"]) (NormalB body) []]
+  where
+  serializerName = mkTySerializerName name
+  serializerArgs = map (VarP . mkTySerializerVarName) args ++ Maybe.maybeToList patM
+
+-- | Create the serializer for a given form of PadsData
+genSerializeData :: PadsData -> Maybe Exp -> Q Exp
+genSerializeData (PUnion bs) rep = genSerializeUnion bs rep
+genSerializeData (PSwitch exp pbs) rep = genSerializeSwitch exp pbs rep
+
+-- | Create the serializer for a PUnion type of data constructor
+genSerializeUnion :: [BranchInfo] -> Maybe Exp -> Q Exp
+genSerializeUnion bs (Just rep) = do
+  matches <- concat <$> mapM genSerializeBranchInfo bs
+  return $ CaseE rep matches
+genSerializeUnion bs Nothing = error "genSerializeUnion: expected rep"
+
+-- | At the serialization stage, a PSwitch is simply a sugared PUnion; treat it
+-- accordingly here.
+genSerializeSwitch :: Exp -> [(Pat,BranchInfo)] -> Maybe Exp -> Q Exp
+genSerializeSwitch _ pbs r = genSerializeUnion (map snd pbs) r
+
+-- | Dispatch to the appropriate function based on the type of BranchInfo.
+genSerializeBranchInfo :: BranchInfo -> Q [Match]
+genSerializeBranchInfo (BRecord c fields predM) = genSerializeRecord c fields predM
+genSerializeBranchInfo (BConstr c args predM) = genSerializeConstr c args predM
+
+-- | Serialization of records is accomplished with a case statement at runtime
+-- to bring all names of variables into scope
+genSerializeRecord :: UString -> [FieldInfo] -> Maybe Exp -> Q [Match]
+genSerializeRecord recName fields predM = do
+  let (namesM, tys) = unzip (map (\(n,(_,t),_,_) -> (n,t)) fields)
+  let serializers = map (\(n,t) -> genSerializeTy t ((VarE . mkName) <$> n)) (zip namesM tys)
+  let serialized = [app s n t | (s,n,t) <- zip3 serializers namesM tys]
+  casePat  <- conP (mkName recName) (map (varP . mkName) (Maybe.catMaybes namesM))
+  caseBody <- normalB [| concatCs $(listE serialized) |]
+  return [Match casePat caseBody []]
+  where
+    app :: Q Exp -> Maybe String -> PadsTy -> Q Exp
+    app s (Just n) t = s
+    app s Nothing  t = if hasRep t then s `appE` (genDefTy t) else s
+
+-- | Serialization of branch constructors is somewhat similar to that of
+-- records, but differs in the lack of named variables. Simply create TH
+-- newNames for each relevant variable or constant.
+genSerializeConstr :: String -> [ConstrArg] -> Maybe Exp -> Q [Match]
+genSerializeConstr name args predM = do
+  let tys = [ty | (_,ty) <- args]
+  let tys' = map (flip genSerializeTy Nothing) tys
+  names <- sequence [newName "x" | ty <- tys]
+  let params = [varE n | n <- names]
+  let apps = listE [if hasRep t then s `appE` p else s | (s,p,t) <- zip3 tys' params tys]
+  matchPat  <- conP (mkName name) [varP n | (n, t) <- zip names tys, hasRep t]
+  matchBody <- normalB $ [| concatCs $apps |]
+  return [Match matchPat matchBody []]
+
+-- | Driver function to serialize PadsTys, dispatches to the appropriate helper.
+-- The "Maybe Exp" parameter informs a function whether or not it needs to
+-- apply the serializer it creates to the variable standing for the Haskell data
+-- representation - usually "rep" in generated code.
+genSerializeTy :: PadsTy -> (Maybe Exp) -> Q Exp
+genSerializeTy (PConstrain pat ty exp) r     = genSerializeConstrain pat ty exp r
+genSerializeTy (PTransform src dest exp _) r = genSerializeTransform src dest exp r
+genSerializeTy (PList ty sepM termM) r       = genSerializeList ty sepM termM r
+genSerializeTy (PPartition ty exp) r         = genSerializePartition ty exp r
+genSerializeTy (PValue exp ty) r             = genSerializeValue exp ty r
+genSerializeTy (PApp tys expM) r             = genSerializeApp tys expM r
+genSerializeTy (PTuple tys) r                = genSerializeTuple tys r
+genSerializeTy (PExpression exp) r           = genSerializeExp exp r
+genSerializeTy (PTycon c) r                  = genSerializeTycon c r
+genSerializeTy (PTyvar v) r                  = genSerializeTyvar v r
+
+-- | At the serialization stage, already existing data cannot be constrained,
+-- unlike in the generation stage. Here we merely pass the type back into
+-- genSerializeTy to obtain its serializer.
+genSerializeConstrain :: Pat -> PadsTy -> Exp -> (Maybe Exp) -> Q Exp
+genSerializeConstrain _ ty _ r = genSerializeTy ty r
+
+-- | Serialization of a PTransform PadsTy requires only a thin skin atop the
+-- functions provided for converting between types.
+genSerializeTransform :: PadsTy -> PadsTy -> Exp -> (Maybe Exp) -> Q Exp
+genSerializeTransform src dest (TupE [srcToDest,destToSrc]) r = do
+  let srcSerializer = genSerializeTy src Nothing
+  let destToSrc' = [| \x -> $(return destToSrc) (x, undefined) |]
+  let serializer = [| $srcSerializer . fst . $destToSrc' |]
+  case r of
+    Just rep -> [| $serializer $(return rep) |]
+    Nothing  -> [| $serializer               |]
+
+-- | Create a serializer for a PList, which will intersperse separators and
+-- incorporate terminating conditions as necessary.
+genSerializeList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> (Maybe Exp) -> Q Exp
+genSerializeList ty sepM termM r = do
+  let s = genSerializeTy ty Nothing
+  cs   <- newName "cs"
+  cs'  <- newName "cs_sep"
+  cs'' <- newName "cs_sep_term"
+  dec1 <- [d| $(varP cs) = map $s $(dyn "rep") |]
+  dec2 <- case sepM of
+    Nothing -> [d| $(varP cs') = $(varE cs) |]
+    Just s  -> let
+      def   = genDefTy s
+      def_s = genSerializeTy s Nothing
+      app = if hasRep s then def_s `appE` def else def_s
+      in  [d| $(varP cs') = intersperse $app $(varE cs) |]
+  dec3 <- case termM of
+    Nothing        -> [d| $(varP cs'') = concatCs $(varE cs') |]
+    Just (LLen e)  -> [d| $(varP cs'') = concatCs $(varE cs') |]
+    Just (LTerm t) -> let
+      def   = genDefTy t
+      def_s = genSerializeTy t Nothing
+      app = if hasRep t then def_s `appE` def else def_s
+      in  [d| $(varP cs'') = concatCs $(varE cs') `cApp` $app |]
+  let lamArgs = [(VarP . mkName) "rep"]
+  let letDecs = dec1 ++ dec2 ++ dec3
+  return $
+    case r of Just rep -> (LamE lamArgs $ LetE letDecs (VarE cs'')) `AppE` rep
+              Nothing  -> (LamE lamArgs $ LetE letDecs (VarE cs''))
+
+-- | Create a serializer for a PPartition type. We can ignore "bytes X" and
+-- "none" disciplines, as such disciplines are only relevant to parsing, and
+-- simply serialize the underlying type. As for "newline" and "windows"
+-- disciplines, instead of figure out where to place the relevant characters,
+-- provide a helpful error.
+genSerializePartition :: PadsTy -> Exp -> (Maybe Exp) -> Q Exp
+genSerializePartition ty exp r
+  | exp == (VarE (Name (OccName "newline") NameS))
+        = [| error "genSerializePartition: unimplemented: newline discipline" |]
+  | exp == (VarE (Name (OccName "windows") NameS))
+        = [| error "genSerializePartition: unimplemented: windows discipline" |]
+  | otherwise = genSerializeTy ty r
+
+-- | PValues are stored in a parse result but do not appear in the original
+-- data. Relying on all serializations being concatenated, where each
+-- serialization is a CList, we can provide an "empty" serialization for a
+-- PValue with (const) id.
+genSerializeValue :: Exp -> PadsTy -> (Maybe Exp) -> Q Exp
+genSerializeValue _ _ (Just rep) = [|       id |]
+genSerializeValue _ _ Nothing    = [| const id |]
+
+-- | A PADS application of types is translated directly to a Template Haskell
+-- application (AppE).
+genSerializeApp :: [PadsTy] -> (Maybe Exp) -> (Maybe Exp) -> Q Exp
+genSerializeApp tys expM r = do
+  serializers <- mapM (flip genSerializeTy Nothing) tys
+  return (foldl1 AppE (serializers ++ Maybe.maybeToList expM ++ Maybe.maybeToList r))
+
+-- | In the runtime function, a case statement is deployed to ensure the input
+-- has the correct tuple format, then a serializer for each element of the tuple
+-- is bound in a let statement, with their results concatenated to create the
+-- function's overall result.
+genSerializeTuple :: [PadsTy] -> (Maybe Exp) -> Q Exp
+genSerializeTuple tys r = do
+  let serializers = map (flip genSerializeTy Nothing) tys
+  letnames  <- sequence [newName "k" | s <- serializers] -- newName "x" results in a capturable name?
+  casenames <- sequence [newName "y" | s <- serializers]
+  let letdecs = map mkDec (zip3 letnames casenames (zip tys serializers))
+  let letbody = [| concatCs $(listE $ map varE letnames) |]
+  let casebody = normalB $ letE letdecs letbody
+  let casenames' = [cn | (cn,ty) <- zip casenames tys, hasRep ty]
+  case r
+    of Just rep -> let
+         lamArgs = [(varP . mkName) "rep"]
+         matches = [match (tupP [varP cn | cn <- casenames']) casebody []]
+         in (lamE lamArgs (caseE (dyn "rep") matches)) `appE` (return rep)
+       Nothing -> let
+         lamArgs = [(varP . mkName) "rep"]
+         matches = [match (tupP [varP cn | cn <- casenames']) casebody []]
+         in (lamE lamArgs (caseE (dyn "rep") matches))
+  where
+    mkDec :: (Name, Name, (PadsTy, Q Exp)) -> Q Dec
+    mkDec (ln, cn, (t, t')) = if hasRep t
+      then valD (varP ln) (normalB (appE t' (varE cn))) []
+      else valD (varP ln) (normalB       t'           ) []
+
+
+-- | The runtime function exp_serialize can be called on literal numbers,
+-- characters, and strings, and will serialize them appropriately.
+genSerializeExp :: Exp -> (Maybe Exp) -> Q Exp
+genSerializeExp exp _ = [| exp_serialize $(return exp) |] --error "genSerializeExp: unexpected representation" --appE [| exp_serialize $(return exp) |] (return rep)
+
+-- | A PTycon is represented according to mkTySerializerName, where the
+-- resultant name will be an in-scope runtime serializer.
+genSerializeTycon :: QString -> (Maybe Exp) -> Q Exp
+genSerializeTycon c r = case r of
+  (Just rep) -> return $ AppE ((VarE . mkTySerializerQName) c) rep
+  Nothing    -> return $       (VarE . mkTySerializerQName) c
+
+-- | A PTyvar is represented according to mkTySerializerVarName, where the
+-- resultant name will stand for a serializer the user must provide.
+genSerializeTyvar :: String -> (Maybe Exp) -> Q Exp
+genSerializeTyvar s (Just rep) = return $ (VarE $ mkTySerializerVarName s) `AppE` rep
+genSerializeTyvar s Nothing    = return $ (VarE $ mkTySerializerVarName s)
+
 -------------------------------------------------------------------------------
 -- Generating Printing Function from a Declaration
 
 -- | Generate the lazy "function list" printer for a given 'PadsTy' Pads type as
 -- parsed using Pads' plain-type syntactic form..
 genPadsPrintFL :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
-genPadsPrintFL name args patM padsTy = do 
+genPadsPrintFL name args patM padsTy = do
   let rm = [mkName "rep", mkName "md"]
   body  <- genPrintTy padsTy $ Just $ TupE (map VarE rm)
   return [mkPrinterFunction name args rm patM body]
 
 -- | Generate the lazy function list printer for the Pads data-type syntactic
 -- form.
-genPadsDataPrintFL :: UString -> [LString] -> Maybe Pat -> PadsData -> Q [Dec] 
+genPadsDataPrintFL :: UString -> [LString] -> Maybe Pat -> PadsData -> Q [Dec]
 genPadsDataPrintFL name args patM padsData = do
   let rm = [mkName "rep", mkName "md"]
   body  <- genPrintData padsData $ Just $ TupE (map VarE rm)
   return [mkPrinterFunction name args rm patM body]
 
 -- | Generate the lazy function list printer for the Pads newtype syntactic form.
-genPadsNewPrintFL :: UString -> [LString] -> Maybe Pat -> BranchInfo -> Q [Dec] 
-genPadsNewPrintFL name args patM branch = do 
+genPadsNewPrintFL :: UString -> [LString] -> Maybe Pat -> BranchInfo -> Q [Dec]
+genPadsNewPrintFL name args patM branch = do
   let rm = [mkName "rep", mkName "md"]
   matches <- genPrintBranchInfo False branch
   let body = CaseE (TupE (map VarE rm)) matches
@@ -813,7 +1264,7 @@ genPadsNewPrintFL name args patM branch = do
 genPadsObtainPrintFL :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
 genPadsObtainPrintFL name args padsTy exp = do
   let rm = [mkName "rep", mkName "md"]
-  body  <- genPrintTy (PTransform padsTy (PTycon [name]) exp) $ Just $ TupE (map VarE rm)
+  body  <- genPrintTy (PTransform padsTy (PTycon [name]) exp Nothing) $ Just $ TupE (map VarE rm)
   return [mkPrinterFunction name args rm Nothing body]
 
 -- | Make the function declaration for the "lazy function list" printer with the
@@ -834,7 +1285,7 @@ mkPrinterFunction name args rm patM body =
 -- translated.
 genPrintTy :: PadsTy -> Maybe Exp -> Q Exp
 genPrintTy (PConstrain pat ty exp) rm   = genPrintTy ty rm  -- XXX: doesn't check the constraint; ideally we should change @printFL@ to account for possible printing errors
-genPrintTy (PTransform src dest exp) rm = genPrintTrans src exp rm
+genPrintTy (PTransform src dest exp _) rm = genPrintTrans src exp rm
 genPrintTy (PList ty sepM termM) rm     = genPrintList ty sepM termM >>= applyPrintTy rm
 genPrintTy (PPartition ty exp) rm       = [| (error "genPrintTy PPartition not implemented") |] --genPrintPartition ty exp rm
 genPrintTy (PApp tys expM) rm           = genPrintTyApp tys expM >>= applyPrintTy rm
@@ -883,12 +1334,12 @@ applyPrintTy rm f = do
 
 -- | Generate the template haskell code for printing a 'PList' Pads type.
 genPrintList :: PadsTy -> Maybe PadsTy -> Maybe TermCond -> Q Exp
-genPrintList ty sepOpt termCondOpt = do 
+genPrintList ty sepOpt termCondOpt = do
   (elemRepE, elemRepP) <- doGenPE "elemrep"
   (elemMDE,  elemMDP)  <- doGenPE "elemmd"
   parseElemE <- genPrintTy ty $ Just $ TupE [elemRepE,elemMDE]
   let parseElemFnE = LamE [TupP [elemRepP, elemMDP]] parseElemE
-  sepElemE <- case sepOpt of 
+  sepElemE <- case sepOpt of
     Nothing -> return (VarE 'printNothing)
     Just ty -> do
       def <- genDefTy ty
@@ -922,7 +1373,7 @@ genPrintTuple tys (Just rm) = do
   let mdPats = map VarP (Maybe.catMaybes mdNamesM)
   inners <- sequence [genPrintTupleInner t r m | (t,r,m) <- zip3 tys repNamesM mdNamesM{-, hasRep t-}]
   return $ CaseE rm
-                [Match (TupP [TupP $ repPats, TupP [SigP WildP (ConT ''Base_md), (TupP mdPats)]]) 
+                [Match (TupP [TupP $ repPats, TupP [SigP WildP (ConT ''Base_md), (TupP mdPats)]])
                        (NormalB (VarE 'concatFL `AppE` ListE inners))
                        []]
 genPrintTuple tys Nothing = do
@@ -948,7 +1399,7 @@ genNamesforTuple True str tys = sequence [if hasRep ty then fmap Just (newName s
 -- | Generate the template haskell print function for some type inside of a
 -- tuple based on whether or not that type has an in-memory representation
 -- '(Just r)' and a metadata representation '(Just m)'.
-genPrintTupleInner t (Just r) (Just m)  = genPrintTy t (Just (TupE [VarE r,VarE m])) 
+genPrintTupleInner t (Just r) (Just m)  = genPrintTy t (Just (TupE [VarE r,VarE m]))
 genPrintTupleInner t Nothing (Just m)   = genDefTy t >>= \def -> genPrintTy t (Just (TupE [def, VarE m]))
 genPrintTupleInner t Nothing Nothing    = genPrintTy t Nothing
 genPrintTupleInner t (Just r) Nothing   = error ("genPrintTupleInner: Type '" ++ show t
@@ -1001,10 +1452,10 @@ genPrintBranchInfo doDef (BConstr c args predM) = genPrintConstr doDef c args pr
 -- | Generate the individual 'Match' of the Haskell case expression for matching
 -- on a record being printed.
 genPrintRecord :: UString -> [FieldInfo] -> Maybe Exp -> Q [Match]
-genPrintRecord (mkName -> recName) fields predM = do 
+genPrintRecord (mkName -> recName) fields predM = do
   (repEs, repPs) <- getPEforFields (\t -> genDefTy t >>= \def -> return $ SigE def (mkRepTy t)) (return . getBranchNameL) fields
   (mdEs,  mdPs)  <- getPEforFields (return . SigE (VarE 'myempty) . mkMDTy False) (return . getBranchMDNameL) fields
-  let ptys = map (\(n,(_,ty),p) -> ty) fields
+  let ptys = map (\(n,(_,ty),p,_) -> ty) fields
   let ty_rep_mds = zip3 ptys repEs mdEs
   expE <- mapM (\(ty,r,m) -> genPrintTy ty $ Just $ TupE [r,m]) ty_rep_mds
   let printItemsE = ListE expE
@@ -1017,7 +1468,7 @@ genPrintRecord (mkName -> recName) fields predM = do
 
 -- | Get the printer expression for an individual field of a record.
 getPEforField :: (PadsTy -> Q Exp) -> (String -> Q Name) -> FieldInfo -> Q (Exp, Maybe FieldPat)
-getPEforField def mkFieldNm (nameOpt, (strict,pty), optPred) = case nameOpt of
+getPEforField def mkFieldNm (nameOpt, (strict,pty), optPred, _) = case nameOpt of
   Nothing -> def pty >>= \d -> return (d,Nothing)
   Just str -> do
     name <- mkFieldNm str
@@ -1037,10 +1488,10 @@ getPEforFields def mkFieldNm fields = do
 -- for a Pads value constructor.
 genPrintConstr :: Bool -> String -> [ConstrArg] -> (Maybe Exp) -> Q [Match]
 genPrintConstr doDef (mkName -> recName) args predM = do
-  let fields = map (\c -> (Just "arg",c,Nothing)) args
+  let fields = map (\c -> (Just "arg",c,Nothing,Nothing)) args
   (repEs, repPs) <- getPEforFields (\t -> genDefTy t >>= \def -> return $ SigE def (mkRepTy t)) newName fields
   (mdEs,  mdPs)  <- getPEforFields (return . SigE (VarE 'myempty) . mkMDTy False) newName fields
-  let ptys = map (\(n,(s,ty),p) -> ty) fields
+  let ptys = map (\(n,(s,ty),p,_) -> ty) fields
 
   let genBody mdEs = (do
       { let genTyRepMd = (\(ty,r,m) -> if hasRep ty then return (ty,r,m) else genDefTy ty >>= (\def -> return (ty,SigE def (mkRepTy ty),m)))
@@ -1051,7 +1502,7 @@ genPrintConstr doDef (mkName -> recName) args predM = do
       ; return caseBody
       })
 
-  let repPat = ConP recName (filterByHasRep ptys $ map snd repPs)  
+  let repPat = ConP recName (filterByHasRep ptys $ map snd repPs)
   let mdPat  = TupP[SigP WildP (ConT ''Base_md), ConP (getStructInnerMDName recName) (map snd mdPs)]
 
   caseBody <- genBody mdEs
@@ -1072,26 +1523,26 @@ genPrintSwitch exp pbs rm = genPrintUnion (map snd pbs) rm
 
 -- | Generate the Pads default value for a 'PadsDeclType'
 genPadsDef :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
-genPadsDef name args patM padsTy = do 
+genPadsDef name args patM padsTy = do
   body  <- genDefTy padsTy
   return [mkDefFunction name args patM body]
 
 -- | Generate the Pads default value for a Pads data declaration.
-genPadsDataDef :: UString -> [LString] -> Maybe Pat -> PadsData -> Q [Dec] 
+genPadsDataDef :: UString -> [LString] -> Maybe Pat -> PadsData -> Q [Dec]
 genPadsDataDef name args patM padsData = do
   body  <- genDefData padsData
   return [mkDefFunction name args patM body]
 
 -- | Generate the Pads default value for a Pads newtype declaration.
-genPadsNewDef :: UString -> [LString] -> Maybe Pat -> BranchInfo -> Q [Dec] 
-genPadsNewDef name args patM branch = do 
+genPadsNewDef :: UString -> [LString] -> Maybe Pat -> BranchInfo -> Q [Dec]
+genPadsNewDef name args patM branch = do
   body <- genDefBranchInfo branch
   return [mkDefFunction name args patM body]
 
 -- | Generate the Pads default value for a Pads obtain declaration.
 genPadsObtainDef :: UString -> [LString] -> PadsTy -> Exp -> Q [Dec]
 genPadsObtainDef name args padsTy exp = do
-  body  <- genDefTy (PTransform padsTy (PTycon [name]) exp)
+  body  <- genDefTy (PTransform padsTy (PTycon [name]) exp Nothing)
   return [mkDefFunction name args Nothing body]
 
 -- | Generate the Pads default value as a function declaration of the form
@@ -1109,7 +1560,7 @@ mkDefFunction name args patM body =
 -- | Generate the default Haskell value for some Pads type.
 genDefTy :: PadsTy -> Q Exp
 genDefTy (PConstrain pat ty exp)   = genDefTy ty  -- XXX: doesn't check the constraint; ideally we should change @printFL@ to account for possible printing errors
-genDefTy (PTransform src dest exp) = do
+genDefTy (PTransform src dest exp _) = do
   defSrc <- genDefTy src
   srcToDest <- [| \rep -> fst $ (fst $(return exp)) S.zeroSpan (rep,(error "TODO defaultMd")) |] -- XXX: fix this undefined, it kind of requires defaultMd to be defined inductively over Pads types as well...
   return $ AppE srcToDest defSrc
@@ -1152,13 +1603,13 @@ genDefBranchInfo (BConstr c args pred) = do
   reps <- sequence $ [genDefTy ty | (strict,ty) <- args, hasRep ty]
   return $ foldl1 AppE (ConE (mkConstrName c):reps)
 genDefBranchInfo (BRecord c fields expM) = do
-  reps <- sequence $ [liftM (l,) (genDefTy ty) | (Just l,(strict,ty),_) <- fields, hasRep ty]
+  reps <- sequence $ [liftM (l,) (genDefTy ty) | (Just l,(strict,ty),_,_) <- fields, hasRep ty]
 
   let lets = flip map reps $ \(lab,def) -> ValD (VarP $ mkName lab) (NormalB def) []
   return $ LetE lets $ foldl1 AppE (ConE (mkConstrName c):map (VarE . mkName . fst) reps)
 
 -------------------------------------------------------------------------------
--- * Name Manipulation Functions 
+-- * Name Manipulation Functions
 
 -- ** Naming types, and accessing the names of types
 
@@ -1194,7 +1645,7 @@ mkFieldName str   = mkName str
 -- monad.
 mkFieldMDName str = mkName (str ++ "_md")
 
--- | Pads constructor 
+-- | Pads constructor
 mkConstrName   str  = mkName str
 mkConstrIMDName str = mkName (str ++ "_imd")
 mkfnMDName str      = mkName (strToLower str ++ "_md")
@@ -1222,12 +1673,24 @@ getStructInnerMDName name = let str = show name in mkName (str++"_imd")
 mkTyPrinterName str    = mkName (strToLower str ++ "_printFL")
 mkTyPrinterQName str    = mkName (appendLower str "_printFL")
 mkTyPrinterVarName str = mkName (str ++ "__pr")
- 
+
 mkTyDefName str    = mkName (strToLower str ++ "_def")
 mkTyDefQName str    = mkName (appendLower str "_def")
 mkTyDefVarName str = mkName (str ++ "__d")
 
- 
+
+-- ** Naming Generators
+
+mkTyGeneratorName str = mkName (strToLower str ++ "_genM")
+mkTyGeneratorQName str = mkName (appendLower str "_genM")
+mkVarGeneratorName str = mkName (strToLower str ++ "__g")
+
+-- ** Naming Serializers
+
+mkTySerializerName str = mkName (strToLower str ++ "_serialize")
+mkTySerializerQName str = mkName (appendLower str "_serialize")
+mkTySerializerVarName str = mkName (str ++ "__s")
+
 
 appendTo :: QString -> String -> String
 appendTo ms s    = qName (init ms ++ [last ms ++ s])
@@ -1246,4 +1709,3 @@ foldr1M f (x:xs) = f x =<< foldr1M f xs
 appT2 f x y = AppT (AppT f x) y
 
 appE3 f x y z = AppE (AppE (AppE f x) y) z
-
