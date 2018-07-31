@@ -986,7 +986,7 @@ data Chunk = CharChunk   Char
 -- are the relevant ones, somewhat in opposition to the way Chunks represent
 -- binary but in harmony with the way the parsing engine handles non-byte-
 -- aligned data.
-fromChunks :: [Chunk] -> [Word8]
+fromChunks :: [Chunk] -> B.ByteString
 fromChunks cs = let
   bits = concat $ chunksToBits cs
   toPad = case (8 - ((length bits) `mod` 8)) of 8 -> 0; x -> x
@@ -994,7 +994,7 @@ fromChunks cs = let
   bytes = asBytes $ bits ++ padding
   in if   (length (bits ++ padding) `mod` 8) /= 0
      then error "fromChunks: bug in binary conversion"
-     else map fromBytes bytes
+     else B.pack $ map fromBytes bytes
   where
     chunksToBits :: [Chunk] -> [[Word8]]
     chunksToBits [] = []
