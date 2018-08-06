@@ -1145,8 +1145,12 @@ genSerializeList ty sepM termM r = do
       app = if hasRep s then def_s `appE` def else def_s
       in  [d| $(varP cs') = intersperse $app $(varE cs) |]
   dec3 <- case termM of
-    Nothing        -> [d| $(varP cs'') = concatCs $(varE cs') |]
-    Just (LLen e)  -> [d| $(varP cs'') = concatCs $(varE cs') |]
+    Nothing -> [d| $(varP cs'') = concatCs $(varE cs') |]
+    Just (LLen e) -> case sepM of
+      Nothing ->
+        [d| $(varP cs'') = concatCs $ take  $(return e)        $(varE cs') |]
+      Just _  ->
+        [d| $(varP cs'') = concatCs $ take ($(return e)*2 - 1) $(varE cs') |]
     Just (LTerm t) -> let
       def   = genDefTy t
       def_s = genSerializeTy t Nothing

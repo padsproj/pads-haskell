@@ -261,11 +261,12 @@ constrainedGenTest = do
   return $ all (== "cc") (map (take 2) ss)
 
 -- PLists of several forms
--- TODO: terminator LLen
-[pads| type RegularList = [Bits8 8]
-       type SepList     = [Bits8 8 | '|']
-       type SepTermList = [Bits8 8 | '|'] terminator Char
-       --type SepTermList2 = [Bits8 8 | '|'] terminator EOR |]
+[pads| type RegularList    = [Bits8 8]
+       type SepList        = [Bits8 8 | '|']
+       type SepTermList    = [Bits8 8 | '|'] terminator Char
+       type SepTermListLit = [Char | '|'] terminator '~'
+       type LenList        = [Digit] length 5
+       type SepLenList     = [Digit | '|'] length 5 |]
 
 regularListTest_name = "RegularList"
 regularListTest_expected = [(BinaryChunk 10) 8, (BinaryChunk 5) 8]
@@ -281,7 +282,7 @@ sepListTest_got = fromCL $ sepList_serialize [10, 5]
 sepListTest
   = TestCase (sepListTest_expected @=? sepListTest_got)
 
-sepTermListTest_name = "SepTermList"
+sepTermListTest_name = "SepTermList, Type Terminator"
 sepTermListTest_expected
   = [(BinaryChunk 10) 8, CharChunk '|', (BinaryChunk 5) 8, CharChunk 'X']
 sepTermListTest_got
@@ -294,6 +295,57 @@ sepTermListBytesTest_expected = B.pack [10, 124, 5, 88]
 sepTermListBytesTest_got = fromChunks sepTermListTest_got
 sepTermListBytesTest
   = TestCase (sepTermListBytesTest_expected @=? sepTermListBytesTest_got)
+
+sepTermListLitTest_name = "SepTermList, Literal Terminator"
+sepTermListLitTest_expected
+  = [CharChunk 'a', CharChunk '|', CharChunk 'b', CharChunk '~']
+sepTermListLitTest_got
+  = fromCL $ sepTermListLit_serialize "ab"
+sepTermListLitTest
+  = TestCase (sepTermListLitTest_expected @=? sepTermListLitTest_got)
+
+sepTermListLitCycleTest_name = "SepTermListLit Cycle"
+sepTermListLitCycleTest = do
+  ls <- replicateM sampleSize (runGen sepTermListLit_genM)
+  let ls_serialized = map (BC.unpack . fromChunks . fromCL . sepTermListLit_serialize) ls
+  let ls_parsed = map (fst . fst . sepTermListLit_parseS) ls_serialized
+  return $ ls == ls_parsed
+
+lenListTest_name = "LenList"
+lenListTest_expected
+  = [CharChunk '6', CharChunk '5', CharChunk '5', CharChunk '3',
+     CharChunk '5']
+lenListTest_got
+  = fromCL $ lenList_serialize [6, 5, 5, 3, 5, 0, 0, 0]
+lenListTest
+  = TestCase (lenListTest_expected @=? lenListTest_got)
+
+lenListCycleTest_name = "LenList Cycle"
+lenListCycleTest = do
+  ls <- replicateM sampleSize (runGen lenList_genM)
+  let ls_serialized = map (BC.unpack . fromChunks . fromCL . lenList_serialize) ls
+  let ls_parsed = map (fst . fst . lenList_parseS) ls_serialized
+  return $ ls == ls_parsed
+
+sepLenListTest_name = "SepLenList"
+sepLenListTest_expected
+  = [CharChunk '6', CharChunk '|',
+     CharChunk '5', CharChunk '|',
+     CharChunk '5', CharChunk '|',
+     CharChunk '3', CharChunk '|',
+     CharChunk '5']
+sepLenListTest_got
+  = fromCL $ sepLenList_serialize [6, 5, 5, 3, 5, 0, 0, 0]
+sepLenListTest
+  = TestCase (sepLenListTest_expected @=? sepLenListTest_got)
+
+sepLenListCycleTest_name = "SepLenList Cycle"
+sepLenListCycleTest = do
+  ls <- replicateM sampleSize (runGen sepLenList_genM)
+  let ls_serialized = map (BC.unpack . fromChunks . fromCL . sepLenList_serialize) ls
+  let ls_parsed = map (fst . fst . sepLenList_parseS) ls_serialized
+  return $ ls == ls_parsed
+
 
 -- Run-of-the-mill record with sub-byte data
 [pads| data Pixel = Pixel { a :: Bits16 9
@@ -518,16 +570,18 @@ paramGenTest
   = TestCase (assert paramGenTest_invariant)
 
 -- Obtain with custom generator (non-isomorphic types)
-[pads| type Hex = obtain Int from String using <| (hexStrToInt, intToHexStr) |> generator absInt_genM |]
+[pads| type Hex = obtain Word from String using <| (hexStrToWord, wordToHexStr) |> generator word_genM |]
 
-hexStrToInt :: Span -> (String, String_md) -> (Int, Int_md)
-hexStrToInt _ (s, md) = ((fst . (!! 0) . readHex) s, md)
+type Word_md = Int_md
 
-intToHexStr :: (Int, Int_md) -> (String, String_md)
-intToHexStr (i, md) = (showHex i "", md)
+hexStrToWord :: Span -> (String, String_md) -> (Word, Word_md)
+hexStrToWord _ (s, md) = ((fromIntegral . fst . (!! 0) . readHex) s, md)
 
-absInt_genM :: PadsGen Int
-absInt_genM = abs <$> randNum
+wordToHexStr :: (Word, Word_md) -> (String, String_md)
+wordToHexStr (i, md) = (showHex (fromIntegral i) "", md)
+
+word_genM :: PadsGen Word
+word_genM = abs <$> randNum
 
 hexObtainTest_name = "Hex Obtain"
 hexObtainTest_expected
@@ -824,82 +878,88 @@ binCharEquivTest = let
   ccs2' = fromChunks ccs2
   in (return :: a -> IO a) (bcs' == ccs' && bcs2' == ccs2')
 
-tests = TestList [ charTest_name              ~: charTest
-                 , charCycleTest_name         ~: charCycleTest
-                 , intTest_name               ~: intTest
-                 , intCycleTest_name          ~: intCycleTest
-                 , bits8Test_name             ~: bits8Test
-                 , bits8CycleTest_name        ~: bits8CycleTest
-                 , bits8MisalignedTest_name   ~: bits8MisalignedTest
-                 , bits16Test_name            ~: bits16Test
-                 , bits16CycleTest_name       ~: bits16CycleTest
-                 , bits16MisalignedTest_name  ~: bits16MisalignedTest
-                 , bits32Test_name            ~: bits32Test
-                 , bits32CycleTest_name       ~: bits32CycleTest
-                 , bits64Test_name            ~: bits64Test
-                 , bits64CycleTest_name       ~: bits64CycleTest
-                 , bitBoolTest_name           ~: bitBoolTest
-                 , bitBoolCycleTest_name      ~: bitBoolCycleTest
-                 , bitFieldCycleTest_name     ~: bitFieldCycleTest
-                 , bytesTest_name             ~: bytesTest
-                 , myStringCTest_name         ~: myStringCTest
-                 , myStringCCycleTest_name    ~: myStringCCycleTest
-                 , myTupleTest_name           ~: myTupleTest
-                 , myTupleCycleTest_name      ~: myTupleCycleTest
-                 , byteTest_name              ~: byteTest
-                 , byteCycleTest_name         ~: byteCycleTest
-                 , twoBytesTest_name          ~: twoBytesTest
-                 , twoBytesCycleTest_name     ~: twoBytesCycleTest
-                 , nestedTupleTest_name       ~: nestedTupleTest
-                 , constrainedStringTest_name ~: constrainedStringTest
-                 , constrainedGenTest_name    ~: constrainedGenTest
-                 , regularListTest_name       ~: regularListTest
-                 , sepListTest_name           ~: sepListTest
-                 , sepTermListTest_name       ~: sepTermListTest
-                 , sepTermListBytesTest_name  ~: sepTermListBytesTest
-                 , pixelTest_name             ~: pixelTest
-                 , pixelBytesTest_name        ~: pixelBytesTest
-                 , pixelCycleTest_name        ~: pixelCycleTest
-                 , recordConstantsTest_name   ~: recordConstantsTest
-                 , constantsCycleTest_name    ~: constantsCycleTest
-                 , fooFooTest_name            ~: fooFooTest
-                 , fooBarTest_name            ~: fooBarTest
-                 , myConstr1WithArgsTest_name ~: myConstr1WithArgsTest
-                 , myConstr2NoArgsTest_name   ~: myConstr2NoArgsTest
-                 , myConstr3TVArgsTest_name   ~: myConstr3TVArgsTest
-                 , myConstr4NoArgsTest_name   ~: myConstr4NoArgsTest
-                 --, myConstrCycleTest_name     ~: myConstrCycleTest
-                 , myListEmptyTest_name       ~: myListEmptyTest
-                 , myListNonemptyTest_name    ~: myListNonemptyTest
-                 , myListCycleTest_name       ~: myListCycleTest
-                 , nTTest_name                ~: nTTest
-                 , nTCycleTest_name           ~: nTCycleTest
-                 , switchTest_name            ~: switchTest
-                 , switchCycleTest_name       ~: switchCycleTest
-                 , dependentSerTest_name      ~: dependentSerTest
-                 , dependentGenTest_name      ~: dependentGenTest
-                 , paramSerTest_name          ~: paramSerTest
-                 , paramGenTest_name          ~: paramGenTest
-                 , hexObtainTest_name         ~: hexObtainTest
-                 , hexCycleTest_name          ~: hexCycleTest
-                 , littleInt8Test_name        ~: littleInt8Test
-                 , littleInt16Test_name       ~: littleInt16Test
-                 , littleInt32Test_name       ~: littleInt32Test
-                 , bigInt8Test_name           ~: bigInt8Test
-                 , bigInt16Test_name          ~: bigInt16Test
-                 , bigInt32Test_name          ~: bigInt32Test
-                 , withGensTest_name          ~: withGensTest
-                 , pCAPCycleTest_name         ~: pCAPCycleTest
-                 , emptyChunksTest_name       ~: emptyChunksTest
-                 , charChunksTest_name        ~: charChunksTest
-                 , binaryChunksTest_name      ~: binaryChunksTest
-                 , bigBinaryChunksTest_name   ~: bigBinaryChunksTest
-                 , bigBinaryChunks2Test_name  ~: bigBinaryChunks2Test
-                 , misalignedChunksTest_name  ~: misalignedChunksTest
-                 , misalignedChunks2Test_name ~: misalignedChunks2Test
-                 , mixedChunksTest_name       ~: mixedChunksTest
-                 , mixedChunks2Test_name      ~: mixedChunks2Test
-                 , binCharEquivTest_name      ~: binCharEquivTest
+tests = TestList [ charTest_name                ~: charTest
+                 , charCycleTest_name           ~: charCycleTest
+                 , intTest_name                 ~: intTest
+                 , intCycleTest_name            ~: intCycleTest
+                 , bits8Test_name               ~: bits8Test
+                 , bits8CycleTest_name          ~: bits8CycleTest
+                 , bits8MisalignedTest_name     ~: bits8MisalignedTest
+                 , bits16Test_name              ~: bits16Test
+                 , bits16CycleTest_name         ~: bits16CycleTest
+                 , bits16MisalignedTest_name    ~: bits16MisalignedTest
+                 , bits32Test_name              ~: bits32Test
+                 , bits32CycleTest_name         ~: bits32CycleTest
+                 , bits64Test_name              ~: bits64Test
+                 , bits64CycleTest_name         ~: bits64CycleTest
+                 , bitBoolTest_name             ~: bitBoolTest
+                 , bitBoolCycleTest_name        ~: bitBoolCycleTest
+                 , bitFieldCycleTest_name       ~: bitFieldCycleTest
+                 , bytesTest_name               ~: bytesTest
+                 , myStringCTest_name           ~: myStringCTest
+                 , myStringCCycleTest_name      ~: myStringCCycleTest
+                 , myTupleTest_name             ~: myTupleTest
+                 , myTupleCycleTest_name        ~: myTupleCycleTest
+                 , byteTest_name                ~: byteTest
+                 , byteCycleTest_name           ~: byteCycleTest
+                 , twoBytesTest_name            ~: twoBytesTest
+                 , twoBytesCycleTest_name       ~: twoBytesCycleTest
+                 , nestedTupleTest_name         ~: nestedTupleTest
+                 , constrainedStringTest_name   ~: constrainedStringTest
+                 , constrainedGenTest_name      ~: constrainedGenTest
+                 , regularListTest_name         ~: regularListTest
+                 , sepListTest_name             ~: sepListTest
+                 , sepTermListTest_name         ~: sepTermListTest
+                 , sepTermListBytesTest_name    ~: sepTermListBytesTest
+                 , sepTermListLitTest_name      ~: sepTermListLitTest
+                 , sepTermListLitCycleTest_name ~: sepTermListLitCycleTest
+                 , lenListTest_name             ~: lenListTest
+                 , lenListCycleTest_name        ~: lenListCycleTest
+                 , sepLenListTest_name          ~: sepLenListTest
+                 , sepLenListCycleTest_name     ~: sepLenListCycleTest
+                 , pixelTest_name               ~: pixelTest
+                 , pixelBytesTest_name          ~: pixelBytesTest
+                 , pixelCycleTest_name          ~: pixelCycleTest
+                 , recordConstantsTest_name     ~: recordConstantsTest
+                 , constantsCycleTest_name      ~: constantsCycleTest
+                 , fooFooTest_name              ~: fooFooTest
+                 , fooBarTest_name              ~: fooBarTest
+                 , myConstr1WithArgsTest_name   ~: myConstr1WithArgsTest
+                 , myConstr2NoArgsTest_name     ~: myConstr2NoArgsTest
+                 , myConstr3TVArgsTest_name     ~: myConstr3TVArgsTest
+                 , myConstr4NoArgsTest_name     ~: myConstr4NoArgsTest
+                 --, myConstrCycleTest_name       ~: myConstrCycleTest
+                 , myListEmptyTest_name         ~: myListEmptyTest
+                 , myListNonemptyTest_name      ~: myListNonemptyTest
+                 , myListCycleTest_name         ~: myListCycleTest
+                 , nTTest_name                  ~: nTTest
+                 , nTCycleTest_name             ~: nTCycleTest
+                 , switchTest_name              ~: switchTest
+                 , switchCycleTest_name         ~: switchCycleTest
+                 , dependentSerTest_name        ~: dependentSerTest
+                 , dependentGenTest_name        ~: dependentGenTest
+                 , paramSerTest_name            ~: paramSerTest
+                 , paramGenTest_name            ~: paramGenTest
+                 , hexObtainTest_name           ~: hexObtainTest
+                 , hexCycleTest_name            ~: hexCycleTest
+                 , littleInt8Test_name          ~: littleInt8Test
+                 , littleInt16Test_name         ~: littleInt16Test
+                 , littleInt32Test_name         ~: littleInt32Test
+                 , bigInt8Test_name             ~: bigInt8Test
+                 , bigInt16Test_name            ~: bigInt16Test
+                 , bigInt32Test_name            ~: bigInt32Test
+                 , withGensTest_name            ~: withGensTest
+                 , pCAPCycleTest_name           ~: pCAPCycleTest
+                 , emptyChunksTest_name         ~: emptyChunksTest
+                 , charChunksTest_name          ~: charChunksTest
+                 , binaryChunksTest_name        ~: binaryChunksTest
+                 , bigBinaryChunksTest_name     ~: bigBinaryChunksTest
+                 , bigBinaryChunks2Test_name    ~: bigBinaryChunks2Test
+                 , misalignedChunksTest_name    ~: misalignedChunksTest
+                 , misalignedChunks2Test_name   ~: misalignedChunks2Test
+                 , mixedChunksTest_name         ~: mixedChunksTest
+                 , mixedChunks2Test_name        ~: mixedChunks2Test
+                 , binCharEquivTest_name        ~: binCharEquivTest
                  ]
 
 test = runTestTT tests
