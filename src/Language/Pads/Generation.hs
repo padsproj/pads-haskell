@@ -10,7 +10,7 @@ import System.Random.MWC
 
 -- | A custom application of the ReaderT monad, allowing threaded access to a
 -- random generator, supplied when the generation function is called at top
--- level (i.e. via runGen)
+-- level (i.e. via runPadsGen)
 newtype PadsGen a = PadsGen { unPadsGen :: ReaderT GenIO IO a }
   -- Here 'Gen RealWorld' is equal to 'GenIO' above. We can't write
   -- 'GenIO' here because 'GenIO' is defined as 'Gen (PrimState IO)',
@@ -22,8 +22,8 @@ newtype PadsGen a = PadsGen { unPadsGen :: ReaderT GenIO IO a }
 
 -- | Provides the requisite random number generator to the supplied generation
 -- computation and returns the result as a value in IO.
-runGen :: PadsGen a -> IO a
-runGen genM = do
+runPadsGen :: PadsGen a -> IO a
+runPadsGen genM = do
   gen <- createSystemRandom
   runReaderT (unPadsGen genM) gen
 

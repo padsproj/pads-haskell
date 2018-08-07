@@ -603,7 +603,7 @@ stringC_genM c = do
   replicateM i (randLetterExcluding c)
 
 stringC_serialize :: Char -> StringC -> CList
-stringC_serialize c s = (string_serialize s) `cApp` (toCL [CharChunk c])
+stringC_serialize c s = (string_serialize s) `cAppend` (toCL [CharChunk c])
 
 -----------------------------------------------------------------
 
@@ -1024,11 +1024,11 @@ type CList = [Chunk] -> [Chunk]
 instance Show CList where
   show cl = show $ fromCL cl
 
-cApp :: CList -> CList -> CList
-cs1 `cApp` cs2 = cs1 . cs2
+cAppend :: CList -> CList -> CList
+cs1 `cAppend` cs2 = cs1 . cs2
 
-concatCs :: [CList] -> CList
-concatCs cl = foldr cApp id cl
+cConcat :: [CList] -> CList
+cConcat cl = foldr cAppend id cl
 
 toCL :: [Chunk] -> CList
 toCL cs = (cs ++)

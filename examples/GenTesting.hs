@@ -54,7 +54,7 @@ charTest = TestCase (charTest_expected @=? charTest_got)
 
 charCycleTest_name = "Char Cycle"
 charCycleTest = do
-  cs <- replicateM sampleSize (runGen char_genM)
+  cs <- replicateM sampleSize (runPadsGen char_genM)
   let cs_serialized = map (BC.unpack . fromChunks . fromCL . char_serialize) cs
   let cs_parsed = map (fst . fst . (parseStringInput char_parseM)) cs_serialized
   return $ cs == cs_parsed
@@ -66,7 +66,7 @@ intTest = TestCase (intTest_expected @=? intTest_got)
 
 intCycleTest_name = "Int Cycle"
 intCycleTest = do
-  xs <- replicateM sampleSize (runGen int_genM)
+  xs <- replicateM sampleSize (runPadsGen int_genM)
   let xs_serialized = map (BC.unpack . fromChunks . fromCL . int_serialize) xs
   let xs_parsed = map (fst . fst . (parseStringInput int_parseM)) xs_serialized
   return $ xs == xs_parsed
@@ -84,7 +84,7 @@ bits8Test = TestCase (bits8Test_expected @=? bits8Test_got)
 
 bits8CycleTest_name = "Bits8 Cycle"
 bits8CycleTest = do
-  xs <- replicateM sampleSize (runGen (bits8_genM 8))
+  xs <- replicateM sampleSize (runPadsGen (bits8_genM 8))
   let xs_serialized = map (BC.unpack . fromChunks . fromCL . (bits8_serialize 8)) xs
   let xs_parsed = map (fst . fst . (parseStringInput bits8N_parseM)) xs_serialized
   return $ xs == xs_parsed
@@ -104,7 +104,7 @@ bits16Test = TestCase (bits16Test_expected @=? bits16Test_got)
 
 bits16CycleTest_name = "Bits16 Cycle"
 bits16CycleTest = do
-  xs <- replicateM sampleSize (runGen (bits16_genM 16))
+  xs <- replicateM sampleSize (runPadsGen (bits16_genM 16))
   let xs_serialized = map (BC.unpack . fromChunks . fromCL . (bits16_serialize 16)) xs
   let xs_parsed = map (fst . fst . (parseStringInput bits16N_parseM)) xs_serialized
   return $ xs == xs_parsed
@@ -124,7 +124,7 @@ bits32Test = TestCase (bits32Test_expected @=? bits32Test_got)
 
 bits32CycleTest_name = "Bits32 Cycle"
 bits32CycleTest = do
-  xs <- replicateM sampleSize (runGen (bits32_genM 32))
+  xs <- replicateM sampleSize (runPadsGen (bits32_genM 32))
   let xs_serialized = map (BC.unpack . fromChunks . fromCL . (bits32_serialize 32)) xs
   let xs_parsed = map (fst . fst . (parseStringInput bits32N_parseM)) xs_serialized
   return $ xs == xs_parsed
@@ -136,7 +136,7 @@ bits64Test = TestCase (bits64Test_expected @=? bits64Test_got)
 
 bits64CycleTest_name = "Bits64 Cycle"
 bits64CycleTest = do
-  xs <- replicateM sampleSize (runGen (bits64_genM 64))
+  xs <- replicateM sampleSize (runPadsGen (bits64_genM 64))
   let xs_serialized = map (BC.unpack . fromChunks . fromCL . (bits64_serialize 64)) xs
   let xs_parsed = map (fst . fst . (parseStringInput bits64N_parseM)) xs_serialized
   return $ xs == xs_parsed
@@ -148,7 +148,7 @@ bitBoolTest = TestCase (bitBoolTest_expected @=? bitBoolTest_got)
 
 bitBoolCycleTest_name = "BitBool Cycle"
 bitBoolCycleTest = do
-  bs <- replicateM sampleSize (runGen bitBool_genM)
+  bs <- replicateM sampleSize (runPadsGen bitBool_genM)
   let bs_serialized = map (BC.unpack . fromChunks . fromCL . bitBool_serialize) bs
   let bs_parsed = map (fst . fst . (parseStringInput bitBoolN_parseM)) bs_serialized
   return $ bs == bs_parsed
@@ -158,7 +158,7 @@ bitBoolCycleTest = do
 [pads| type BitField50 = partition BitField 50 using none |]
 bitFieldCycleTest_name = "BitField Cycle"
 bitFieldCycleTest = do
-  xs <- replicateM sampleSize (runGen (bitField_genM 50))
+  xs <- replicateM sampleSize (runPadsGen (bitField_genM 50))
   let xs_serialized = map (BC.unpack . fromChunks . fromCL . (bitField_serialize 50)) xs
   let xs_parsed = map (fst . fst . bitField50_parseS) xs_serialized
   return $ xs == xs_parsed
@@ -179,7 +179,7 @@ myStringCTest
 
 myStringCCycleTest_name = "MyStringC Cycle"
 myStringCCycleTest = do
-  ss <- replicateM sampleSize (runGen myStringC_genM)
+  ss <- replicateM sampleSize (runPadsGen myStringC_genM)
   let ss_serialized = map (BC.unpack . fromChunks . fromCL . myStringC_serialize) ss
   let ss_parsed = map (fst . fst . myStringC_parseS) ss_serialized
   return $ ss == ss_parsed
@@ -199,7 +199,7 @@ myTupleTest
 
 myTupleCycleTest_name = "MyTuple Cycle"
 myTupleCycleTest = do
-  ts <- replicateM sampleSize (runGen myTuple_genM)
+  ts <- replicateM sampleSize (runPadsGen myTuple_genM)
   let ts_serialized = map (BC.unpack . fromChunks . fromCL . myTuple_serialize) ts
   let ts_parsed = map (fst . fst . myTuple_parseS) ts_serialized
   return $ ts == ts_parsed
@@ -215,7 +215,7 @@ byteTest = TestCase (byteTest_expected @=? byteTest_got)
 
 byteCycleTest_name = "Byte Cycle"
 byteCycleTest = do
-  bs <- replicateM sampleSize (runGen byte_genM)
+  bs <- replicateM sampleSize (runPadsGen byte_genM)
   let bs_serialized = map (BC.unpack . fromChunks . fromCL . byte_serialize) bs
   let bs_parsed = map (fst . fst . byteN_parseS) bs_serialized
   return $ bs == bs_parsed
@@ -232,7 +232,7 @@ twoBytesTest
 
 twoBytesCycleTest_name = "TwoBytes Cycle"
 twoBytesCycleTest = do
-  ts <- replicateM sampleSize (runGen twoBytesP_genM)
+  ts <- replicateM sampleSize (runPadsGen twoBytesP_genM)
   let ts_serialized = map (BC.unpack . fromChunks . fromCL . twoBytes_serialize) ts
   let ts_parsed = map (fst . fst . twoBytesP_parseS) ts_serialized
   return $ ts == ts_parsed
@@ -257,7 +257,7 @@ constrainedStringTest
 
 constrainedGenTest_name = "Constrained Generation"
 constrainedGenTest = do
-  ss <- replicateM 3 (runGen cString_genM)
+  ss <- replicateM 3 (runPadsGen cString_genM)
   return $ all (== "cc") (map (take 2) ss)
 
 -- PLists of several forms
@@ -306,7 +306,7 @@ sepTermListLitTest
 
 sepTermListLitCycleTest_name = "SepTermListLit Cycle"
 sepTermListLitCycleTest = do
-  ls <- replicateM sampleSize (runGen sepTermListLit_genM)
+  ls <- replicateM sampleSize (runPadsGen sepTermListLit_genM)
   let ls_serialized = map (BC.unpack . fromChunks . fromCL . sepTermListLit_serialize) ls
   let ls_parsed = map (fst . fst . sepTermListLit_parseS) ls_serialized
   return $ ls == ls_parsed
@@ -322,7 +322,7 @@ lenListTest
 
 lenListCycleTest_name = "LenList Cycle"
 lenListCycleTest = do
-  ls <- replicateM sampleSize (runGen lenList_genM)
+  ls <- replicateM sampleSize (runPadsGen lenList_genM)
   let ls_serialized = map (BC.unpack . fromChunks . fromCL . lenList_serialize) ls
   let ls_parsed = map (fst . fst . lenList_parseS) ls_serialized
   return $ ls == ls_parsed
@@ -341,7 +341,7 @@ sepLenListTest
 
 sepLenListCycleTest_name = "SepLenList Cycle"
 sepLenListCycleTest = do
-  ls <- replicateM sampleSize (runGen sepLenList_genM)
+  ls <- replicateM sampleSize (runPadsGen sepLenList_genM)
   let ls_serialized = map (BC.unpack . fromChunks . fromCL . sepLenList_serialize) ls
   let ls_parsed = map (fst . fst . sepLenList_parseS) ls_serialized
   return $ ls == ls_parsed
@@ -374,7 +374,7 @@ pixelBytesTest
 
 pixelCycleTest_name = "Pixel Cycle"
 pixelCycleTest = do
-  ps <- replicateM sampleSize (runGen pixel_genM)
+  ps <- replicateM sampleSize (runPadsGen pixel_genM)
   let ps_serialized = map (BC.unpack . fromChunks . fromCL . pixel_serialize) ps
   let ps_parsed = map (fst . fst . pixelNone_parseS) ps_serialized
   return $ ps == ps_parsed
@@ -396,7 +396,7 @@ recordConstantsTest
 
 constantsCycleTest_name = "Constants Cycle"
 constantsCycleTest = do
-  cs <- replicateM sampleSize (runGen constants_genM)
+  cs <- replicateM sampleSize (runPadsGen constants_genM)
   let cs_serialized = map (BC.unpack . fromChunks . fromCL . constants_serialize) cs
   let cs_parsed = map (fst . fst . constants_parseS) cs_serialized
   return $ cs == cs_parsed
@@ -455,7 +455,7 @@ myConstr4NoArgsTest
 -- as an example but excluded from the actual list of tests
 myConstrCycleTest_name = "MyConstr Cycle"
 myConstrCycleTest = do
-  cs <- replicateM sampleSize (runGen (myConstr_genM int_genM))
+  cs <- replicateM sampleSize (runPadsGen (myConstr_genM int_genM))
   let cs_serialized = map (BC.unpack . fromChunks . fromCL . (myConstr_serialize int_serialize)) cs
   let cs_parsed = map (fst . fst . (myConstr_parseS int_parseM)) cs_serialized
   return $ cs == cs_parsed
@@ -483,7 +483,7 @@ myListNonemptyTest
 
 myListCycleTest_name = "MyList Cycle"
 myListCycleTest = do
-  ls <- replicateM sampleSize (runGen (myList_genM char_genM))
+  ls <- replicateM sampleSize (runPadsGen (myList_genM char_genM))
   let ls_serialized = map (BC.unpack . fromChunks . fromCL . (myList_serialize char_serialize)) ls
   let ls_parsed = map (fst . fst . (myList_parseS char_parseM)) ls_serialized
   return $ ls == ls_parsed
@@ -497,7 +497,7 @@ nTTest = TestCase (nTTest_expected @=? nTTest_got)
 
 nTCycleTest_name = "NewType Cycle"
 nTCycleTest = do
-  nts <- replicateM sampleSize (runGen nT_genM)
+  nts <- replicateM sampleSize (runPadsGen nT_genM)
   let nts_serialized = map (BC.unpack . fromChunks . fromCL . nT_serialize) nts
   let nts_parsed = map (fst . fst . nT_parseS) nts_serialized
   return $ nts == nts_parsed
@@ -521,7 +521,7 @@ switchTest
 
 switchCycleTest_name = "Switch Cycle"
 switchCycleTest = do
-  ss <- replicateM sampleSize (runGen switchTest_genM)
+  ss <- replicateM sampleSize (runPadsGen switchTest_genM)
   let ss_serialized = map (BC.unpack . fromChunks . fromCL . switchTest_serialize) ss
   let ss_parsed = map (fst . fst . switchTest_parseS) ss_serialized
   return $ ss == ss_parsed
@@ -540,7 +540,7 @@ dependentSerTest
 
 dependentGenTest_name = "Dependent Generation"
 dependentGenTest_invariant = do
-  deps <- replicateM sampleSize (runGen dependent_genM)
+  deps <- replicateM sampleSize (runPadsGen dependent_genM)
   return $ all (== True)
     (map (\dep -> (fromIntegral $ f dep) == (B.length $ g dep)) deps)
 dependentGenTest
@@ -563,7 +563,7 @@ paramSerTest
 
 paramGenTest_name = "Parameterized Generation"
 paramGenTest_invariant = do
-  params <- replicateM sampleSize (runGen param1_genM)
+  params <- replicateM sampleSize (runPadsGen param1_genM)
   return $ all (== True)
     (map (\par -> (fromIntegral $ p1 par) == (B.length (p3 (p2 par)))) params)
 paramGenTest
@@ -592,7 +592,7 @@ hexObtainTest
 
 hexCycleTest_name = "Hex Cycle"
 hexCycleTest = do
-  hs <- replicateM sampleSize (runGen hex_genM)
+  hs <- replicateM sampleSize (runPadsGen hex_genM)
   let hs_serialized = map (BC.unpack . fromChunks . fromCL . hex_serialize) hs
   let hs_parsed = map (fst . fst . hex_parseS) hs_serialized
   return $ hs == hs_parsed
@@ -663,7 +663,7 @@ myGen = (ST.lift $ randNumBetween 1 100) >>= (flip replicateM increment)
 
 withGensTest_name = "Field Generators"
 withGensTest = do
-  wgs <- replicateM sampleSize (runGen withGens_genM)
+  wgs <- replicateM sampleSize (runPadsGen withGens_genM)
   let wgs_serialized = map (BC.unpack . fromChunks . fromCL . withGens_serialize) wgs
   let wgs_parsed = map (fst . fst . withGens_parseS) wgs_serialized
   return $ wgs == wgs_parsed
@@ -772,14 +772,14 @@ mtu = 1460
 
 pCAPCycleTest_name = "PCAP Cycle"
 pCAPCycleTest = do
-  ps <- replicateM 5 (runGen pCAP_genM)
+  ps <- replicateM 5 (runPadsGen pCAP_genM)
   let ps_serialized = map (BC.unpack . fromChunks . fromCL . pCAP_serialize) ps
   let ps_parsed = map (fst . fst . pCAP_parseS) ps_serialized
   return $ ps == ps_parsed
 
 writePCAP :: IO ()
 writePCAP = do
-  pcap <- runGen pCAP_genM
+  pcap <- runPadsGen pCAP_genM
   B.writeFile "data/fakePackets.pcap" $ (fromChunks . fromCL . pCAP_serialize) pcap
 
 

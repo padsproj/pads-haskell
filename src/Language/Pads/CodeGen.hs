@@ -1074,7 +1074,7 @@ genSerializeRecord recName fields predM = do
   let serializers = map (\(n,t) -> genSerializeTy t ((VarE . mkName) <$> n)) (zip namesM tys)
   let serialized = [app s n t | (s,n,t) <- zip3 serializers namesM tys]
   casePat  <- conP (mkName recName) (map (varP . mkName) (Maybe.catMaybes namesM))
-  caseBody <- normalB [| concatCs $(listE serialized) |]
+  caseBody <- normalB [| cConcat $(listE serialized) |]
   return [Match casePat caseBody []]
   where
     app :: Q Exp -> Maybe String -> PadsTy -> Q Exp
@@ -1092,7 +1092,7 @@ genSerializeConstr name args predM = do
   let params = [varE n | n <- names]
   let apps = listE [if hasRep t then s `appE` p else s | (s,p,t) <- zip3 tys' params tys]
   matchPat  <- conP (mkName name) [varP n | (n, t) <- zip names tys, hasRep t]
-  matchBody <- normalB $ [| concatCs $apps |]
+  matchBody <- normalB $ [| cConcat $apps |]
   return [Match matchPat matchBody []]
 
 -- | Driver function to serialize PadsTys, dispatches to the appropriate helper.
@@ -1145,17 +1145,17 @@ genSerializeList ty sepM termM r = do
       app = if hasRep s then def_s `appE` def else def_s
       in  [d| $(varP cs') = intersperse $app $(varE cs) |]
   dec3 <- case termM of
-    Nothing -> [d| $(varP cs'') = concatCs $(varE cs') |]
+    Nothing -> [d| $(varP cs'') = cConcat $(varE cs') |]
     Just (LLen e) -> case sepM of
       Nothing ->
-        [d| $(varP cs'') = concatCs $ take  $(return e)        $(varE cs') |]
+        [d| $(varP cs'') = cConcat $ take  $(return e)        $(varE cs') |]
       Just _  ->
-        [d| $(varP cs'') = concatCs $ take ($(return e)*2 - 1) $(varE cs') |]
+        [d| $(varP cs'') = cConcat $ take ($(return e)*2 - 1) $(varE cs') |]
     Just (LTerm t) -> let
       def   = genDefTy t
       def_s = genSerializeTy t Nothing
       app = if hasRep t then def_s `appE` def else def_s
-      in  [d| $(varP cs'') = concatCs $(varE cs') `cApp` $app |]
+      in  [d| $(varP cs'') = cConcat $(varE cs') `cAppend` $app |]
   let lamArgs = [(VarP . mkName) "rep"]
   let letDecs = dec1 ++ dec2 ++ dec3
   return $
@@ -1200,7 +1200,7 @@ genSerializeTuple tys r = do
   letnames  <- sequence [newName "k" | s <- serializers] -- newName "x" results in a capturable name?
   casenames <- sequence [newName "y" | s <- serializers]
   let letdecs = map mkDec (zip3 letnames casenames (zip tys serializers))
-  let letbody = [| concatCs $(listE $ map varE letnames) |]
+  let letbody = [| cConcat $(listE $ map varE letnames) |]
   let casebody = normalB $ letE letdecs letbody
   let casenames' = [cn | (cn,ty) <- zip casenames tys, hasRep ty]
   case r
