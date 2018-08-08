@@ -260,6 +260,19 @@ constrainedGenTest = do
   ss <- replicateM 3 (runPadsGen cString_genM)
   return $ all (== "cc") (map (take 2) ss)
 
+[pads| type SimpleC  = constrain s :: Int where <| s == 5 |>
+       type SimpleC2 = constrain s :: Int where <| 5 == s |> |]
+simpleConstraintTest_name = "Simple Constraint"
+simpleConstraintTest = do
+  ss <- replicateM sampleSize (runPadsGen simpleC_genM)
+  return $ all (== 5) ss
+
+simpleConstraintTest2_name = "Simple Constraint 2"
+simpleConstraintTest2 = do
+  ss <- replicateM sampleSize (runPadsGen simpleC2_genM)
+  return $ all (== 5) ss
+
+
 -- PLists of several forms
 [pads| type RegularList    = [Bits8 8]
        type SepList        = [Bits8 8 | '|']
@@ -907,6 +920,8 @@ tests = TestList [ charTest_name                ~: charTest
                  , nestedTupleTest_name         ~: nestedTupleTest
                  , constrainedStringTest_name   ~: constrainedStringTest
                  , constrainedGenTest_name      ~: constrainedGenTest
+                 , simpleConstraintTest_name    ~: simpleConstraintTest
+                 , simpleConstraintTest2_name   ~: simpleConstraintTest2
                  , regularListTest_name         ~: regularListTest
                  , sepListTest_name             ~: sepListTest
                  , sepTermListTest_name         ~: sepTermListTest
@@ -964,5 +979,5 @@ tests = TestList [ charTest_name                ~: charTest
 
 test = runTestTT tests
 
-main :: IO ()
-main = test >> return ()
+main :: IO Counts
+main = test
