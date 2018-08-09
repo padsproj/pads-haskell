@@ -15,6 +15,7 @@ module GenTesting where
 
 import           Data.Bits
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Char8 as BC
 import           Data.Char (isDigit)
 import           Data.Maybe (fromJust)
 import           Data.Time.Clock.POSIX (getPOSIXTime)
@@ -32,32 +33,41 @@ import           Language.Pads.Padsc
 import qualified Language.Pads.Library.LittleEndian as LE
 import qualified Language.Pads.Library.BigEndian    as BE
 
+-- Some tests in this suite compare "expected" and "got" as lists of Chunks,
+-- and some as ByteStrings. Often, if the comparison is between lists of
+-- Chunks, it's because doing so makes the test more readable/understable,
+-- often because it includes bit-level data which is easier to view as Chunks.
+-- The difference in these two types of tests is a call to @fromChunks@ and
+-- usually a call to @pack@. The standalone testing of @fromChunks@, as
+-- well as those more complex tests that include it, should be sufficient to
+-- ensure its correctness.
+
 sampleSize = 100 -- used for "cycle" testing - generate, serialize, parse
 
 --------------------------------------------------------------------------------
 -- Unit testing of serialization of pure/primitive PADS types
 
 charTest_name = "Char"
-charTest_expected = [chrToWord8 'a']
+charTest_expected = BC.pack "a"
 charTest_got = fromChunks $ fromCL $ char_serialize 'a'
 charTest = TestCase (charTest_expected @=? charTest_got)
 
 charCycleTest_name = "Char Cycle"
 charCycleTest = do
-  cs <- replicateM sampleSize (runGen char_genM)
-  let cs_serialized = map ((map word8ToChr) . fromChunks . fromCL . char_serialize) cs
+  cs <- replicateM sampleSize (runPadsGen char_genM)
+  let cs_serialized = map (BC.unpack . fromChunks . fromCL . char_serialize) cs
   let cs_parsed = map (fst . fst . (parseStringInput char_parseM)) cs_serialized
   return $ cs == cs_parsed
 
 intTest_name = "Int"
-intTest_expected = [chrToWord8 '2']
-intTest_got = fromChunks $ fromCL $ int_serialize 2
+intTest_expected = BC.pack "12"
+intTest_got = fromChunks $ fromCL $ int_serialize 12
 intTest = TestCase (intTest_expected @=? intTest_got)
 
 intCycleTest_name = "Int Cycle"
 intCycleTest = do
-  xs <- replicateM sampleSize (runGen int_genM)
-  let xs_serialized = map ((map word8ToChr) . fromChunks . fromCL . int_serialize) xs
+  xs <- replicateM sampleSize (runPadsGen int_genM)
+  let xs_serialized = map (BC.unpack . fromChunks . fromCL . int_serialize) xs
   let xs_parsed = map (fst . fst . (parseStringInput int_parseM)) xs_serialized
   return $ xs == xs_parsed
 
@@ -68,19 +78,19 @@ intCycleTest = do
        type Bits64N  = partition Bits64 64 using none
        type BitBoolN = partition BitBool   using none |]
 bits8Test_name = "Bits8"
-bits8Test_expected = [98]
+bits8Test_expected = B.pack [98]
 bits8Test_got = (fromChunks $ (fromCL $ ((bits8_serialize 8) 98)))
 bits8Test = TestCase (bits8Test_expected @=? bits8Test_got)
 
 bits8CycleTest_name = "Bits8 Cycle"
 bits8CycleTest = do
-  xs <- replicateM sampleSize (runGen (bits8_genM 8))
-  let xs_serialized = map ((map word8ToChr) . fromChunks . fromCL . (bits8_serialize 8)) xs
+  xs <- replicateM sampleSize (runPadsGen (bits8_genM 8))
+  let xs_serialized = map (BC.unpack . fromChunks . fromCL . (bits8_serialize 8)) xs
   let xs_parsed = map (fst . fst . (parseStringInput bits8N_parseM)) xs_serialized
   return $ xs == xs_parsed
 
 bits8MisalignedTest_name = "Bits8 Misaligned"
-bits8MisalignedTest_expected = [224] -- representing 11100000 (or 7 << 5)
+bits8MisalignedTest_expected = B.pack [224] -- representing 11100000 (or 7 << 5)
 bits8MisalignedTest_got
   = (fromChunks $ (fromCL $ ((bits8_serialize 3) 7)))
 bits8MisalignedTest
@@ -88,19 +98,19 @@ bits8MisalignedTest
       (bits8MisalignedTest_expected @=? bits8MisalignedTest_got)
 
 bits16Test_name = "Bits16"
-bits16Test_expected = [139,74]
+bits16Test_expected = B.pack [139,74]
 bits16Test_got = (fromChunks $ (fromCL $ ((bits16_serialize 16) 35658)))
 bits16Test = TestCase (bits16Test_expected @=? bits16Test_got)
 
 bits16CycleTest_name = "Bits16 Cycle"
 bits16CycleTest = do
-  xs <- replicateM sampleSize (runGen (bits16_genM 16))
-  let xs_serialized = map ((map word8ToChr) . fromChunks . fromCL . (bits16_serialize 16)) xs
+  xs <- replicateM sampleSize (runPadsGen (bits16_genM 16))
+  let xs_serialized = map (BC.unpack . fromChunks . fromCL . (bits16_serialize 16)) xs
   let xs_parsed = map (fst . fst . (parseStringInput bits16N_parseM)) xs_serialized
   return $ xs == xs_parsed
 
 bits16MisalignedTest_name = "Bits16 Misaligned"
-bits16MisalignedTest_expected = [224,192] -- representing 1110000011000000 (or 899 << 6)
+bits16MisalignedTest_expected = B.pack [224,192] -- representing 1110000011000000 (or 899 << 6)
 bits16MisalignedTest_got
   = (fromChunks $ (fromCL $ ((bits16_serialize 10) 899)))
 bits16MisalignedTest
@@ -108,38 +118,38 @@ bits16MisalignedTest
       (bits16MisalignedTest_expected @=? bits16MisalignedTest_got)
 
 bits32Test_name = "Bits32"
-bits32Test_expected = [128,128,128,129]
+bits32Test_expected = B.pack [128,128,128,129]
 bits32Test_got = (fromChunks $ (fromCL $ ((bits32_serialize 32) 2155905153)))
 bits32Test = TestCase (bits32Test_expected @=? bits32Test_got)
 
 bits32CycleTest_name = "Bits32 Cycle"
 bits32CycleTest = do
-  xs <- replicateM sampleSize (runGen (bits32_genM 32))
-  let xs_serialized = map ((map word8ToChr) . fromChunks . fromCL . (bits32_serialize 32)) xs
+  xs <- replicateM sampleSize (runPadsGen (bits32_genM 32))
+  let xs_serialized = map (BC.unpack . fromChunks . fromCL . (bits32_serialize 32)) xs
   let xs_parsed = map (fst . fst . (parseStringInput bits32N_parseM)) xs_serialized
   return $ xs == xs_parsed
 
 bits64Test_name = "Bits64"
-bits64Test_expected = [128,128,128,128,128,128,128,129]
+bits64Test_expected = B.pack [128,128,128,128,128,128,128,129]
 bits64Test_got = (fromChunks $ (fromCL $ ((bits64_serialize 64) 9259542123273814145)))
 bits64Test = TestCase (bits64Test_expected @=? bits64Test_got)
 
 bits64CycleTest_name = "Bits64 Cycle"
 bits64CycleTest = do
-  xs <- replicateM sampleSize (runGen (bits64_genM 64))
-  let xs_serialized = map ((map word8ToChr) . fromChunks . fromCL . (bits64_serialize 64)) xs
+  xs <- replicateM sampleSize (runPadsGen (bits64_genM 64))
+  let xs_serialized = map (BC.unpack . fromChunks . fromCL . (bits64_serialize 64)) xs
   let xs_parsed = map (fst . fst . (parseStringInput bits64N_parseM)) xs_serialized
   return $ xs == xs_parsed
 
 bitBoolTest_name = "BitBool"
-bitBoolTest_expected = [128]
+bitBoolTest_expected = B.pack [128]
 bitBoolTest_got = (fromChunks . fromCL . bitBool_serialize) True
 bitBoolTest = TestCase (bitBoolTest_expected @=? bitBoolTest_got)
 
 bitBoolCycleTest_name = "BitBool Cycle"
 bitBoolCycleTest = do
-  bs <- replicateM sampleSize (runGen bitBool_genM)
-  let bs_serialized = map ((map word8ToChr) . fromChunks . fromCL . bitBool_serialize) bs
+  bs <- replicateM sampleSize (runPadsGen bitBool_genM)
+  let bs_serialized = map (BC.unpack . fromChunks . fromCL . bitBool_serialize) bs
   let bs_parsed = map (fst . fst . (parseStringInput bitBoolN_parseM)) bs_serialized
   return $ bs == bs_parsed
 
@@ -148,13 +158,13 @@ bitBoolCycleTest = do
 [pads| type BitField50 = partition BitField 50 using none |]
 bitFieldCycleTest_name = "BitField Cycle"
 bitFieldCycleTest = do
-  xs <- replicateM sampleSize (runGen (bitField_genM 50))
-  let xs_serialized = map ((map word8ToChr) . fromChunks . fromCL . (bitField_serialize 50)) xs
+  xs <- replicateM sampleSize (runPadsGen (bitField_genM 50))
+  let xs_serialized = map (BC.unpack . fromChunks . fromCL . (bitField_serialize 50)) xs
   let xs_parsed = map (fst . fst . bitField50_parseS) xs_serialized
   return $ xs == xs_parsed
 
 bytesTest_name = "Bytes"
-bytesTest_expected = [1, 2, 3, 4]
+bytesTest_expected = B.pack [1, 2, 3, 4]
 bytesTest_got
   = (fromChunks $ (fromCL $ ((bytes_serialize 4) $ (B.pack [1, 2, 3, 4]))))
 bytesTest = TestCase (bytesTest_expected @=? bytesTest_got)
@@ -162,16 +172,15 @@ bytesTest = TestCase (bytesTest_expected @=? bytesTest_got)
 [pads| type MyStringC = StringC 'f' |]
 
 myStringCTest_name = "MyStringC"
-myStringCTest_expected
-  = [CharChunk 't', CharChunk 'g', CharChunk 'i', CharChunk 'f']
-myStringCTest_got = (fromCL $ (myStringC_serialize "tgi"))
+myStringCTest_expected = BC.pack "tgif"
+myStringCTest_got = fromChunks (fromCL $ (myStringC_serialize "tgi"))
 myStringCTest
   = TestCase (myStringCTest_expected @=? myStringCTest_got)
 
 myStringCCycleTest_name = "MyStringC Cycle"
 myStringCCycleTest = do
-  ss <- replicateM sampleSize (runGen myStringC_genM)
-  let ss_serialized = map ((map word8ToChr) . fromChunks . fromCL . myStringC_serialize) ss
+  ss <- replicateM sampleSize (runPadsGen myStringC_genM)
+  let ss_serialized = map (BC.unpack . fromChunks . fromCL . myStringC_serialize) ss
   let ss_parsed = map (fst . fst . myStringC_parseS) ss_serialized
   return $ ss == ss_parsed
 
@@ -190,8 +199,8 @@ myTupleTest
 
 myTupleCycleTest_name = "MyTuple Cycle"
 myTupleCycleTest = do
-  ts <- replicateM sampleSize (runGen myTuple_genM)
-  let ts_serialized = map ((map word8ToChr) . fromChunks . fromCL . myTuple_serialize) ts
+  ts <- replicateM sampleSize (runPadsGen myTuple_genM)
+  let ts_serialized = map (BC.unpack . fromChunks . fromCL . myTuple_serialize) ts
   let ts_parsed = map (fst . fst . myTuple_parseS) ts_serialized
   return $ ts == ts_parsed
 
@@ -201,13 +210,13 @@ myTupleCycleTest = do
 
 byteTest_name = "Byte"
 byteTest_expected = [(BinaryChunk 254) 8]
-byteTest_got = fromCL $ byte_serialize (254 :: Byte)
+byteTest_got = fromCL $ byte_serialize 254
 byteTest = TestCase (byteTest_expected @=? byteTest_got)
 
 byteCycleTest_name = "Byte Cycle"
 byteCycleTest = do
-  bs <- replicateM sampleSize (runGen byte_genM)
-  let bs_serialized = map ((map word8ToChr) . fromChunks . fromCL . byte_serialize) bs
+  bs <- replicateM sampleSize (runPadsGen byte_genM)
+  let bs_serialized = map (BC.unpack . fromChunks . fromCL . byte_serialize) bs
   let bs_parsed = map (fst . fst . byteN_parseS) bs_serialized
   return $ bs == bs_parsed
 
@@ -217,48 +226,47 @@ byteCycleTest = do
 
 twoBytesTest_name = "TwoBytes"
 twoBytesTest_expected = [(BinaryChunk 0) 8, (BinaryChunk 122) 8]
-twoBytesTest_got = fromCL $ twoBytes_serialize ((0, 122) :: TwoBytes)
+twoBytesTest_got = fromCL $ twoBytes_serialize (0, 122)
 twoBytesTest
   = TestCase (twoBytesTest_expected @=? twoBytesTest_got)
 
 twoBytesCycleTest_name = "TwoBytes Cycle"
 twoBytesCycleTest = do
-  ts <- replicateM sampleSize (runGen twoBytesP_genM)
-  let ts_serialized = map ((map word8ToChr) . fromChunks . fromCL . twoBytes_serialize) ts
+  ts <- replicateM sampleSize (runPadsGen twoBytesP_genM)
+  let ts_serialized = map (BC.unpack . fromChunks . fromCL . twoBytes_serialize) ts
   let ts_parsed = map (fst . fst . twoBytesP_parseS) ts_serialized
   return $ ts == ts_parsed
 
 -- Nested tuple
 [pads| type TupleN = (Int, ',', (Int,':',Int), ';', Int) |]
 nestedTupleTest_name = "Nested Tuple"
-nestedTupleTest_expected
-  = [CharChunk '1', CharChunk ',', CharChunk '2', CharChunk ':',
-     CharChunk '3', CharChunk ';', CharChunk '4']
-nestedTupleTest_got = fromCL $ tupleN_serialize (1, (2, 3), 4)
+nestedTupleTest_expected = BC.pack "1,2:3;4"
+nestedTupleTest_got = fromChunks $ fromCL $ tupleN_serialize (1, (2, 3), 4)
 nestedTupleTest
   = TestCase (nestedTupleTest_expected @=? nestedTupleTest_got)
 
 -- PConstrain serialization (simple) and generation (less simple)
 [pads| type CString = constrain s :: StringFW 10 where <| take 2 s == "cc" |> |]
 constrainedStringTest_name = "Constrained String"
-constrainedStringTest_expected = [CharChunk 'c', CharChunk 'c']
+constrainedStringTest_expected = BC.pack "cc"
 constrainedStringTest_got
-  = ((take 2) $ (fromCL $ (cString_serialize "ccjqnbfkwh")))
+  = (B.take 2 $ fromChunks (fromCL $ (cString_serialize "ccjqnbfkwh")))
 constrainedStringTest
   = TestCase
       (constrainedStringTest_expected @=? constrainedStringTest_got)
 
 constrainedGenTest_name = "Constrained Generation"
 constrainedGenTest = do
-  ss <- replicateM 5 (runGen cString_genM)
+  ss <- replicateM 3 (runPadsGen cString_genM)
   return $ all (== "cc") (map (take 2) ss)
 
 -- PLists of several forms
--- TODO: terminator LLen
-[pads| type RegularList = [Bits8 8]
-       type SepList     = [Bits8 8 | '|']
-       type SepTermList = [Bits8 8 | '|'] terminator Char
-       --type SepTermList2 = [Bits8 8 | '|'] terminator EOR |]
+[pads| type RegularList    = [Bits8 8]
+       type SepList        = [Bits8 8 | '|']
+       type SepTermList    = [Bits8 8 | '|'] terminator Char
+       type SepTermListLit = [Char | '|'] terminator '~'
+       type LenList        = [Digit] length 5
+       type SepLenList     = [Digit | '|'] length 5 |]
 
 regularListTest_name = "RegularList"
 regularListTest_expected = [(BinaryChunk 10) 8, (BinaryChunk 5) 8]
@@ -274,7 +282,7 @@ sepListTest_got = fromCL $ sepList_serialize [10, 5]
 sepListTest
   = TestCase (sepListTest_expected @=? sepListTest_got)
 
-sepTermListTest_name = "SepTermList"
+sepTermListTest_name = "SepTermList, Type Terminator"
 sepTermListTest_expected
   = [(BinaryChunk 10) 8, CharChunk '|', (BinaryChunk 5) 8, CharChunk 'X']
 sepTermListTest_got
@@ -283,10 +291,61 @@ sepTermListTest
   = TestCase (sepTermListTest_expected @=? sepTermListTest_got)
 
 sepTermListBytesTest_name = "SepTermList Bytes"
-sepTermListBytesTest_expected = [10, 124, 5, 88]
+sepTermListBytesTest_expected = B.pack [10, 124, 5, 88]
 sepTermListBytesTest_got = fromChunks sepTermListTest_got
 sepTermListBytesTest
   = TestCase (sepTermListBytesTest_expected @=? sepTermListBytesTest_got)
+
+sepTermListLitTest_name = "SepTermList, Literal Terminator"
+sepTermListLitTest_expected
+  = [CharChunk 'a', CharChunk '|', CharChunk 'b', CharChunk '~']
+sepTermListLitTest_got
+  = fromCL $ sepTermListLit_serialize "ab"
+sepTermListLitTest
+  = TestCase (sepTermListLitTest_expected @=? sepTermListLitTest_got)
+
+sepTermListLitCycleTest_name = "SepTermListLit Cycle"
+sepTermListLitCycleTest = do
+  ls <- replicateM sampleSize (runPadsGen sepTermListLit_genM)
+  let ls_serialized = map (BC.unpack . fromChunks . fromCL . sepTermListLit_serialize) ls
+  let ls_parsed = map (fst . fst . sepTermListLit_parseS) ls_serialized
+  return $ ls == ls_parsed
+
+lenListTest_name = "LenList"
+lenListTest_expected
+  = [CharChunk '6', CharChunk '5', CharChunk '5', CharChunk '3',
+     CharChunk '5']
+lenListTest_got
+  = fromCL $ lenList_serialize [6, 5, 5, 3, 5, 0, 0, 0]
+lenListTest
+  = TestCase (lenListTest_expected @=? lenListTest_got)
+
+lenListCycleTest_name = "LenList Cycle"
+lenListCycleTest = do
+  ls <- replicateM sampleSize (runPadsGen lenList_genM)
+  let ls_serialized = map (BC.unpack . fromChunks . fromCL . lenList_serialize) ls
+  let ls_parsed = map (fst . fst . lenList_parseS) ls_serialized
+  return $ ls == ls_parsed
+
+sepLenListTest_name = "SepLenList"
+sepLenListTest_expected
+  = [CharChunk '6', CharChunk '|',
+     CharChunk '5', CharChunk '|',
+     CharChunk '5', CharChunk '|',
+     CharChunk '3', CharChunk '|',
+     CharChunk '5']
+sepLenListTest_got
+  = fromCL $ sepLenList_serialize [6, 5, 5, 3, 5, 0, 0, 0]
+sepLenListTest
+  = TestCase (sepLenListTest_expected @=? sepLenListTest_got)
+
+sepLenListCycleTest_name = "SepLenList Cycle"
+sepLenListCycleTest = do
+  ls <- replicateM sampleSize (runPadsGen sepLenList_genM)
+  let ls_serialized = map (BC.unpack . fromChunks . fromCL . sepLenList_serialize) ls
+  let ls_parsed = map (fst . fst . sepLenList_parseS) ls_serialized
+  return $ ls == ls_parsed
+
 
 -- Run-of-the-mill record with sub-byte data
 [pads| data Pixel = Pixel { a :: Bits16 9
@@ -308,15 +367,15 @@ pixelTest
   = TestCase (pixelTest_expected @=? pixelTest_got)
 
 pixelBytesTest_name = "Pixel Bytes"
-pixelBytesTest_expected = [255, 129, 0, 17]
+pixelBytesTest_expected = B.pack [255, 129, 0, 17]
 pixelBytesTest_got = fromChunks pixelTest_got
 pixelBytesTest
   = TestCase (pixelBytesTest_expected @=? pixelBytesTest_got)
 
 pixelCycleTest_name = "Pixel Cycle"
 pixelCycleTest = do
-  ps <- replicateM sampleSize (runGen pixel_genM)
-  let ps_serialized = map ((map word8ToChr) . fromChunks . fromCL . pixel_serialize) ps
+  ps <- replicateM sampleSize (runPadsGen pixel_genM)
+  let ps_serialized = map (BC.unpack . fromChunks . fromCL . pixel_serialize) ps
   let ps_parsed = map (fst . fst . pixelNone_parseS) ps_serialized
   return $ ps == ps_parsed
 
@@ -327,7 +386,7 @@ pixelCycleTest = do
                                   , var2 :: StringFW 10 } |]
 
 recordConstantsTest_name = "Record Constants"
-recordConstantsTest_expected = map chrToWord8 "42stringchellothere"
+recordConstantsTest_expected = BC.pack "42stringchellothere"
 recordConstantsTest_got
   = (fromChunks
        $ (fromCL $ (constants_serialize $ ((Constants 42) "hellothere"))))
@@ -337,8 +396,8 @@ recordConstantsTest
 
 constantsCycleTest_name = "Constants Cycle"
 constantsCycleTest = do
-  cs <- replicateM sampleSize (runGen constants_genM)
-  let cs_serialized = map ((map word8ToChr) . fromChunks . fromCL . constants_serialize) cs
+  cs <- replicateM sampleSize (runPadsGen constants_genM)
+  let cs_serialized = map (BC.unpack . fromChunks . fromCL . constants_serialize) cs
   let cs_parsed = map (fst . fst . constants_parseS) cs_serialized
   return $ cs == cs_parsed
 
@@ -347,13 +406,13 @@ constantsCycleTest = do
                 | Bar { x :: Int } |]
 
 fooFooTest_name = "FooFoo"
-fooFooTest_expected = [CharChunk '1']
-fooFooTest_got = fromCL $ foo_serialize ((Foo 1) 2)
+fooFooTest_expected = BC.pack "1"
+fooFooTest_got = fromChunks $ fromCL $ foo_serialize ((Foo 1) 2)
 fooFooTest = TestCase (fooFooTest_expected @=? fooFooTest_got)
 
 fooBarTest_name = "FooBar"
-fooBarTest_expected = [CharChunk '0']
-fooBarTest_got = fromCL $ foo_serialize (Bar 0)
+fooBarTest_expected = BC.pack "0"
+fooBarTest_got = fromChunks $ fromCL $ foo_serialize (Bar 0)
 fooBarTest = TestCase (fooBarTest_expected @=? fooBarTest_got)
 
 -- Test branch constructors
@@ -363,10 +422,9 @@ fooBarTest = TestCase (fooBarTest_expected @=? fooBarTest_got)
                        | MyConstr4 |]
 
 myConstr1WithArgsTest_name = "MyConstr1 (With Args)"
-myConstr1WithArgsTest_expected
-  = [CharChunk '1', CharChunk '2', CharChunk 'x']
+myConstr1WithArgsTest_expected = BC.pack "12x"
 myConstr1WithArgsTest_got
-  = (fromCL $ (myConstr_serialize undefined ((MyConstr1 12) 'x')))
+  = fromChunks (fromCL $ (myConstr_serialize undefined ((MyConstr1 12) 'x')))
 myConstr1WithArgsTest
   = TestCase (myConstr1WithArgsTest_expected @=? myConstr1WithArgsTest_got)
 
@@ -378,20 +436,18 @@ myConstr2NoArgsTest
   = TestCase (myConstr2NoArgsTest_expected @=? myConstr2NoArgsTest_got)
 
 myConstr3TVArgsTest_name = "MyConstr3 (With Tyvar Args)"
-myConstr3TVArgsTest_expected
-  = [CharChunk '3',CharChunk 'H',CharChunk 'e',
-     CharChunk 'l',CharChunk 'l',CharChunk 'o']
-myConstr3TVArgsTest_got = (fromCL $ (myConstr_serialize int_serialize (MyConstr3 3)))
+myConstr3TVArgsTest_expected = BC.pack "3Hello"
+myConstr3TVArgsTest_got
+  = fromChunks (fromCL $ (myConstr_serialize int_serialize (MyConstr3 3)))
 myConstr3TVArgsTest
   = TestCase
       (myConstr3TVArgsTest_expected @=? myConstr3TVArgsTest_got)
 
+-- Odd, but this corresponds with the parser's behavior
 myConstr4NoArgsTest_name = "MyConstr4 (No Args)"
-myConstr4NoArgsTest_expected
-  = [CharChunk 'M', CharChunk 'y', CharChunk 'C',CharChunk 'o', CharChunk 'n',
-     CharChunk 's', CharChunk 't', CharChunk 'r', CharChunk '4']
+myConstr4NoArgsTest_expected = BC.pack "MyConstr4"
 myConstr4NoArgsTest_got
-  = (fromCL $ (myConstr_serialize undefined (MyConstr4)))
+  = fromChunks (fromCL $ (myConstr_serialize undefined (MyConstr4)))
 myConstr4NoArgsTest
   = TestCase (myConstr4NoArgsTest_expected @=? myConstr4NoArgsTest_got)
 
@@ -399,8 +455,8 @@ myConstr4NoArgsTest
 -- as an example but excluded from the actual list of tests
 myConstrCycleTest_name = "MyConstr Cycle"
 myConstrCycleTest = do
-  cs <- replicateM sampleSize (runGen (myConstr_genM int_genM))
-  let cs_serialized = map ((map word8ToChr) . fromChunks . fromCL . (myConstr_serialize int_serialize)) cs
+  cs <- replicateM sampleSize (runPadsGen (myConstr_genM int_genM))
+  let cs_serialized = map (BC.unpack . fromChunks . fromCL . (myConstr_serialize int_serialize)) cs
   let cs_parsed = map (fst . fst . (myConstr_parseS int_parseM)) cs_serialized
   return $ cs == cs_parsed
 
@@ -416,33 +472,33 @@ myListEmptyTest
   = TestCase (myListEmptyTest_expected @=? myListEmptyTest_got)
 
 myListNonemptyTest_name = "MyList Nonempty"
-myListNonemptyTest_expected
-  = [CharChunk 'f', CharChunk 'o', CharChunk 'o']
+myListNonemptyTest_expected = BC.pack "foo"
 myListNonemptyTest_got
-  = (fromCL
-       $ ((myList_serialize char_serialize)
+  = fromChunks
+      (fromCL
+        $ ((myList_serialize char_serialize)
             ((MyCons 'f') ((MyCons 'o') ((MyCons 'o') MyNil)))))
 myListNonemptyTest
   = TestCase (myListNonemptyTest_expected @=? myListNonemptyTest_got)
 
 myListCycleTest_name = "MyList Cycle"
 myListCycleTest = do
-  ls <- replicateM sampleSize (runGen (myList_genM char_genM))
-  let ls_serialized = map ((map word8ToChr) . fromChunks . fromCL . (myList_serialize char_serialize)) ls
+  ls <- replicateM sampleSize (runPadsGen (myList_genM char_genM))
+  let ls_serialized = map (BC.unpack . fromChunks . fromCL . (myList_serialize char_serialize)) ls
   let ls_parsed = map (fst . fst . (myList_parseS char_parseM)) ls_serialized
   return $ ls == ls_parsed
 
 [pads| newtype NT = NT Int |]
 
 nTTest_name = "NewType"
-nTTest_expected = [CharChunk '3']
-nTTest_got = (fromCL $ (nT_serialize (NT 3)))
+nTTest_expected = BC.pack "3"
+nTTest_got = fromChunks (fromCL $ (nT_serialize (NT 3)))
 nTTest = TestCase (nTTest_expected @=? nTTest_got)
 
 nTCycleTest_name = "NewType Cycle"
 nTCycleTest = do
-  nts <- replicateM sampleSize (runGen nT_genM)
-  let nts_serialized = map ((map word8ToChr) . fromChunks . fromCL . nT_serialize) nts
+  nts <- replicateM sampleSize (runPadsGen nT_genM)
+  let nts_serialized = map (BC.unpack . fromChunks . fromCL . nT_serialize) nts
   let nts_parsed = map (fst . fst . nT_parseS) nts_serialized
   return $ nts == nts_parsed
 
@@ -454,7 +510,7 @@ nTCycleTest = do
        data SwitchTest = SwitchTest { arg :: Int, parity :: SwitchRec arg } |]
 
 switchTest_name = "Switch"
-switchTest_expected = map chrToWord8 "150119154Even"
+switchTest_expected = BC.pack "150119154Even"
 switchTest_got
   = (fromChunks
        $ (fromCL
@@ -465,8 +521,8 @@ switchTest
 
 switchCycleTest_name = "Switch Cycle"
 switchCycleTest = do
-  ss <- replicateM sampleSize (runGen switchTest_genM)
-  let ss_serialized = map ((map word8ToChr) . fromChunks . fromCL . switchTest_serialize) ss
+  ss <- replicateM sampleSize (runPadsGen switchTest_genM)
+  let ss_serialized = map (BC.unpack . fromChunks . fromCL . switchTest_serialize) ss
   let ss_parsed = map (fst . fst . switchTest_parseS) ss_serialized
   return $ ss == ss_parsed
 
@@ -484,7 +540,7 @@ dependentSerTest
 
 dependentGenTest_name = "Dependent Generation"
 dependentGenTest_invariant = do
-  deps <- replicateM sampleSize (runGen dependent_genM)
+  deps <- replicateM sampleSize (runPadsGen dependent_genM)
   return $ all (== True)
     (map (\dep -> (fromIntegral $ f dep) == (B.length $ g dep)) deps)
 dependentGenTest
@@ -501,41 +557,43 @@ paramSerTest_expected
   = [BinaryChunk 3 8, CharChunk 'c', CharChunk 'c', CharChunk 'c']
 paramSerTest_got
   = (fromCL
-       $ (param1_serialize ((Param1 3) (Param2 (B.pack [99, 99, 99])))))
+       $ (param1_serialize (Param1 3 (Param2 (B.pack [99, 99, 99])))))
 paramSerTest
   = TestCase (paramSerTest_expected @=? paramSerTest_got)
 
 paramGenTest_name = "Parameterized Generation"
 paramGenTest_invariant = do
-  params <- replicateM sampleSize (runGen param1_genM)
+  params <- replicateM sampleSize (runPadsGen param1_genM)
   return $ all (== True)
     (map (\par -> (fromIntegral $ p1 par) == (B.length (p3 (p2 par)))) params)
 paramGenTest
   = TestCase (assert paramGenTest_invariant)
 
 -- Obtain with custom generator (non-isomorphic types)
-[pads| type Hex = obtain Int from String using <| (hexStrToInt, intToHexStr) |> generator absInt_genM |]
+[pads| type Hex = obtain Word from String using <| (hexStrToWord, wordToHexStr) |> generator word_genM |]
 
-hexStrToInt :: Span -> (String, String_md) -> (Int, Int_md)
-hexStrToInt _ (s, md) = ((fst . (!! 0) . readHex) s, md)
+type Word_md = Int_md
 
-intToHexStr :: (Int, Int_md) -> (String, String_md)
-intToHexStr (i, md) = (showHex i "", md)
+hexStrToWord :: Span -> (String, String_md) -> (Word, Word_md)
+hexStrToWord _ (s, md) = ((fromIntegral . fst . (!! 0) . readHex) s, md)
 
-absInt_genM :: PadsGen Int
-absInt_genM = abs <$> randNum
+wordToHexStr :: (Word, Word_md) -> (String, String_md)
+wordToHexStr (i, md) = (showHex (fromIntegral i) "", md)
+
+word_genM :: PadsGen Word
+word_genM = abs <$> randNum
 
 hexObtainTest_name = "Hex Obtain"
 hexObtainTest_expected
-  = [CharChunk 'a', CharChunk 'b', CharChunk '1', CharChunk '2']
-hexObtainTest_got = (fromCL $ (hex_serialize 43794))
+  = BC.pack "ab12"
+hexObtainTest_got = fromChunks (fromCL $ (hex_serialize 43794))
 hexObtainTest
   = TestCase (hexObtainTest_expected @=? hexObtainTest_got)
 
 hexCycleTest_name = "Hex Cycle"
 hexCycleTest = do
-  hs <- replicateM sampleSize (runGen hex_genM)
-  let hs_serialized = map ((map word8ToChr) . fromChunks . fromCL . hex_serialize) hs
+  hs <- replicateM sampleSize (runPadsGen hex_genM)
+  let hs_serialized = map (BC.unpack . fromChunks . fromCL . hex_serialize) hs
   let hs_parsed = map (fst . fst . hex_parseS) hs_serialized
   return $ hs == hs_parsed
 
@@ -543,42 +601,40 @@ hexCycleTest = do
 -- along with creation of qualified serializer names (e.g. LE.int16_serialize)
 [pads| type MyLEInt8 = LE.Int8 |]
 littleInt8Test_name = "LE Int8"
-littleInt8Test_expected = [CharChunk (word8ToChr 1)]
-littleInt8Test_got = fromCL $ myLEInt8_serialize 1
+littleInt8Test_expected = B.pack [1]
+littleInt8Test_got = fromChunks $ fromCL $ myLEInt8_serialize 1
 littleInt8Test = TestCase (littleInt8Test_expected @=? littleInt8Test_got)
 
 [pads| type MyLEInt16 = LE.Int16 |]
 littleInt16Test_name = "LE Int16"
-littleInt16Test_expected = [CharChunk (word8ToChr 0), CharChunk (word8ToChr 1)]
-littleInt16Test_got = fromCL $ myLEInt16_serialize 256
+littleInt16Test_expected = B.pack [0, 1]
+littleInt16Test_got = fromChunks $ fromCL $ myLEInt16_serialize 256
 littleInt16Test = TestCase (littleInt16Test_expected @=? littleInt16Test_got)
 
 [pads| type MyLEInt32 = LE.Int32 |]
 littleInt32Test_name = "LE Int32"
 littleInt32Test_expected
-  = [CharChunk (word8ToChr 1), CharChunk (word8ToChr 1),
-     CharChunk (word8ToChr 1), CharChunk (word8ToChr 0)]
-littleInt32Test_got = fromCL $ myLEInt32_serialize 65793
+  = B.pack [1, 1, 1, 0]
+littleInt32Test_got = fromChunks $ fromCL $ myLEInt32_serialize 65793
 littleInt32Test = TestCase (littleInt32Test_expected @=? littleInt32Test_got)
 
 [pads| type MyBEInt8 = BE.Int8 |]
 bigInt8Test_name = "BE Int8"
-bigInt8Test_expected = [CharChunk (word8ToChr 253)]
-bigInt8Test_got = fromCL $ myBEInt8_serialize 253
+bigInt8Test_expected = B.pack [253]
+bigInt8Test_got = fromChunks $ fromCL $ myBEInt8_serialize 253
 bigInt8Test = TestCase (bigInt8Test_expected @=? bigInt8Test_got)
 
 [pads| type MyBEInt16 = BE.Int16 |]
 bigInt16Test_name = "BE Int16"
-bigInt16Test_expected = [CharChunk (word8ToChr 1), CharChunk (word8ToChr 0)]
-bigInt16Test_got = fromCL $ myBEInt16_serialize 256
+bigInt16Test_expected = B.pack [1, 0]
+bigInt16Test_got = fromChunks $ fromCL $ myBEInt16_serialize 256
 bigInt16Test = TestCase (bigInt16Test_expected @=? bigInt16Test_got)
 
 [pads| type MyBEInt32 = BE.Int32 |]
 bigInt32Test_name = "BE Int32"
 bigInt32Test_expected
-  = [CharChunk (word8ToChr 0), CharChunk (word8ToChr 1),
-     CharChunk (word8ToChr 1), CharChunk (word8ToChr 1)]
-bigInt32Test_got = fromCL $ myBEInt32_serialize 65793
+  = B.pack [0, 1, 1, 1]
+bigInt32Test_got = fromChunks $ fromCL $ myBEInt32_serialize 65793
 bigInt32Test = TestCase (bigInt32Test_expected @=? bigInt32Test_got)
 
 
@@ -607,8 +663,8 @@ myGen = (ST.lift $ randNumBetween 1 100) >>= (flip replicateM increment)
 
 withGensTest_name = "Field Generators"
 withGensTest = do
-  wgs <- replicateM sampleSize (runGen withGens_genM)
-  let wgs_serialized = map ((map word8ToChr) . fromChunks . fromCL . withGens_serialize) wgs
+  wgs <- replicateM sampleSize (runPadsGen withGens_genM)
+  let wgs_serialized = map (BC.unpack . fromChunks . fromCL . withGens_serialize) wgs
   let wgs_parsed = map (fst . fst . withGens_parseS) wgs_serialized
   return $ wgs == wgs_parsed
 
@@ -716,34 +772,34 @@ mtu = 1460
 
 pCAPCycleTest_name = "PCAP Cycle"
 pCAPCycleTest = do
-  ps <- replicateM 5 (runGen pCAP_genM)
-  let ps_serialized = map ((map word8ToChr) . fromChunks . fromCL . pCAP_serialize) ps
+  ps <- replicateM 5 (runPadsGen pCAP_genM)
+  let ps_serialized = map (BC.unpack . fromChunks . fromCL . pCAP_serialize) ps
   let ps_parsed = map (fst . fst . pCAP_parseS) ps_serialized
   return $ ps == ps_parsed
 
 writePCAP :: IO ()
 writePCAP = do
-  pcap <- runGen pCAP_genM
-  B.writeFile "data/fakePackets.pcap" $ (B.pack . fromChunks . fromCL . pCAP_serialize) pcap
+  pcap <- runPadsGen pCAP_genM
+  B.writeFile "data/fakePackets.pcap" $ (fromChunks . fromCL . pCAP_serialize) pcap
 
 
 -------------------------------------------------------------------------------
 -- Unit testing of fromChunks function
 
 emptyChunksTest_name = "Empty Chunks"
-emptyChunksTest_expected = []
+emptyChunksTest_expected = B.empty
 emptyChunksTest_got = fromChunks []
 emptyChunksTest
   = TestCase (emptyChunksTest_expected @=? emptyChunksTest_got)
 
 charChunksTest_name = "CharChunks"
-charChunksTest_expected = [100,99,98]
+charChunksTest_expected = B.pack [100,99,98]
 charChunksTest_got = fromChunks [CharChunk 'd',CharChunk 'c',CharChunk 'b']
 charChunksTest
   = TestCase (charChunksTest_expected @=? charChunksTest_got)
 
 binaryChunksTest_name = "Binary Chunks"
-binaryChunksTest_expected = [100, 100]
+binaryChunksTest_expected = B.pack [100, 100]
 binaryChunksTest_got
   = fromChunks
       [(BinaryChunk 12) 5, (BinaryChunk 8) 4, (BinaryChunk 6) 3,
@@ -751,8 +807,33 @@ binaryChunksTest_got
 binaryChunksTest
   = TestCase (binaryChunksTest_expected @=? binaryChunksTest_got)
 
+bigBinaryChunksTest_name = "Big Binary Chunks"
+bigBinaryChunksTest_expected
+  = B.concat [ B.replicate 7  0 `B.append` B.pack [1]
+             , B.replicate 15 0 `B.append` B.pack [2]
+             , B.replicate 31 0 `B.append` B.pack [6]
+             ]
+bigBinaryChunksTest_got
+  = fromChunks [BinaryChunk 1 64, BinaryChunk 2 128, BinaryChunk 3 255]
+bigBinaryChunksTest
+  = TestCase (bigBinaryChunksTest_expected @=? bigBinaryChunksTest_got)
+
+bigBinaryChunks2Test_name = "Big Binary Chunks 2"
+bigBinaryChunks2Test_expected
+  = B.concat [ B.replicate 8 255
+             , B.pack [128] `B.append` B.replicate 15 0
+             , B.replicate 31 255 `B.append` B.pack [254]
+             ]
+bigBinaryChunks2Test_got
+  = fromChunks [ BinaryChunk (2^64 - 1) 64
+               , BinaryChunk (2^127) 128
+               , BinaryChunk (2^255 - 1) 255
+               ]
+bigBinaryChunks2Test
+  = TestCase (bigBinaryChunks2Test_expected @=? bigBinaryChunks2Test_got)
+
 misalignedChunksTest_name = "Misaligned Chunks"
-misalignedChunksTest_expected = [100, 96]
+misalignedChunksTest_expected = B.pack [100, 96]
 misalignedChunksTest_got
   = fromChunks
       [(BinaryChunk 12) 5, (BinaryChunk 8) 4, (BinaryChunk 6) 3]
@@ -762,13 +843,13 @@ misalignedChunksTest
          @=? misalignedChunksTest_got)
 
 misalignedChunks2Test_name = "Misaligned Chunks 2"
-misalignedChunks2Test_expected = [192]
+misalignedChunks2Test_expected = B.pack [192]
 misalignedChunks2Test_got = fromChunks [(BinaryChunk 3) 2]
 misalignedChunks2Test
   = TestCase (misalignedChunks2Test_expected @=? misalignedChunks2Test_got)
 
-mixedChunksTest_name = "Mixed Chunks"
-mixedChunksTest_expected = [76, 128, 200]
+mixedChunksTest_name = "Mixed Misaligned Chunks"
+mixedChunksTest_expected = B.pack [76, 128, 200]
 mixedChunksTest_got
   = fromChunks
       [(BinaryChunk 2) 3, CharChunk 'd', (BinaryChunk 1) 6,
@@ -776,79 +857,109 @@ mixedChunksTest_got
 mixedChunksTest
   = TestCase (mixedChunksTest_expected @=? mixedChunksTest_got)
 
+mixedChunks2Test_name = "Mixed Aligned Chunks"
+mixedChunks2Test_expected = B.pack [97, 1, 98]
+mixedChunks2Test_got
+  = fromChunks [CharChunk 'a', BinaryChunk 1 8, CharChunk 'b']
+mixedChunks2Test
+  = TestCase (mixedChunks2Test_expected @=? mixedChunks2Test_got)
 
-tests = TestList [ charTest_name              ~: charTest
-                 , charCycleTest_name         ~: charCycleTest
-                 , intTest_name               ~: intTest
-                 , intCycleTest_name          ~: intCycleTest
-                 , bits8Test_name             ~: bits8Test
-                 , bits8CycleTest_name        ~: bits8CycleTest
-                 , bits8MisalignedTest_name   ~: bits8MisalignedTest
-                 , bits16Test_name            ~: bits16Test
-                 , bits16CycleTest_name       ~: bits16CycleTest
-                 , bits16MisalignedTest_name  ~: bits16MisalignedTest
-                 , bits32Test_name            ~: bits32Test
-                 , bits32CycleTest_name       ~: bits32CycleTest
-                 , bits64Test_name            ~: bits64Test
-                 , bits64CycleTest_name       ~: bits64CycleTest
-                 , bitBoolTest_name           ~: bitBoolTest
-                 , bitBoolCycleTest_name      ~: bitBoolCycleTest
-                 , bitFieldCycleTest_name     ~: bitFieldCycleTest
-                 , bytesTest_name             ~: bytesTest
-                 , myStringCTest_name         ~: myStringCTest
-                 , myStringCCycleTest_name    ~: myStringCCycleTest
-                 , myTupleTest_name           ~: myTupleTest
-                 , myTupleCycleTest_name      ~: myTupleCycleTest
-                 , byteTest_name              ~: byteTest
-                 , byteCycleTest_name         ~: byteCycleTest
-                 , twoBytesTest_name          ~: twoBytesTest
-                 , twoBytesCycleTest_name     ~: twoBytesCycleTest
-                 , nestedTupleTest_name       ~: nestedTupleTest
-                 , constrainedStringTest_name ~: constrainedStringTest
-                 , constrainedGenTest_name    ~: constrainedGenTest
-                 , regularListTest_name       ~: regularListTest
-                 , sepListTest_name           ~: sepListTest
-                 , sepTermListTest_name       ~: sepTermListTest
-                 , sepTermListBytesTest_name  ~: sepTermListBytesTest
-                 , pixelTest_name             ~: pixelTest
-                 , pixelBytesTest_name        ~: pixelBytesTest
-                 , pixelCycleTest_name        ~: pixelCycleTest
-                 , recordConstantsTest_name   ~: recordConstantsTest
-                 , constantsCycleTest_name    ~: constantsCycleTest
-                 , fooFooTest_name            ~: fooFooTest
-                 , fooBarTest_name            ~: fooBarTest
-                 , myConstr1WithArgsTest_name ~: myConstr1WithArgsTest
-                 , myConstr2NoArgsTest_name   ~: myConstr2NoArgsTest
-                 , myConstr3TVArgsTest_name   ~: myConstr3TVArgsTest
-                 , myConstr4NoArgsTest_name   ~: myConstr4NoArgsTest
-                 --, myConstrCycleTest_name     ~: myConstrCycleTest
-                 , myListEmptyTest_name       ~: myListEmptyTest
-                 , myListNonemptyTest_name    ~: myListNonemptyTest
-                 , myListCycleTest_name       ~: myListCycleTest
-                 , nTTest_name                ~: nTTest
-                 , nTCycleTest_name           ~: nTCycleTest
-                 , switchTest_name            ~: switchTest
-                 , switchCycleTest_name       ~: switchCycleTest
-                 , dependentSerTest_name      ~: dependentSerTest
-                 , dependentGenTest_name      ~: dependentGenTest
-                 , paramSerTest_name          ~: paramSerTest
-                 , paramGenTest_name          ~: paramGenTest
-                 , hexObtainTest_name         ~: hexObtainTest
-                 , hexCycleTest_name          ~: hexCycleTest
-                 , littleInt8Test_name        ~: littleInt8Test
-                 , littleInt16Test_name       ~: littleInt16Test
-                 , littleInt32Test_name       ~: littleInt32Test
-                 , bigInt8Test_name           ~: bigInt8Test
-                 , bigInt16Test_name          ~: bigInt16Test
-                 , bigInt32Test_name          ~: bigInt32Test
-                 , withGensTest_name          ~: withGensTest
-                 , pCAPCycleTest_name         ~: pCAPCycleTest
-                 , emptyChunksTest_name       ~: emptyChunksTest
-                 , charChunksTest_name        ~: charChunksTest
-                 , binaryChunksTest_name      ~: binaryChunksTest
-                 , misalignedChunksTest_name  ~: misalignedChunksTest
-                 , misalignedChunks2Test_name ~: misalignedChunks2Test
-                 , mixedChunksTest_name       ~: mixedChunksTest
+-- Ensure theoretically equivalent binary and character chunks behave
+-- equivalently, individually and together in a list
+binCharEquivTest_name = "Binary/Char Chunk Equivalence"
+binCharEquivTest = let
+  bcs = [ [BinaryChunk i 8]          | i <- [0..255]]
+  ccs = [ [CharChunk (word8ToChr c)] | c <- [0..255]]
+  bcs' = map fromChunks bcs
+  ccs' = map fromChunks ccs
+  bcs2 = [BinaryChunk i 8          | i <- [0..255]]
+  ccs2 = [CharChunk (word8ToChr c) | c <- [0..255]]
+  bcs2' = fromChunks bcs2
+  ccs2' = fromChunks ccs2
+  in (return :: a -> IO a) (bcs' == ccs' && bcs2' == ccs2')
+
+tests = TestList [ charTest_name                ~: charTest
+                 , charCycleTest_name           ~: charCycleTest
+                 , intTest_name                 ~: intTest
+                 , intCycleTest_name            ~: intCycleTest
+                 , bits8Test_name               ~: bits8Test
+                 , bits8CycleTest_name          ~: bits8CycleTest
+                 , bits8MisalignedTest_name     ~: bits8MisalignedTest
+                 , bits16Test_name              ~: bits16Test
+                 , bits16CycleTest_name         ~: bits16CycleTest
+                 , bits16MisalignedTest_name    ~: bits16MisalignedTest
+                 , bits32Test_name              ~: bits32Test
+                 , bits32CycleTest_name         ~: bits32CycleTest
+                 , bits64Test_name              ~: bits64Test
+                 , bits64CycleTest_name         ~: bits64CycleTest
+                 , bitBoolTest_name             ~: bitBoolTest
+                 , bitBoolCycleTest_name        ~: bitBoolCycleTest
+                 , bitFieldCycleTest_name       ~: bitFieldCycleTest
+                 , bytesTest_name               ~: bytesTest
+                 , myStringCTest_name           ~: myStringCTest
+                 , myStringCCycleTest_name      ~: myStringCCycleTest
+                 , myTupleTest_name             ~: myTupleTest
+                 , myTupleCycleTest_name        ~: myTupleCycleTest
+                 , byteTest_name                ~: byteTest
+                 , byteCycleTest_name           ~: byteCycleTest
+                 , twoBytesTest_name            ~: twoBytesTest
+                 , twoBytesCycleTest_name       ~: twoBytesCycleTest
+                 , nestedTupleTest_name         ~: nestedTupleTest
+                 , constrainedStringTest_name   ~: constrainedStringTest
+                 , constrainedGenTest_name      ~: constrainedGenTest
+                 , regularListTest_name         ~: regularListTest
+                 , sepListTest_name             ~: sepListTest
+                 , sepTermListTest_name         ~: sepTermListTest
+                 , sepTermListBytesTest_name    ~: sepTermListBytesTest
+                 , sepTermListLitTest_name      ~: sepTermListLitTest
+                 , sepTermListLitCycleTest_name ~: sepTermListLitCycleTest
+                 , lenListTest_name             ~: lenListTest
+                 , lenListCycleTest_name        ~: lenListCycleTest
+                 , sepLenListTest_name          ~: sepLenListTest
+                 , sepLenListCycleTest_name     ~: sepLenListCycleTest
+                 , pixelTest_name               ~: pixelTest
+                 , pixelBytesTest_name          ~: pixelBytesTest
+                 , pixelCycleTest_name          ~: pixelCycleTest
+                 , recordConstantsTest_name     ~: recordConstantsTest
+                 , constantsCycleTest_name      ~: constantsCycleTest
+                 , fooFooTest_name              ~: fooFooTest
+                 , fooBarTest_name              ~: fooBarTest
+                 , myConstr1WithArgsTest_name   ~: myConstr1WithArgsTest
+                 , myConstr2NoArgsTest_name     ~: myConstr2NoArgsTest
+                 , myConstr3TVArgsTest_name     ~: myConstr3TVArgsTest
+                 , myConstr4NoArgsTest_name     ~: myConstr4NoArgsTest
+                 --, myConstrCycleTest_name       ~: myConstrCycleTest
+                 , myListEmptyTest_name         ~: myListEmptyTest
+                 , myListNonemptyTest_name      ~: myListNonemptyTest
+                 , myListCycleTest_name         ~: myListCycleTest
+                 , nTTest_name                  ~: nTTest
+                 , nTCycleTest_name             ~: nTCycleTest
+                 , switchTest_name              ~: switchTest
+                 , switchCycleTest_name         ~: switchCycleTest
+                 , dependentSerTest_name        ~: dependentSerTest
+                 , dependentGenTest_name        ~: dependentGenTest
+                 , paramSerTest_name            ~: paramSerTest
+                 , paramGenTest_name            ~: paramGenTest
+                 , hexObtainTest_name           ~: hexObtainTest
+                 , hexCycleTest_name            ~: hexCycleTest
+                 , littleInt8Test_name          ~: littleInt8Test
+                 , littleInt16Test_name         ~: littleInt16Test
+                 , littleInt32Test_name         ~: littleInt32Test
+                 , bigInt8Test_name             ~: bigInt8Test
+                 , bigInt16Test_name            ~: bigInt16Test
+                 , bigInt32Test_name            ~: bigInt32Test
+                 , withGensTest_name            ~: withGensTest
+                 , pCAPCycleTest_name           ~: pCAPCycleTest
+                 , emptyChunksTest_name         ~: emptyChunksTest
+                 , charChunksTest_name          ~: charChunksTest
+                 , binaryChunksTest_name        ~: binaryChunksTest
+                 , bigBinaryChunksTest_name     ~: bigBinaryChunksTest
+                 , bigBinaryChunks2Test_name    ~: bigBinaryChunks2Test
+                 , misalignedChunksTest_name    ~: misalignedChunksTest
+                 , misalignedChunks2Test_name   ~: misalignedChunks2Test
+                 , mixedChunksTest_name         ~: mixedChunksTest
+                 , mixedChunks2Test_name        ~: mixedChunks2Test
+                 , binCharEquivTest_name        ~: binCharEquivTest
                  ]
 
 test = runTestTT tests

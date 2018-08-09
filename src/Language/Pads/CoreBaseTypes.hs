@@ -603,7 +603,7 @@ stringC_genM c = do
   replicateM i (randLetterExcluding c)
 
 stringC_serialize :: Char -> StringC -> CList
-stringC_serialize c s = (string_serialize s) `cApp` (toCL [CharChunk c])
+stringC_serialize c s = (string_serialize s) `cAppend` (toCL [CharChunk c])
 
 -----------------------------------------------------------------
 
@@ -962,15 +962,8 @@ bytesNB_serialize = bytes_serialize
 
 
 -- | Chunks represent an abstraction of literal data, and allow for easy
--- consumption and concatenation into one ByteString/Word8 (TODO) list of data, which
--- can be written to disk.
--- A CharChunk represents just an ASCII character, and is used for the vast
--- majority of PADS types, since almost all have a disk representation of a
--- string of characters. A BinaryChunk is used for those types whose on-disk
--- representations may not be multiples of whole bytes, and contains the value
--- of the data and the bits of it we care about, where a value of n bits means
--- we care about the n least significant bits of the val. For this, we consider
--- a binary number to have bits increasing in significance from right to left.
+-- consumption and concatenation into one ByteString of data, which can be
+-- written to disk. Each BinaryChunk represents the value val .&. (2^bits - 1)
 data Chunk = CharChunk   Char
            | BinaryChunk { val :: Integer, bits :: Int }
     deriving (Eq, Show, Lift)
@@ -980,13 +973,7 @@ data Chunk = CharChunk   Char
 -- converts each chunk into "bits" (a list of 1's and 0's), then splits that
 -- into "bytes" (lists of length 8 each) to simplify combination in non-byte-
 -- aligned cases.
--- When the data does not add up to a multiple of full bytes, the resultant
--- binary can be thought of as being "left-aligned," e.g. a description of just
--- 3 bits of data would result in a byte where the 3 most significant bits
--- are the relevant ones, somewhat in opposition to the way Chunks represent
--- binary but in harmony with the way the parsing engine handles non-byte-
--- aligned data.
-fromChunks :: [Chunk] -> [Word8]
+fromChunks :: [Chunk] -> B.ByteString
 fromChunks cs = let
   bits = concat $ chunksToBits cs
   toPad = case (8 - ((length bits) `mod` 8)) of 8 -> 0; x -> x
@@ -994,13 +981,18 @@ fromChunks cs = let
   bytes = asBytes $ bits ++ padding
   in if   (length (bits ++ padding) `mod` 8) /= 0
      then error "fromChunks: bug in binary conversion"
-     else map fromBytes bytes
+     else B.pack $ map fromBytes bytes
   where
+    -- | Dispatches to toPaddedBits depending on Chunk type
     chunksToBits :: [Chunk] -> [[Word8]]
     chunksToBits [] = []
-    chunksToBits ((CharChunk c):cs)     = (toPaddedBits (fromEnum c) 8) : chunksToBits cs
-    chunksToBits ((BinaryChunk v b):cs) = (toPaddedBits v            b) : chunksToBits cs
+    chunksToBits ((CharChunk c):cs) =
+      (toPaddedBits (fromEnum c) 8) : chunksToBits cs
+    chunksToBits ((BinaryChunk v b):cs) =
+      (toPaddedBits v            b) : chunksToBits cs
 
+    -- | Ensure every value includes the number of bits it's meant to, since
+    -- toBits won't include 0s when necessary
     toPaddedBits :: Integral a => a -> Int -> [Word8]
     toPaddedBits x padTo = let
       x' = toBits x []
@@ -1009,15 +1001,18 @@ fromChunks cs = let
          then drop (abs $ padTo - length x') x'
          else padding ++ x'
 
+    -- | Straightforward decimal-to-bits conversion
     toBits :: Integral a => a -> [Word8] -> [Word8]
     toBits 0 [] = [0]
     toBits 0 bs = bs
     toBits x bs = toBits (x `div` 2) (fromIntegral x `mod` 2 : bs)
 
+    -- | Split list of 1s and 0s into lists of length 8 each
     asBytes :: [Word8] -> [[Word8]]
     asBytes [] = []
     asBytes xs = (take 8 xs) : (asBytes $ drop 8 xs)
 
+    -- | Convert a list of 8 bits into a decimal byte
     fromBytes :: [Word8] -> Word8
     fromBytes bs = let
       withPowers = zip bs (reverse [0..7])
@@ -1029,14 +1024,14 @@ type CList = [Chunk] -> [Chunk]
 instance Show CList where
   show cl = show $ fromCL cl
 
-cApp :: CList -> CList -> CList
-cs1 `cApp` cs2 = cs1 . cs2
+cAppend :: CList -> CList -> CList
+cs1 `cAppend` cs2 = cs1 . cs2
+
+cConcat :: [CList] -> CList
+cConcat cl = foldr cAppend id cl
 
 toCL :: [Chunk] -> CList
 toCL cs = (cs ++)
-
-concatCs :: [CList] -> CList
-concatCs cl = foldr cApp id cl
 
 fromCL :: CList -> [Chunk]
 fromCL cl = cl []
@@ -1044,17 +1039,22 @@ fromCL cl = cl []
 class ExpSerialize a where
   exp_serialize :: a -> CList
 
--- TODO: fix overlapping, look into similar extensions
-instance {-# OVERLAPPING #-} ExpSerialize Char where
+instance ExpSerialize Char where
   exp_serialize = char_serialize
 
-instance {-# OVERLAPPING #-} ExpSerialize [Char] where
+instance ExpSerialize [Char] where
   exp_serialize = string_serialize
 
-instance {-# OVERLAPPING #-} ExpSerialize RE where
-  exp_serialize _ = string_serialize "RegEx Literal" -- TODO
+instance ExpSerialize RE where
+  exp_serialize _ = string_serialize "RegEx Literal"
 
-instance (Num a, Show a) => ExpSerialize a where
+-- This instance doesn't overlap with the above three, though GHC's constraint-
+-- matching logic obscures that fact. Since a. no other instance is "strictly
+-- more specific" and b. this instance is the only incoherent one, the
+-- INCOHERENT pragma can be applied safely here without fear of undefined
+-- behavior (likely failure) by GHC choosing a random/incorrect instance. See
+-- the GHC user's guide at section 10.8.3.6 for more details.
+instance {-# INCOHERENT #-} (Num a, Show a) => ExpSerialize a where
   exp_serialize x = toCL $ map CharChunk $ show x
 
 -----------------------------------------------------------------
