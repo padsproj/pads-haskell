@@ -28,8 +28,8 @@ instance Lift Exp
 data PadsDecl
     -- | A pads type declaration e.g.:
     --
-    -- > [pads| type           Foo     x y z   (foo :: Int) = (x, y, z, foo) |]
-             =  PadsDeclType   String [String] (Maybe Pat) PadsTy
+    -- > [pads| type           Foo     x y z   (foo :: Int) = (x, y, z, foo) generator <|gen|> |]
+             =  PadsDeclType   String [String] (Maybe Pat) PadsTy            (Maybe Exp)
 
     -- | A pads data declaration e.g.:
     --

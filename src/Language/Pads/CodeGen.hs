@@ -62,7 +62,7 @@ make_pads_declarations = make_pads_declarations' (const $ return [])
 -- the PADS AST (no parser codegen)
 make_pads_asts :: [PadsDecl] -> Q Exp
 make_pads_asts = let
-    mpa pd@(PadsDeclType n _ _ _)     = [| ($(litE $ stringL n), $(lift pd)) |]
+    mpa pd@(PadsDeclType n _ _ _ _)   = [| ($(litE $ stringL n), $(lift pd)) |]
     mpa pd@(PadsDeclData n _ _ _ _)   = [| ($(litE $ stringL n), $(lift pd)) |]
     mpa pd@(PadsDeclNew n _ _ _ _)    = [| ($(litE $ stringL n), $(lift pd)) |]
     mpa pd@(PadsDeclObtain n _ _ _ _) = [| ($(litE $ stringL n), $(lift pd)) |]
@@ -79,12 +79,12 @@ make_pads_declarations' derivation ds = fmap concat (mapM (genPadsDecl derivatio
 genPadsDecl :: Derivation -> PadsDecl -> Q [Dec]
 -- ^ Generate all the top level Haskell declarations associated with a single
 -- Pads declaration.
-genPadsDecl derivation pd@(PadsDeclType name args pat padsTy) = do
+genPadsDecl derivation pd@(PadsDeclType name args pat padsTy gen) = do
   let typeDecs = mkTyRepMDDecl name args padsTy
   parseM  <- genPadsParseM name args pat padsTy
   parseS  <- genPadsParseS name args pat
   printFL <- genPadsPrintFL name args pat padsTy
-  genM    <- genPadsGenM name args pat padsTy
+  genM    <- genPadsGenM name args pat padsTy gen
   serialize <- genPadsSerialize name args pat padsTy
   def <- genPadsDef name args pat padsTy
   let sigs = mkPadsSignature name args (fmap patType pat)
@@ -805,9 +805,10 @@ genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred
 -- common how they construct said function.
 
 -- | PadsDeclType generator declaration
-genPadsGenM :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
-genPadsGenM name args patM padsTy = do
-  let body = genGenTy padsTy
+genPadsGenM :: UString -> [LString] -> Maybe Pat -> PadsTy -> Maybe Exp -> Q [Dec]
+genPadsGenM name args patM padsTy genM = do
+  let body = case genM of Just gen -> return gen
+                          Nothing  -> genGenTy padsTy
   mkGeneratorFunction name args patM body
 
 -- | PadsDeclData generator declaration

@@ -70,7 +70,8 @@ typeDecl
   = do { reserved "type"
        ; (id,env) <- declLHS; pat <- patLHS
        ; rhs <- ptype env
-       ; return (PadsDeclType id env pat rhs)
+       ; genM <- optionMaybe gen
+       ; return (PadsDeclType id env pat rhs genM)
        } <?> "Pads type declaration"
 
 dataDecl :: Parser PadsDecl
