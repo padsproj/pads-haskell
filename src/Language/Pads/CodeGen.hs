@@ -62,7 +62,7 @@ make_pads_declarations = make_pads_declarations' (const $ return [])
 -- the PADS AST (no parser codegen)
 make_pads_asts :: [PadsDecl] -> Q Exp
 make_pads_asts = let
-    mpa pd@(PadsDeclType n _ _ _)     = [| ($(litE $ stringL n), $(lift pd)) |]
+    mpa pd@(PadsDeclType n _ _ _ _)   = [| ($(litE $ stringL n), $(lift pd)) |]
     mpa pd@(PadsDeclData n _ _ _ _)   = [| ($(litE $ stringL n), $(lift pd)) |]
     mpa pd@(PadsDeclNew n _ _ _ _)    = [| ($(litE $ stringL n), $(lift pd)) |]
     mpa pd@(PadsDeclObtain n _ _ _ _) = [| ($(litE $ stringL n), $(lift pd)) |]
@@ -79,12 +79,12 @@ make_pads_declarations' derivation ds = fmap concat (mapM (genPadsDecl derivatio
 genPadsDecl :: Derivation -> PadsDecl -> Q [Dec]
 -- ^ Generate all the top level Haskell declarations associated with a single
 -- Pads declaration.
-genPadsDecl derivation pd@(PadsDeclType name args pat padsTy) = do
+genPadsDecl derivation pd@(PadsDeclType name args pat padsTy gen) = do
   let typeDecs = mkTyRepMDDecl name args padsTy
   parseM  <- genPadsParseM name args pat padsTy
   parseS  <- genPadsParseS name args pat
   printFL <- genPadsPrintFL name args pat padsTy
-  genM    <- genPadsGenM name args pat padsTy
+  genM    <- genPadsGenM name args pat padsTy gen
   serialize <- genPadsSerialize name args pat padsTy
   def <- genPadsDef name args pat padsTy
   let sigs = mkPadsSignature name args (fmap patType pat)
@@ -805,9 +805,10 @@ genParseRecConstrain labP xnP ty exp = [| parseConstraint $(genParseTy ty) $pred
 -- common how they construct said function.
 
 -- | PadsDeclType generator declaration
-genPadsGenM :: UString -> [LString] -> Maybe Pat -> PadsTy -> Q [Dec]
-genPadsGenM name args patM padsTy = do
-  let body = genGenTy padsTy
+genPadsGenM :: UString -> [LString] -> Maybe Pat -> PadsTy -> Maybe Exp -> Q [Dec]
+genPadsGenM name args patM padsTy genM = do
+  let body = case genM of Just gen -> return gen
+                          Nothing  -> genGenTy padsTy
   mkGeneratorFunction name args patM body
 
 -- | PadsDeclData generator declaration
@@ -877,7 +878,8 @@ genGenRecord c fields pred = do
   doStmts <- sequence $ map genGenField fields
   let labels = map mkName $ Maybe.catMaybes $ [label | (label,(_,ty),_,_) <- fields, hasRep ty]
   let conLabs = applyE (ConE (mkConstrName c) : map VarE labels)
-  returnStmt <- [| (return :: a -> PadsGen a) ($(return conLabs)) |]
+  let a = (varT . mkName) "a"
+  returnStmt <- [| (return :: $a -> PadsGen $a) ($(return conLabs)) |]
   return $ DoE (concat doStmts ++ [NoBindS returnStmt])
 
 -- | Generate the generator for a field of a Pads record; each one becomes a
@@ -900,7 +902,8 @@ genGenConstr c args pred = do
   binds <- sequence [bindS (varP n) ty | (n,ty) <- zip names tys']
   let constructor = (conE . mkName) c
   let toreturn = foldl1 appE (constructor : (map varE names))
-  ret <- noBindS [| (return :: a -> PadsGen a) $toreturn |]
+  let a = (varT . mkName) "a"
+  ret <- noBindS [| (return :: $a -> PadsGen $a) $toreturn |]
   return $ DoE (binds ++ [ret])
 
 -- * Generating Generator from Type Expression
@@ -920,36 +923,31 @@ genGenTy pty = case pty of
   PTycon c                     -> mkGenTycon c
   PTyvar v                     -> mkGenTyvar v
 
--- | Generate code that uses the runtime function 'untilM' to generate random
--- examples of data until one satisfies the constraint. If a predicate
+-- | Generate code that uses the runtime function 'randWithConstraint' to
+-- generate random data until one satisfies the constraint. If a predicate
 -- requires that the variable in question be exactly equal to a value,
--- untilM is bypassed and that value is assigned directly.
+-- randWithConstraint is bypassed and that value is assigned directly.
 --
--- e.g. constrain tcpDstPort :: Bits16 16 <| tcpDstPort == 22 |> will avoid
+-- e.g. @constrain tcpDstPort :: Bits16 16 <| tcpDstPort == 22 |>@ will avoid
 -- creating new 16-bit values until one happens to be equal to 22, and will
 -- instead assign the literal 22 to tcpDstPort.
 genGenConstrain :: Pat -> PadsTy -> Exp -> Q Exp
-genGenConstrain pat pty e = do
-  name <- newName "x"
-  orig <- bindS (varP name) (genGenTy pty)
-  let pat' = return pat; e' = return e
-  let (VarE x) = fromVarP pat; xName = nameBase x
-  gen <- case e of
-    (UInfixE
-      (VarE (Name (OccName var)  NameS))
-      (VarE (Name (OccName "==") NameS))
-      y) | var == xName -> bindS pat' [| return $(return y) |]
-    (UInfixE
-      y
-      (VarE (Name (OccName "==") NameS))
-      (VarE (Name (OccName var)  NameS)))
-        | var == xName -> bindS pat' [| return $(return y) |]
-    _ -> bindS pat' [| untilM $(lamE [pat'] e') (const $(genGenTy pty)) recLimit $(varE name) |]
-  ret  <- noBindS [| return $(return $ fromVarP pat) |]
-  return $ DoE [orig,gen,ret]
+genGenConstrain pat pty e = let
+  var = fromVarP pat
+  patQ = return pat
+  eQ = return e
+  in case e of
+    (UInfixE y eq z)
+      | simpleEquality var y eq z -> [| return $(return z) |]
+      | simpleEquality var z eq y -> [| return $(return y) |]
+    _ -> [| randWithConstraint $(genGenTy pty) $(lamE [patQ] eQ) |]
+
   where
     fromVarP :: Pat -> Exp
     fromVarP (VarP x) = VarE x
+
+    simpleEquality :: Exp -> Exp -> Exp -> Exp -> Bool
+    simpleEquality var y eq z = (y == var && eq == (VarE . mkName) "==")
 
 -- | If an optional generator is included in the quasiquoted PADS description,
 -- simply provide it. If not, fail with a (hopefully) helpful error message.
@@ -959,22 +957,22 @@ genGenTransform src dest exp genM = case genM of
   Nothing -> [| (return $
                  error  $ "genGenTy: PTransform unimplemented. You likely arrived "
                        ++ "at this error by having an \"obtain\" declaration/expression "
-                       ++ "in your description. If so, you can provide your own "
-                       ++ "generation function f by appending \" generator f\" "
-                       ++ "to it.") :: PadsGen a |]
+                       ++ "in your description with no provided generator. If "
+                       ++ "so, you can provide your own generation function f "
+                       ++ "by appending \" generator f\" to it.") :: PadsGen a |]
 
--- | Generate a list representing a Pads list type. We ignore the separator and
--- PadsTy termination condition here and include them in the data during
--- serialization.
+-- | Generate a list representing a Pads list type by generating a call to
+-- the runtime function 'randList'. We ignore the separator and LTerm
+-- termination condition here and incorporate them during serialization, but the
+-- LLen termination condition is respected at this stage.
 genGenList :: PadsTy -> (Maybe PadsTy) -> (Maybe TermCond) -> Q Exp
-genGenList pty sep term =
-  case (sep,term) of
-    (_, Just (LLen l)) -> [| sequence $ replicate $(return l) $(genGenTy pty) |]
-    _ -> do
-      name <- newName "n"
-      bind <- bindS (varP name) [| randNumBound 100 |]
-      ret  <- noBindS [| sequence $ replicate $(varE name) $(genGenTy pty) |]
-      return $ DoE (bind : [ret])
+genGenList pty _ (Just (LLen e)) = let
+  gen = genGenTy pty
+  in [| randList $gen (Just $(return e)) |]
+genGenList pty _ _ = let
+  gen = genGenTy pty
+  in [| randList $gen Nothing |]
+
 
 -- | All variables on which a PValue statement depends will be in scope at this
 -- point, so the expression can be returned and evaluated at runtime.

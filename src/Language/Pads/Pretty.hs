@@ -24,7 +24,7 @@ import Language.Pads.RegExp
 
 
 instance Pretty PadsDecl where
-    ppr (PadsDeclType con vars pat padsty) = text "type" <+> (ppr_decl_lhs con vars pat) <+> text "=" <+> ppr padsty
+    ppr (PadsDeclType con vars pat padsty _) = text "type" <+> (ppr_decl_lhs con vars pat) <+> text "=" <+> ppr padsty
     ppr (PadsDeclData con vars pat padsrhs cons) = text "data" <+> (ppr_decl_lhs con vars pat) <+> text "="
                                                    <+> ppr padsrhs <> ppr_derives cons
     ppr (PadsDeclNew  con vars pat branchInfo cons) = text "newtype" <+> (ppr_decl_lhs con vars pat) <+> text "="
