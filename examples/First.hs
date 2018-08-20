@@ -862,7 +862,7 @@ padsExp_ast =
   [ ("Halloween", PadsDeclType "Halloween" [] Nothing
                   ( PList (PApp [PTycon ["StringFW"]] (Just (LitE (IntegerL 4))))
                           (Just (PTycon ["EOR"]))
-                          (Just (LTerm (PTycon ["EOF"])))))]
+                          (Just (LTerm (PTycon ["EOF"])))) Nothing)]
 padsExp_input   = "karl\njred\nmatt\nsam_"
 padsExp_result  = halloween_parseS padsExp_input
 padsExp_expects = (["karl", "jred", "matt", "sam_"], 0, "")

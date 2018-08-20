@@ -260,13 +260,21 @@ constrainedGenTest = do
   ss <- replicateM 3 (runPadsGen cString_genM)
   return $ all (== "cc") (map (take 2) ss)
 
+[pads| type SimpleC  = constrain s :: Int where <| s == 5 |>
+       type SimpleC2 = constrain s :: Int where <| 5 == s |> |]
+simpleConstraintTest_name = "Simple Constraint"
+simpleConstraintTest = do
+  ss <- replicateM sampleSize (runPadsGen simpleC_genM)
+  return $ all (== 5) ss
+
+simpleConstraintTest2_name = "Simple Constraint 2"
+simpleConstraintTest2 = do
+  ss <- replicateM sampleSize (runPadsGen simpleC2_genM)
+  return $ all (== 5) ss
+
+
 -- PLists of several forms
-[pads| type RegularList    = [Bits8 8]
-       type SepList        = [Bits8 8 | '|']
-       type SepTermList    = [Bits8 8 | '|'] terminator Char
-       type SepTermListLit = [Char | '|'] terminator '~'
-       type LenList        = [Digit] length 5
-       type SepLenList     = [Digit | '|'] length 5 |]
+[pads| type RegularList = [Bits8 8] |]
 
 regularListTest_name = "RegularList"
 regularListTest_expected = [(BinaryChunk 10) 8, (BinaryChunk 5) 8]
@@ -275,6 +283,7 @@ regularListTest_got
 regularListTest
   = TestCase (regularListTest_expected @=? regularListTest_got)
 
+[pads| type SepList = [Bits8 8 | '|'] |]
 sepListTest_name = "SepList"
 sepListTest_expected
   = [(BinaryChunk 10) 8, CharChunk '|', (BinaryChunk 5) 8]
@@ -282,7 +291,8 @@ sepListTest_got = fromCL $ sepList_serialize [10, 5]
 sepListTest
   = TestCase (sepListTest_expected @=? sepListTest_got)
 
-sepTermListTest_name = "SepTermList, Type Terminator"
+[pads| type SepTermList = [Bits8 8 | '|'] terminator Char |]
+sepTermListTest_name = "SepList w/ Type Terminator"
 sepTermListTest_expected
   = [(BinaryChunk 10) 8, CharChunk '|', (BinaryChunk 5) 8, CharChunk 'X']
 sepTermListTest_got
@@ -290,56 +300,54 @@ sepTermListTest_got
 sepTermListTest
   = TestCase (sepTermListTest_expected @=? sepTermListTest_got)
 
-sepTermListBytesTest_name = "SepTermList Bytes"
+sepTermListBytesTest_name = "SepList w/ Type Terminator (Bytes)"
 sepTermListBytesTest_expected = B.pack [10, 124, 5, 88]
 sepTermListBytesTest_got = fromChunks sepTermListTest_got
 sepTermListBytesTest
   = TestCase (sepTermListBytesTest_expected @=? sepTermListBytesTest_got)
 
-sepTermListLitTest_name = "SepTermList, Literal Terminator"
+[pads| type SepTermListLit = [Char | '|'] terminator '~' |]
+sepTermListLitTest_name = "SepList w/ Literal Terminator"
 sepTermListLitTest_expected
-  = [CharChunk 'a', CharChunk '|', CharChunk 'b', CharChunk '~']
+  = BC.pack "a|b~"
 sepTermListLitTest_got
-  = fromCL $ sepTermListLit_serialize "ab"
+  = fromChunks $ fromCL $ sepTermListLit_serialize "ab"
 sepTermListLitTest
   = TestCase (sepTermListLitTest_expected @=? sepTermListLitTest_got)
 
-sepTermListLitCycleTest_name = "SepTermListLit Cycle"
+sepTermListLitCycleTest_name = "SepList w/ Literal Terminator Cycle"
 sepTermListLitCycleTest = do
   ls <- replicateM sampleSize (runPadsGen sepTermListLit_genM)
   let ls_serialized = map (BC.unpack . fromChunks . fromCL . sepTermListLit_serialize) ls
   let ls_parsed = map (fst . fst . sepTermListLit_parseS) ls_serialized
   return $ ls == ls_parsed
 
-lenListTest_name = "LenList"
+[pads| type LenList = [Digit] length 5 |]
+lenListTest_name = "List w/ Length"
 lenListTest_expected
-  = [CharChunk '6', CharChunk '5', CharChunk '5', CharChunk '3',
-     CharChunk '5']
+  = BC.pack "65535"
 lenListTest_got
-  = fromCL $ lenList_serialize [6, 5, 5, 3, 5, 0, 0, 0]
+  = fromChunks $ fromCL $ lenList_serialize [6, 5, 5, 3, 5, 0, 0, 0]
 lenListTest
   = TestCase (lenListTest_expected @=? lenListTest_got)
 
-lenListCycleTest_name = "LenList Cycle"
+lenListCycleTest_name = "List w/ Length Cycle"
 lenListCycleTest = do
   ls <- replicateM sampleSize (runPadsGen lenList_genM)
   let ls_serialized = map (BC.unpack . fromChunks . fromCL . lenList_serialize) ls
   let ls_parsed = map (fst . fst . lenList_parseS) ls_serialized
   return $ ls == ls_parsed
 
-sepLenListTest_name = "SepLenList"
+[pads| type SepLenList = [Digit | '|'] length 5 |]
+sepLenListTest_name = "SepList w/ Length"
 sepLenListTest_expected
-  = [CharChunk '6', CharChunk '|',
-     CharChunk '5', CharChunk '|',
-     CharChunk '5', CharChunk '|',
-     CharChunk '3', CharChunk '|',
-     CharChunk '5']
+  = BC.pack "6|5|5|3|5"
 sepLenListTest_got
-  = fromCL $ sepLenList_serialize [6, 5, 5, 3, 5, 0, 0, 0]
+  = fromChunks $ fromCL $ sepLenList_serialize [6, 5, 5, 3, 5, 0, 0, 0]
 sepLenListTest
   = TestCase (sepLenListTest_expected @=? sepLenListTest_got)
 
-sepLenListCycleTest_name = "SepLenList Cycle"
+sepLenListCycleTest_name = "SepList w/ Length Cycle"
 sepLenListCycleTest = do
   ls <- replicateM sampleSize (runPadsGen sepLenList_genM)
   let ls_serialized = map (BC.unpack . fromChunks . fromCL . sepLenList_serialize) ls
@@ -907,6 +915,8 @@ tests = TestList [ charTest_name                ~: charTest
                  , nestedTupleTest_name         ~: nestedTupleTest
                  , constrainedStringTest_name   ~: constrainedStringTest
                  , constrainedGenTest_name      ~: constrainedGenTest
+                 , simpleConstraintTest_name    ~: simpleConstraintTest
+                 , simpleConstraintTest2_name   ~: simpleConstraintTest2
                  , regularListTest_name         ~: regularListTest
                  , sepListTest_name             ~: sepListTest
                  , sepTermListTest_name         ~: sepTermListTest
@@ -964,5 +974,5 @@ tests = TestList [ charTest_name                ~: charTest
 
 test = runTestTT tests
 
-main :: IO ()
-main = test >> return ()
+main :: IO Counts
+main = test

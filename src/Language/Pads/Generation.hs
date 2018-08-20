@@ -27,8 +27,8 @@ runPadsGen genM = do
   gen <- createSystemRandom
   runReaderT (unPadsGen genM) gen
 
--- | The types randNum and randNumBound return are dictated by the types of
--- their callers.
+-- | The types 'randNum'/'randNumBound'/'randNumBetween' return are dictated by
+-- the types of their callers.
 randNum :: (Variate a) => PadsGen a
 randNum = ask >>= (liftIO . uniform)
 
@@ -70,3 +70,40 @@ randLetterExcluding c = randElem (delete c letters)
 
 letters :: [Char]
 letters = ['A'..'Z'] ++ ['a'..'z']
+
+listLengthLimit = 100
+
+-- | A list of random length, provided a PadsGen generator. Optionally also
+-- paramaterized by an Int, which if provided will be the length of the list
+randList :: PadsGen a -> Maybe Int -> PadsGen [a]
+randList padsGen intM = do
+  i <- case intM of
+    Just x  -> return x
+    Nothing -> ask >>= (liftIO . (uniformR (1, listLengthLimit)))
+  replicateM i padsGen
+
+recLimit = 10000
+
+-- | Provided a predicate, function that transforms a seed value, recursion
+-- limit, and seed value, generates a value of the seed's type that satisfies
+-- the predicate
+untilM :: Monad m => (a -> Bool) -> (a -> m a) -> Integer -> a -> m a
+untilM p f i z = do
+  when (i <= 0)
+    (error $ "untilM: recursion too deep. Your description probably "
+          ++ "contains a too-narrow constraint to efficiently "
+          ++ "generate data that satisfy it. To increase "
+          ++ "the recursion limit ('recLimit' in Generation.hs), "
+          ++ "currently set to " ++ show recLimit
+          ++ ", edit it and try again.")
+  if p z
+    then return z
+    else f z >>= untilM p f (i - 1)
+
+-- | A random instance of the provided PadsGen that satisfies the provided
+-- constraint
+randWithConstraint :: PadsGen a -> (a -> Bool) -> PadsGen a
+randWithConstraint padsGen pred = do
+  x <- padsGen
+  x' <- untilM pred (const padsGen) recLimit x
+  return x'
