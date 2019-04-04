@@ -9,15 +9,17 @@
 
 -}
 module Language.Pads.Quote
-    (pads, padsDerivation, pparseDecl, make_pads_declarations)
+    (pads, padsDerivation, pparseDecl, make_pads_declarations, padsE)
     where
 
 import Prelude hiding (exp, init)
 import System.IO.Unsafe (unsafePerformIO)
+import Control.Monad (liftM2, liftM)
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Quote (QuasiQuoter(..))
 
+import Language.Pads.Syntax (PadsDecl(..))
 import Language.Pads.CodeGen
 import qualified Language.Pads.Parser as P
 
@@ -36,32 +38,44 @@ pads = padsDerivation (const $ return [])
 -- (expressions, patterns, and types produce errors).
 padsDerivation :: Derivation -> QuasiQuoter
 padsDerivation derivation = QuasiQuoter
-                    pparseExp
+                    (\s -> pparseExp s >>= (pure . fst))
                     (error "parse pattern")
                     (error "parse type")
-                    (pparseDecl derivation)
+                    (\s -> pparseDecl derivation s >>= (pure . fst))
 
 -- | Just the declaration parser for a PADS quasiquotation. Glues together
 -- 'P.parsePadsDecls' and 'make_pads_declarations', the parser and code
 -- generator.
-pparseDecl :: Derivation -> String -> Q [Dec]
+pparseDecl :: Derivation -> String -> Q ([Dec], [PadsDecl])
 pparseDecl derivation input = do
     loc <- location
     let fileName = loc_filename loc
     let (line,column) = loc_start loc
     case P.parsePadsDecls fileName line column input of
-      Left err -> unsafePerformIO $ fail $ show err
-      Right x  -> make_pads_declarations' derivation x
+      Left err        -> unsafePerformIO $ fail $ show err
+      Right padsDecls ->
+        do result <- make_pads_declarations' derivation padsDecls
+           pure (result, padsDecls)
 
 -- | Just the declaration parser for a PADS quasiquotation. Glues together
 -- 'P.parsePadsDecls' and 'make_pads_declarations', the parser and code
 -- generator.
-pparseExp :: String -> Q Exp
+pparseExp :: String -> Q (Exp, [PadsDecl])
 pparseExp input = do
     loc <- location
     let fileName = loc_filename loc
     let (line,column) = loc_start loc
     case P.parsePadsDecls fileName line column input of
-      Left err -> unsafePerformIO $ fail $ show err
-      Right x  -> make_pads_asts x
+      Left err        -> unsafePerformIO $ fail $ show err
+      Right padsDecls -> do
+        result <- make_pads_asts padsDecls
+        pure (result, padsDecls)
+
+-- | Extensible PADS quasiquoter
+padsE :: ([PadsDecl] -> Q [Dec]) -> QuasiQuoter
+padsE fncn = QuasiQuoter
+  (\s -> pparseExp s >>= (pure . fst))
+  (error "parse pattern")
+  (error "parse type")
+  (\s -> pparseDecl (const $ return []) s >>= \(result,ast) -> (liftM (result ++)) (fncn ast))
 

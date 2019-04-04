@@ -12,6 +12,8 @@ extra-source-files:
 - examples/First.hs
 - examples/AI.hs
 - examples/Binary.hs
+- extended/Extensible.hs
+- extended/ExtensibleEx.hs
 - examples/data/README
 - examples/data/test_file
 - examples/data/ai.3000
@@ -117,3 +119,15 @@ tests:
     - -main-is GenTesting
     dependencies:
     - pads-haskell
+  
+  extended:
+    main: ExtensibleEx.hs
+    source-dirs: extended
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    - -main-is ExtensibleEx
+    dependencies:
+    - pads-haskell
+
