@@ -34,11 +34,27 @@ myCompiler [] = pure []
 
 fI = fromIntegral
 
+mkKarl name typeParams =
+  [d| $(varP $ mkName $ "karl_" ++ name) = $(litE $ integerL $ fI $ length typeParams) |]
+
 compileSingle :: PadsDecl -> Q [Dec]
-compileSingle (PadsDeclType name typeParams pat inner generator) = [d| $(varP $ mkName $ "karl_" ++ name) = $(litE $ integerL $ fI $ length typeParams) |]
-compileSingle (PadsDeclData name typeParams pat inner derivers)  = [d| $(varP $ mkName $ "karl_" ++ name) = $(litE $ integerL $ fI $ length typeParams) |]
-compileSingle (PadsDeclNew  name typeParams pat inner derivers)  = [d| $(varP $ mkName $ "karl_" ++ name) = $(litE $ integerL $ fI $ length typeParams) |]
-compileSingle (PadsDeclObtain name typeParams inner invers generator) = [d| $(varP $ mkName $ "karl_" ++ name) = $(litE $ integerL $ fI $ length typeParams) |]
+compileSingle p@(PadsDeclType name typeParams pat inner generator)       =
+  do k <- mkKarl name typeParams
+     ds <- make_pads_declarations [transform p]
+     pure $ k ++ ds
+compileSingle p@(PadsDeclData name typeParams pat inner derivers)        = mkKarl name typeParams
+compileSingle p@(PadsDeclNew  name typeParams pat inner derivers)        = mkKarl name typeParams
+compileSingle p@(PadsDeclObtain name typeParams inner invers generator)  = mkKarl name typeParams
+
+transform (PadsDeclType name typeParams pat inner generator)
+  = PadsDeclType ("Karl_" ++ name) typeParams pat (transformInner inner) generator
+transform _ = error "unimplemented"
+
+transformInner (PTuple tys) = PTuple $ map transformInner tys
+transformInner (PTycon qs)
+  | qs == ["Int"] = PTycon ["Char"]
+  | otherwise     = PTycon qs
+transformInner rest = rest
 
 myQuoter = padsE myCompiler
 

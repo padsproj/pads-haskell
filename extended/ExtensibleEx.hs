@@ -10,8 +10,10 @@ import Extensible
 [myQuoter| type Foo x y z = (Int, '|', Int) |]
 
 main :: IO ()
-main =
+main = do
   if (karl_Foo == 3) -- because Foo has 3 type parameters
     then print "Success (:"
     else print "Failure ):"
+  print $ (fst . fst . karl_Foo_parseS 0 0 0) "a|b"
+  print $ (fst . fst . foo_parseS 7 8 9)      "3|4"
 
