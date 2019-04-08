@@ -185,7 +185,7 @@ minify = unlines                  .
 -- been corrupted
 writePCAP :: IO PCAP
 writePCAP = do
-  pcap <- runPadsGen pCAP_genM
+  pcap <- runPadsGen' pCAP_genM
   B.writeFile "data/test.pcap" $ (fromChunks . fromCL . pCAP_serialize) pcap
   let bs = map (tcpPayload . ipv4Payload . ethPayload . body) ((ps . snd) pcap)
   B.writeFile "data/maybeGalois.html" (B.concat bs)
