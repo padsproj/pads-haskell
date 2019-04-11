@@ -30,7 +30,7 @@ bToi8 :: Span -> (Bytes, Base_md) -> (Data.Int.Int8, Base_md)
 bToi8 p (bytes,md) = (fromIntegral (bytes `B.index` 0), md)
 i8Tob (i,md) = (B.singleton (fromIntegral i), md)
 
-int8_genM :: PadsGen Int8
+int8_genM :: PadsGen st Int8
 int8_genM = randNum
 
 
@@ -40,7 +40,7 @@ type Int16 = Data.Int.Int16
 bToi16sbl p (bs,md) = (bytesToInt16 SBL bs, md)
 i16sblTob (i,md) = (int16ToBytes SBL i, md)
 
-int16_genM :: PadsGen Int16
+int16_genM :: PadsGen st Int16
 int16_genM = randNum
 
 
@@ -50,7 +50,7 @@ type Int32 = Data.Int.Int32
 bToi32sbl p (bs,md) = (bytesToInt32 SBL bs, md)
 i32sblTob (i,md) = (int32ToBytes SBL i, md)
 
-int32_genM :: PadsGen Int32
+int32_genM :: PadsGen st Int32
 int32_genM = randNum
 
 
@@ -62,7 +62,7 @@ type Word8 = Data.Word.Word8
 bTow8 p (bytes,md) = (bytes `B.index` 0, md)
 w8Tob (i,md) = (B.singleton i, md)
 
-word8_genM :: PadsGen Word8
+word8_genM :: PadsGen st Word8
 word8_genM = randNum
 
 
@@ -72,7 +72,7 @@ type Word16 = Data.Word.Word16
 bTow16sbl p (bs,md) = (bytesToWord16 SBL bs, md)
 w16sblTob (i,md) = (word16ToBytes SBL i, md)
 
-word16_genM :: PadsGen Word16
+word16_genM :: PadsGen st Word16
 word16_genM = randNum
 
 
@@ -82,5 +82,5 @@ type Word32 = Data.Word.Word32
 bTow32sbl p (bs,md) = (bytesToWord32 SBL bs, md)
 w32sblTob (i,md) = (word32ToBytes SBL i, md)
 
-word32_genM :: PadsGen Word32
+word32_genM :: PadsGen st Word32
 word32_genM = randNum

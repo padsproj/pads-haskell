@@ -140,7 +140,7 @@ mtu = 1460
 -- | One-stop shop for packet list generation - working at the level of a list
 -- of packets, we simply call down to packet_genM then map over its results to
 -- perform our filling
-ps_genM :: PadsGen [Packet]
+ps_genM :: PadsGen st [Packet]
 ps_genM = do
   bs <- liftIO $ B.pack <$> minify <$> readFile "data/galois.html"
   let padding = B.replicate (mtu - (B.length bs `mod` mtu)) '\NUL'
@@ -195,7 +195,7 @@ minify = unlines                  .
 -- been corrupted
 writePCAP :: IO PCAP
 writePCAP = do
-  pcap <- runPadsGen' pCAP_genM
+  pcap <- runPadsGen pCAP_genM
   B.writeFile "data/test.pcap" $ (fromChunks . fromCL . pCAP_serialize) pcap
   let bs = map (tcpPayload . ipv4Payload . ethPayload . body) ((ps . snd) pcap)
   B.writeFile "data/maybeGalois.html" (B.concat bs)

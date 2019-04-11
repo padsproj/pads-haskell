@@ -1,84 +1,101 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveFunctor, FlexibleContexts, FlexibleInstances
-   , MultiParamTypeClasses #-}
+   , MultiParamTypeClasses, DerivingVia, InstanceSigs #-}
 
 module Language.Pads.Generation where
 
-import Control.Monad.Reader hiding (lift)
 import Control.Monad.IO.Class (liftIO)
 import Data.List (delete)
 import GHC.Prim (RealWorld)
 import System.Random.MWC
 
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.State.Lazy
-
-type GenState = Int
 
 -- | A custom application of the ReaderT monad, allowing threaded access to a
 -- random generator, supplied when the generation function is called at top
 -- level (i.e. via runPadsGen)
-newtype PadsGen a = PadsGen { unPadsGen :: StateT (GenIO, GenState) IO a }
+newtype PadsGen st a = PadsGen { unPadsGen :: StateT (GenIO, st) IO a }
   -- Here 'Gen RealWorld' is equal to 'GenIO' above. We can't write
   -- 'GenIO' here because 'GenIO' is defined as 'Gen (PrimState IO)',
   -- 'PrimState' is a type family, and type family instances aren't
   -- allowed. It's probably a bug, but GHC will allow us to derive a
   -- @MonadReader GenIO@ instance here, but we then get type errors at
   -- use sites of 'MonadReader' functions, e.g. 'ask'.
-  deriving (Functor, Applicative, Monad, MonadState (Gen RealWorld, GenState), MonadIO)
+  deriving (Functor, Applicative, Monad, MonadIO)
 
---instance (MonadReader (Gen RealWorld)) (PadsGen)
+instance MonadState (Gen RealWorld, st) (PadsGen st) where
+  get :: PadsGen st (Gen RealWorld, st)
+  get   = PadsGen $ StateT $ \s -> pure (s,s)
+  
+  put :: (Gen RealWorld, st) -> PadsGen st ()
+  put s = PadsGen $ StateT $ \_ -> pure ((), s)
 
-askGen fncn = get >>= (fncn . fst)
+askGen :: MonadState (GenIO, st) (PadsGen st) => (GenIO -> PadsGen st a) -> PadsGen st a
+askGen fncn = get >>= fncn . fst
 
 -- | Provides the requisite random number generator to the supplied generation
--- computation and returns the result as a value in IO.
-runPadsGen :: GenState -> PadsGen a -> IO a
-runPadsGen init_state genM = do
+--   computation and returns the result as a value in IO. Initial generator state
+--   must be given.
+runPadsGenSt :: st -> PadsGen st a -> IO a
+runPadsGenSt init_st genM = do
   gen <- createSystemRandom
-  fst <$> runStateT (unPadsGen genM) (gen, init_state)
+  fst <$> runStateT (unPadsGen genM) (gen, init_st)
 
-runPadsGen' :: PadsGen a -> IO a
-runPadsGen' = runPadsGen 0
+-- | Pull user-level state out of the generator (ignore the random seed).
+getState :: PadsGen st st
+getState = do
+  (_, st) <- get
+  return st
 
+-- | Put user-level state intothe generator (carrying over the random seed).
+putState :: st -> PadsGen st ()
+putState v = do
+  (g, _) <- get
+  put (g, v)
+
+-- | Delegates to 'runPadsGen\''
+runPadsGen :: PadsGen () a -> IO a
+runPadsGen = runPadsGenSt ()
 
 -- | The types 'randNum'/'randNumBound'/'randNumBetween' return are dictated by
 -- the types of their callers.
-randNum :: (Variate a) => PadsGen a
+randNum :: (Variate a) => PadsGen st a
 randNum = askGen $ (liftIO . uniform)
 
 -- | A number with bounds i and j
-randNumBetween :: (Integral a, Variate a) => a -> a -> PadsGen a
+randNumBetween :: (Integral a, Variate a) => a -> a -> PadsGen st a
 randNumBetween i j = askGen $ (liftIO . (uniformR (i, j)))
 
 -- | A number with an upper bound i
-randNumBound :: (Integral a, Variate a) => a -> PadsGen a
+randNumBound :: (Integral a, Variate a) => a -> PadsGen st a
 randNumBound i = randNumBetween 0 i
 
 -- | As they aren't members of the System.Random.MWC class Variate, Integers
 -- require special treatment - convert them from doubles.
-randInteger :: PadsGen Integer
+randInteger :: PadsGen st Integer
 randInteger = randIntegerBound (2^1023)
 
 -- | See randInteger
-randIntegerBound :: Integral a => a -> PadsGen Integer
+randIntegerBound :: Integral a => a -> PadsGen st Integer
 randIntegerBound i = do
-  (gen, st) <- get
+  (gen,_) <- get
   i' <- liftIO $ uniformR (0 :: Double, (fromIntegral i) :: Double) gen
   (return . toInteger . floor) i'
 
 -- | Choose an element from a list at random
-randElem :: [a] -> PadsGen a
+randElem :: [a] -> PadsGen st a
 randElem xs = do
-  (gen, st) <- get
+  (gen,_) <- get
   r <- liftIO $ fromIntegral <$> uniformR (0, length xs - 1) gen
   return $ xs !! r
 
 -- | A random letter from English upper and lowercase letters
-randLetter :: PadsGen Char
+randLetter :: PadsGen st Char
 randLetter = randElem letters
 
 -- | A random letter from English upper and lowercase letters, excluding the
 -- provided character
-randLetterExcluding :: Char -> PadsGen Char
+randLetterExcluding :: Char -> PadsGen st Char
 randLetterExcluding c = randElem (delete c letters)
 
 letters :: [Char]
@@ -88,7 +105,7 @@ listLengthLimit = 100
 
 -- | A list of random length, provided a PadsGen generator. Optionally also
 -- paramaterized by an Int, which if provided will be the length of the list
-randList :: PadsGen a -> Maybe Int -> PadsGen [a]
+randList :: PadsGen st a -> Maybe Int -> PadsGen st [a]
 randList padsGen intM = do
   i <- case intM of
     Just x  -> return x
@@ -115,7 +132,7 @@ untilM p f i z = do
 
 -- | A random instance of the provided PadsGen that satisfies the provided
 -- constraint
-randWithConstraint :: PadsGen a -> (a -> Bool) -> PadsGen a
+randWithConstraint :: PadsGen st a -> (a -> Bool) -> PadsGen st a
 randWithConstraint padsGen pred = do
   x <- padsGen
   x' <- untilM pred (const padsGen) recLimit x

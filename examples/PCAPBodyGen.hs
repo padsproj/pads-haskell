@@ -143,7 +143,7 @@ ref = unsafePerformIO $ do
   bs <- B.pack <$> minify <$> readFile "data/galois.html"
   newIORef (bs, B.length bs, 1460)
 
-ps_genM :: PadsGen [Packet]
+ps_genM :: PadsGen st [Packet]
 ps_genM = do
   (_, availLen, desiredLen) <- liftIO $ readIORef ref
   case availLen `mod` desiredLen of
@@ -152,7 +152,7 @@ ps_genM = do
 
 -- | As long as possible, limited by availLen from ref - doesn't update ref,
 -- that's tcpPayload_genM's job
-inclLen_genM :: PadsGen Bits32
+inclLen_genM :: PadsGen st Bits32
 inclLen_genM = do
   (_, availLen, desiredLen) <- liftIO $ readIORef ref
   return $ 54 + (fromIntegral $ min availLen desiredLen)
@@ -160,7 +160,7 @@ inclLen_genM = do
 -- | Grab however much data possible from the ref - put back in the ref the
 -- updated state after the grab. After the last bytes are taken, reset the ref
 -- to allow for repeated generation
-tcpPayload_genM :: PadsGen Bytes'
+tcpPayload_genM :: PadsGen st Bytes'
 tcpPayload_genM = do
   (bs, availLen, desiredLen) <- liftIO $ readIORef ref
   if availLen >= desiredLen
@@ -185,7 +185,7 @@ minify = unlines                  .
 -- been corrupted
 writePCAP :: IO PCAP
 writePCAP = do
-  pcap <- runPadsGen' pCAP_genM
+  pcap <- runPadsGen pCAP_genM
   B.writeFile "data/test.pcap" $ (fromChunks . fromCL . pCAP_serialize) pcap
   let bs = map (tcpPayload . ipv4Payload . ethPayload . body) ((ps . snd) pcap)
   B.writeFile "data/maybeGalois.html" (B.concat bs)

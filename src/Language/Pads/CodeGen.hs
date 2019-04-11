@@ -879,7 +879,7 @@ genGenRecord c fields pred = do
   let labels = map mkName $ Maybe.catMaybes $ [label | (label,(_,ty),_,_) <- fields, hasRep ty]
   let conLabs = applyE (ConE (mkConstrName c) : map VarE labels)
   let a = (varT . mkName) "a"
-  returnStmt <- [| (return :: $a -> PadsGen $a) ($(return conLabs)) |]
+  returnStmt <- [| (return :: $a -> PadsGen st $a) ($(return conLabs)) |]
   return $ DoE (concat doStmts ++ [NoBindS returnStmt])
 
 -- | Generate the generator for a field of a Pads record; each one becomes a
@@ -903,7 +903,7 @@ genGenConstr c args pred = do
   let constructor = (conE . mkName) c
   let toreturn = foldl1 appE (constructor : (map varE names))
   let a = (varT . mkName) "a"
-  ret <- noBindS [| (return :: $a -> PadsGen $a) $toreturn |]
+  ret <- noBindS [| (return :: $a -> PadsGen st $a) $toreturn |]
   return $ DoE (binds ++ [ret])
 
 -- * Generating Generator from Type Expression
@@ -959,7 +959,7 @@ genGenTransform src dest exp genM = case genM of
                        ++ "at this error by having an \"obtain\" declaration/expression "
                        ++ "in your description with no provided generator. If "
                        ++ "so, you can provide your own generation function f "
-                       ++ "by appending \" generator f\" to it.") :: PadsGen a |]
+                       ++ "by appending \" generator f\" to it.") :: PadsGen st a |]
 
 -- | Generate a list representing a Pads list type by generating a call to
 -- the runtime function 'randList'. We ignore the separator and LTerm

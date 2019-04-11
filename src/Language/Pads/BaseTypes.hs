@@ -62,7 +62,7 @@ m2pm :: (Maybe a, Maybe_md a_md) -> (PMaybe a, PMaybe_md a_md)
 m2pm (Just x, md) = (PJust x, md)
 m2pm (Nothing,md) = (PNothing,md)
 
-maybe_genM :: PadsGen a -> PadsGen (Maybe a)
+maybe_genM :: PadsGen st a -> PadsGen st (Maybe a)
 maybe_genM x = pMaybe_genM x >>= (\case PJust a  -> return $ Just a
                                         PNothing -> return $ Nothing)
 
