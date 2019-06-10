@@ -1,5 +1,5 @@
 name:                pads-haskell
-version:             0.0.0.2
+version:             0.1.0.0
 github:              "padsproj/pads-haskell"
 license:             MIT
 author:              "Kathleen Fisher and John Launchbury"
@@ -13,7 +13,7 @@ extra-source-files:
 - examples/AI.hs
 - examples/Binary.hs
 - extended/Extensible.hs
-- extended/ExtensibleEx.hs
+- extended/Main.hs
 - examples/data/README
 - examples/data/test_file
 - examples/data/ai.3000
@@ -41,15 +41,15 @@ description: Please see the README on Github at <https://github.com/padsproj/pad
 
 dependencies:
 - base >= 4.7 && < 5
-- bytestring >= 0.10 && < 0.11
-- byteorder >= 1.0.4 && < 1.1
-- containers >= 0.5.10 && < 0.6
-- ghc-prim
-- haskell-src-meta >= 0.8 && < 0.9 # Parsing Haskell code inside of a PADS description
-- HUnit >= 1.6 && < 1.7
-- mainland-pretty >= 0.6.1 && < 0.7
-- mtl >= 2.2.2 && < 3
-- mwc-random >= 0.13.6.0 && < 0.14
+- bytestring >= 0.10 && < 0.11 # lts-13.25 = 0.10.8.2
+- byteorder >= 1.0.4 && < 1.1 # lts-13.25 = 1.04
+- containers >= 0.5.10 && < 0.7 # lts-13.25 = 0.6.0.1
+- ghc-prim # lts-13.25 = 0.5.3
+- haskell-src-meta >= 0.8 && < 0.9 # lts-13.25 = 0.8.2 Parsing Haskell code inside of a PADS description
+- HUnit >= 1.6 && < 1.8 # lts-13.25 = 1.6.0.0
+- mainland-pretty >= 0.6.1 && < 0.8 # lts-13.25 = 0.7
+- mtl >= 2.2.2 && < 3 # lts-13.25 = 2.2.2
+- mwc-random >= 0.13.6.0 && < 0.15 # lts-13.25 = 0.14.0.0
   #- old-locale #
 - parsec >= 3.1.13 && < 3.2
 - random >= 1.1
@@ -101,7 +101,6 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - pads-haskell
-    - mwc-random >= 0.13.6.0 && < 0.14
     - test-framework >= 0.8.2
     - test-framework-hunit >= 0.3.0
     - test-framework-quickcheck2 >= 0.3.0
@@ -113,23 +112,21 @@ tests:
   # examples/Main.hs: (should your module be named something other than Main,
   # the -main-is flag will be necessary):
   gen:
-    main: examples/GenTesting.hs
+    main: examples/gen-testing/Main.hs
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    - -main-is GenTesting
     dependencies:
     - pads-haskell
   
   extended:
-    main: ExtensibleEx.hs
+    main: Main.hs
     source-dirs: extended
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    - -main-is ExtensibleEx
     dependencies:
     - pads-haskell
 

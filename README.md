@@ -13,7 +13,7 @@ For more information about the project, see the pads website
 
 # Building
 
-`pads-haskell` currently requires GHC 8.2.2 and stack resolver lts-11.3.
+`pads-haskell` currently requires GHC 8.6.5 and stack resolver lts-13.25.
 
 ## Setup
 

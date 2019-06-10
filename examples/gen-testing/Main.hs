@@ -11,7 +11,7 @@
            , TypeSynonymInstances
            , UndecidableInstances #-}
 
-module GenTesting where
+module Main where
 
 import           Data.Bits
 import qualified Data.ByteString as B

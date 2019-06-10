@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts, TypeFamilies, TypeSynonymInstances, TemplateHaskell, QuasiQuotes,
              MultiParamTypeClasses, FlexibleInstances, UndecidableInstances,
              DeriveDataTypeable, ScopedTypeVariables #-}
-module ExtensibleEx where
+module Main where
 import Language.Pads.Padsc
 import Language.Haskell.TH
 

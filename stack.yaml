@@ -3,10 +3,11 @@ extra-package-dbs: []
 packages:
 - '.'
 extra-deps:
-- containers-0.5.11.0
-- mainland-pretty-0.6.2
-- mwc-random-0.13.6.0
+#- containers-0.5.11.0
+#- mainland-pretty-0.6.2
+#- mwc-random-0.13.6.0
+
 #resolver: lts-11.3
 #resolver: nightly-2019-04-08
-resolver: lts-13.16
+resolver: lts-13.25
 
